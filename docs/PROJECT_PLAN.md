@@ -17,6 +17,7 @@ This plan sets out the build order and the changes recommended to the spec. It a
 6. **Fix the screen reader assumption.** Guidepup drives real **NVDA (Windows) and VoiceOver (macOS)** only; it does not support Orca, and none of these run in a headless Linux worker. Use `@guidepup/virtual-screen-reader` server-side and offer real-screen-reader runs later on dedicated Windows and macOS hosts.
 7. **Never claim compliance from automation alone.** Automated engines cover only part of WCAG. VPATs we generate are *drafts*: criteria that automation cannot test default to "Not Evaluated", and a human signs off before export. The FTC's 2025 $1M order against accessiBe over AI "compliance" claims is the precedent to avoid.
 8. **Design for scanning untrusted content.** Arbitrary URLs bring SSRF risk, uploaded files can be zip bombs or malicious PDFs, and APKs can be malware. Workers run sandboxed with network egress controls. See [section 3.6](#36-security-of-scanning-untrusted-content).
+9. **Use configuration, not code, for anything commercial or AI-related.** AI providers and models, task routing, plans, quotas, trials, coupons, payment and email providers, scan engines, compliance mappings and feature flags are all managed from the Super Admin panel. Every setting is typed, scoped (global → plan → organization), versioned, audited and can be rolled back, and changes apply without a redeploy. See [section 3.11](#311-admin-configurable-platform).
 
 ---
 
@@ -187,7 +188,7 @@ We run as a hosted service, so GPL components are fine when used server-side and
 
 ### 3.7 AI gateway
 
-- One internal `LLMGateway` interface with provider adapters (start with the providers in the spec; keep it provider-agnostic). Per-task model routing, per-tenant budgets, retries and fallback, and a response cache keyed by template fingerprint.
+- One internal `LLMGateway` interface with provider adapters. Providers, models and per-task routing are **admin-configured data, not code** (see [3.11.2](#3112-ai-provider-and-model-management)). The gateway also handles per-tenant budgets, retries and fallback, and a response cache keyed by template fingerprint.
 - **Customer data to third-party LLMs:** use zero-data-retention or enterprise agreements, let tenants opt out (falling back to deterministic-only output), and support regional endpoints for public-sector customers.
 - **Human in the loop by default:** AI code fixes are suggestions with a diff and are never applied automatically. AI alt text and AD scripts need approval before they go into a delivered file.
 - **Evaluation harness:** a golden set of issues with expected fixes and alt text, scored in CI whenever prompts or models change.
@@ -217,7 +218,89 @@ Different workers need very different runtimes, so build **separate images and C
 
 Celery on Redis: use `acks_late`, idempotent task IDs, and set `visibility_timeout` above the longest job (video), or move long media jobs to RabbitMQ.
 
-### 3.10 Proposed repository layout
+### 3.11 Admin-configurable platform
+
+**Principle:** if a business, commercial or AI decision might change after launch, it is a setting managed in `/admin`, not a constant in code or an environment variable. New features add their settings to the same framework, so the admin panel grows with the product without one-off screens.
+
+#### 3.11.1 Settings framework (built in Phase 0)
+
+| Concern | Design |
+|---|---|
+| **Typed registry** | Every setting is declared once in code: `key`, type (Pydantic model), default, validation, allowed scopes, sensitivity, owner role. The admin UI **generates its forms from this registry**, so a new setting appears without UI work, and the generated forms follow our accessible form patterns (section 2.4). |
+| **Scope hierarchy** | `global → plan → organization` (→ user where relevant). The UI shows the **effective value and where it came from** (for example "Inherited from GROWTH plan"). |
+| **Secrets** | API keys and credentials are stored with envelope encryption (KMS / Key Vault), or as a reference to a secrets manager. They are **write-only** in the UI (shown as `••••abcd`), have rotation dates, and are never returned by the API or logged. |
+| **Versioning and audit** | Every change is a new version with who, when, why (required comment) and a diff. One-click rollback to any earlier version. |
+| **Safe rollout** | Draft → validate → publish. "Test connection" for providers. AI routing and prompt changes must pass the evaluation harness before activation. Optional staged rollout by percentage of tenants. |
+| **Live reload** | Effective config is cached in Redis and invalidated through pub/sub. API and workers pick up changes within seconds without a redeploy. Each job records the config version it ran with, for reproducibility. |
+| **Guardrails** | Validation stops unsafe states: the last enabled model for a task cannot be disabled, budgets cannot be negative, a quota cannot drop below current usage without confirmation, and white-label colours are contrast-checked. |
+| **Granular admin roles** | Super Admin access is split into `PLATFORM_OWNER`, `BILLING_ADMIN`, `AI_OPS`, `COMPLIANCE_SME`, `SUPPORT` (read-only). High-risk changes (pricing, rule mappings, provider credentials) can require **two-person approval**. |
+| **Not admin-configurable** | Database URLs, master encryption keys, RLS policies and network/sandbox settings stay in environment variables and infrastructure-as-code. The admin panel must never be able to weaken tenant isolation or security. |
+
+#### 3.11.2 AI provider and model management
+
+The provider list is open-ended. Adding a provider means adding a row in the admin panel, and, for a brand-new API style, one adapter class.
+
+| Provider type | Examples | Notes |
+|---|---|---|
+| `openai` | OpenAI | |
+| `azure_openai` | Azure OpenAI | Deployment name + API version + region |
+| `anthropic` | Claude (Anthropic API) | |
+| `bedrock` | AWS Bedrock (Claude, Llama, Mistral, etc.) | IAM role or keys + region |
+| `vertex` / `gemini` | Google Gemini | |
+| `deepseek` | DeepSeek API | Hosted API processes data in China. Flag it so government or regulated tenants can exclude it; open weights can be self-hosted instead |
+| `mistral`, `groq`, etc. | Other hosted APIs | |
+| `openai_compatible` | vLLM, Ollama, OpenRouter, self-hosted open-weight models | Any endpoint that speaks the OpenAI API; good for on-premises or data-residency deals |
+
+Recommended implementation: our own `LLMGateway` interface over **LiteLLM** (MIT, 100+ providers), with the dependency pinned and hash-locked, or thin native adapters where we need provider-specific features. The rest of the codebase never imports a provider SDK directly.
+
+**Data model**
+
+```text
+AIProvider      id, type, display_name, base_url, region, credential_ref (secret),
+                data_policy {zero_retention, processing_regions[], gov_approved},
+                is_enabled, health_status, last_checked_at
+AIModel         id, provider_id, model_name, capabilities {text, vision, json, tools},
+                context_window, input_cost_per_1m, output_cost_per_1m, is_enabled
+AITask          key: code_fix | vision_audit | alt_text | mathml | ad_script |
+                     vpat_narrative | focus_anomaly | doc_layout | ...
+AITaskRoute     task_key, scope (global|plan|org), scope_id,
+                primary_model_id, fallback_model_ids[], params {temperature, max_tokens, timeout},
+                prompt_template_version_id, is_active
+PromptTemplate  task_key, version, body, eval_score, status (draft|active|retired)
+OrgAICredential org_id, provider_id, credential_ref   -- Enterprise "bring your own key"
+AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency, status
+```
+
+**Admin screens (`/admin/ai`)**
+- **Providers:** add or edit, enter credentials once (write-only), "Test connection", enable/disable switch, health status.
+- **Models:** catalogue per provider with capabilities and prices (prices drive FinOps cost reports).
+- **Task routing:** for each AI task, pick a primary model and an ordered fallback chain. The router only offers models with the required capability (for example vision for `vision_audit`). Overrides are possible per plan or per organization.
+- **Prompts:** versioned templates per task, with evaluation score shown; activation is blocked if the score falls below the threshold.
+- **Budgets and limits:** token and cost caps per tenant and per plan, rate limits per provider, alert thresholds.
+- **Data policy:** organizations can restrict processing regions or require zero-retention providers. The router then automatically leaves out providers that don't qualify, and if none qualify, the AI step is skipped and the run falls back to deterministic-only output, never silently ignoring the restriction.
+- **FinOps:** cost per tenant, task, model and provider; error and fallback rates; latency.
+
+#### 3.11.3 Other configurable areas
+
+| Area | What admins control | Phase |
+|---|---|---|
+| **Plans and entitlements** | Plans, prices (INR + other currencies), billing cycles. Quotas and features go in an `PlanEntitlement(plan_id, feature_key, limit)` table instead of fixed `quota_*` columns, so new quotas or features need no schema migration | 1 |
+| **Trials** | Length, trial plan, grace period, behaviour after expiry, reminder schedule | 1 |
+| **Coupons** | Type, value, validity, max redemptions, plan applicability, stacking rules, first-purchase-only | 1 |
+| **Compliance registry** | Standards, rule ↔ clause mappings, versions; SME review workflow before publish | 1 |
+| **Scan engines** | Enable/disable each engine, pinned version, crawl page limits, timeouts and concurrency per plan | 1 |
+| **Email** | Provider (SMTP / SES / other), sender identity, templates (checked for accessibility on save) | 1 |
+| **Feature flags** | Global, per plan, per tenant, percentage rollout, kill switches | 1 |
+| **Payment gateways** | Provider registry using the same pattern as AI providers, tax (GST rate, GSTIN, invoice series) | 2 |
+| **Auth and security policy** | SSO providers per tenant, MFA enforcement, session length, password policy, IP allow-lists | 2 |
+| **White-label defaults** | Allowed customisations per plan, report branding | 2 |
+| **Data retention** | Retention period per plan and asset type, deletion schedules | 2 |
+| **HITL** | SME teams, skills, routing rules, SLAs, escalation | 3 |
+| **Media** | STT models, supported languages, TTS engines and voices, AD style guide | 4 |
+| **Mobile** | Device and emulator profiles, Android API levels | 5 |
+| **Legal content** | Terms, privacy policy, Accessibility Statement, versions shown to users | 1 |
+
+### 3.12 Proposed repository layout
 
 ```text
 apps/
@@ -248,12 +331,14 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 ### Phase 0: Foundations
 
 **Scope**
-- Monorepo layout (3.10), `docker-compose.yml` (Postgres 16, Redis, MinIO, API, workers, web), `.env.example`, Makefile.
+- Monorepo layout (3.12), `docker-compose.yml` (Postgres 16, Redis, MinIO, API, workers, web), `.env.example`, Makefile.
 - CI pipeline: lint, type checks, unit tests, Alembic migration check, **all PR accessibility gates**, container builds, secret scanning.
 - `packages/ui`: design tokens (contrast-validated), React Aria base components (Button, Link, TextField, Select, Dialog, Table, Tabs, Toast, Meter, ProgressBar), Storybook with the a11y addon.
 - App shell: landmarks, skip link, route announcer, focus management, consistent help entry, error pages.
 - Accessible auth: signup, login, email verification, password reset, invite acceptance (SC 3.3.8). Short-lived JWT access tokens plus refresh tokens in `httpOnly` cookies.
 - Postgres RLS framework plus the isolation test suite.
+- **Settings framework (3.11.1):** typed registry, scope resolution, encrypted write-only secrets, versioning + audit + rollback, Redis cache with live invalidation, schema-generated admin forms.
+- `LLMGateway` interface with provider adapters and a fake provider for tests.
 - ADRs for: component library, cloud target, LLM providers, broker.
 
 **Exit criteria**
@@ -272,7 +357,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - **Dashboards (first version):**
   - `/workspace`: New Scan dialog (URL + standards), live progress, findings list with filters, web Fix Workbench (issue list ↔ screenshot ↔ code fix), report export.
   - `/org`: team and invites with live "X of Y seats used", quota meters, plan details, coupon entry, branding (logo only).
-  - `/admin`: tenant directory, plan and coupon CRUD, manual plan assignment, trial funnel counts.
+  - `/admin`: tenant directory, manual plan assignment, trial funnel counts, plus the configuration screens: **plans and entitlements, trials, coupons, AI providers / models / task routing / budgets, scan engines, compliance registry, email, feature flags, legal content** (3.11), with audit history and rollback.
+- **AI providers at launch:** at least two live adapters behind the gateway, so fallback works from day one. All provider types in 3.11.2 can be added as rows without code changes.
 - **Security:** SSRF protections, domain verification, rate limits.
 - **Platform accessibility:** Accessibility Statement published; first human audit of our own UI.
 
@@ -281,6 +367,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Quota and coupon concurrency tests pass (no overspend under parallel requests).
 - Every exported PDF passes veraPDF; DOCX golden tests pass.
 - Our own ACR drafted from a human audit; zero open Critical/Serious accessibility issues in our UI.
+- Switching the code-fix task to a different provider in `/admin` takes effect on the next job with no redeploy, and an outage of one provider falls back automatically.
 - 3–5 design partners actively scanning.
 
 ### Phase 2: Deep web audit and monetisation
@@ -293,6 +380,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Scheduled monitoring, scan-to-scan regression diff, email digests (accessible HTML emails).
 - Payment gateway: subscriptions, GST invoices, webhooks, `PAST_DUE` handling, self-serve upgrade checkout (SC 3.3.7-compliant).
 - Super Admin: MRR/ARR, trial conversion, AI FinOps (token cost per tenant), budget caps.
+- Configuration, round 2: payment gateway registry, tax settings, bring-your-own AI key for Enterprise, per-org data policy (regions, zero retention), prompt versioning with evaluation-gated activation, staged rollouts, two-person approval for high-risk changes.
 - White-label: contrast-validated brand colours, custom report branding.
 - Enterprise SSO (SAML/OIDC); optional here, required before large enterprise deals.
 
@@ -345,7 +433,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | 1 | UI primitive library | React Aria Components only (no Radix mixing) |
 | 2 | Production cloud | Pick **one** for v1 (S3 or Azure Blob); keep the storage abstraction for later |
 | 3 | Payment gateway and timing | Manual invoicing in Phase 1; gateway with INR + GST subscriptions in Phase 2 |
-| 4 | LLM providers and data policy | Provider-agnostic gateway; zero-retention agreements; per-tenant opt-out |
+| 4 | LLM providers and data policy | Admin-configurable providers (3.11.2). Pick 2 for launch; zero-retention agreements; per-tenant region and provider restrictions |
 | 5 | Real screen reader capture | Virtual screen reader in Phase 2; real NVDA/VoiceOver hosts as a premium backlog item |
 | 6 | Celery broker | Redis to start (tuned `visibility_timeout`); revisit RabbitMQ when media jobs land |
 | 7 | Rule-mapping and VPAT sign-off | Named accessibility SME (IAAP CPACC/WAS) owns mappings and VPAT approvals |
@@ -360,4 +448,5 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | Scope too broad, delaying revenue | Phase 1 kept to the web audit MVP; later phases driven by design-partner demand |
 | LLM cost grows with crawl size | Template clustering, response cache, per-tenant budgets, deterministic checks before AI |
 | Hostile inputs (SSRF, malicious files, APKs) | Sandboxed workers, egress controls, domain verification, malware scanning |
+| Admin misconfiguration breaks production (bad key, wrong price, disabled model) | Typed validation, test connection, draft/publish, evaluation gates, two-person approval, versioned rollback, audit log |
 | Engine and rule drift over time | Pinned engine versions per scan, versioned rule registry, benchmark suite in CI |
