@@ -53,3 +53,10 @@
   BYOK calls are metered with `byok=true` and never count against platform budgets.
 - Keys are write-only and encrypted like every secret; the DeepSeek preset marks data as processed in China (`cn`) so
   regulated tenants can exclude it.
+
+## Update (2026-11-28): Anthropic
+`type: anthropic` is served by its own adapter (`a11y_core.ai.anthropic`) for the Messages API: system text goes in the
+`system` field, JSON mode is requested in the system text, only text blocks are returned, and overload (529/5xx) is a
+provider error so the gateway falls back. Same safety rules as the OpenAI-format adapter (no redirects, no bodies or keys
+in errors). It is a platform-admin provider, not an Enterprise own-key type (the own-key guard still allows only OpenAI,
+Azure OpenAI and DeepSeek). Admin quick-add has an Anthropic preset (default model `claude-haiku-5-5`). Bedrock is not built.
