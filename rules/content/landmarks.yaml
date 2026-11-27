@@ -1,0 +1,16 @@
+id: landmarks
+status: draft
+summary: Use landmarks (header, nav, main, footer) so people can jump to the main areas.
+why: Screen reader users jump between landmarks; content outside them is easy to miss.
+who:
+- Screen reader users
+- Keyboard users
+steps:
+- Wrap the page's main content in one <main>.
+- Put navigation in <nav> and the page header and footer in <header> and <footer>.
+examples:
+- stack: html
+  before: <body><div class="content"><p>Text</p></div></body>
+  after: <body><main><p>Text</p></main></body>
+links: []
+test: List landmarks with a screen reader.

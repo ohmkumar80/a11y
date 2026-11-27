@@ -1,0 +1,16 @@
+id: empty-heading
+status: draft
+summary: Headings must have text.
+why: Screen reader users move through a page by headings; an empty one is a dead end.
+who:
+- Screen reader users
+steps:
+- Remove the empty heading, or put the heading text inside it.
+examples:
+- stack: html
+  before: <h2></h2>
+  after: <h2>Contact us</h2>
+links:
+- title: 2.4.6 Headings and Labels
+  url: https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html
+test: List headings with a screen reader.

@@ -1,0 +1,17 @@
+id: valid-lang
+status: draft
+summary: When part of a page is in another language, mark it with a valid lang attribute.
+why: A screen reader switches pronunciation for a marked passage. A wrong code is ignored.
+who:
+- Screen reader users
+steps:
+- Use a valid language code such as fr, ta or hi.
+- Put lang on the smallest element that contains the foreign text.
+examples:
+- stack: html
+  before: <p lang="zz-invalid">Bonjour</p>
+  after: <p lang="fr">Bonjour</p>
+links:
+- title: 3.1.2 Language of Parts
+  url: https://www.w3.org/WAI/WCAG22/Understanding/language-of-parts.html
+test: Compare the code with the list of language subtags.

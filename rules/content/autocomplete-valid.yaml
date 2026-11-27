@@ -1,0 +1,18 @@
+id: autocomplete-valid
+status: draft
+summary: Fields that collect personal details should say what they are, using valid autocomplete values.
+why: Browsers and password managers can fill the field correctly, which helps people with motor or memory difficulties.
+who:
+- People with motor or cognitive disabilities
+- People using password managers
+steps:
+- Use the standard tokens, such as email, tel, given-name, family-name, postal-code.
+- Remove tokens that are not in the HTML list.
+examples:
+- stack: html
+  before: <input type="text" autocomplete="foo">
+  after: <input type="text" autocomplete="email">
+links:
+- title: 1.3.5 Identify Input Purpose
+  url: https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose.html
+test: Check the value against the HTML autocomplete token list.

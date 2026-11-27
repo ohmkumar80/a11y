@@ -21,6 +21,7 @@ from .routers import (
     org,
     org_ai,
     reports,
+    rule_guidance,
     scans,
     standards,
 )
@@ -91,6 +92,7 @@ app.include_router(admin_billing.router)
 app.include_router(admin_ai.router)
 app.include_router(org_ai.router)
 app.include_router(standards.router)
+app.include_router(rule_guidance.router)
 app.include_router(scans.router)
 app.include_router(domains.router)
 app.include_router(reports.router)

@@ -1,0 +1,19 @@
+id: meta-refresh
+status: draft
+summary: Pages must not refresh or redirect automatically after a delay.
+why: People who read slowly, or use a screen reader, can lose their place or be pulled away before they finish.
+who:
+- Screen reader users
+- People who read slowly
+- People with cognitive disabilities
+steps:
+- Remove the meta refresh.
+- Use a server-side redirect, or a link the person chooses to follow.
+examples:
+- stack: html
+  before: <meta http-equiv="refresh" content="60;url=/other">
+  after: <!-- no timed refresh -->
+links:
+- title: 2.2.1 Timing Adjustable
+  url: https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html
+test: Look for <meta http-equiv="refresh"> in the page head.

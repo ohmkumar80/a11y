@@ -1,0 +1,22 @@
+id: error-message
+status: draft
+summary: Tell people when a field has an error, and say in text what is wrong.
+why: People who cannot see colour changes, or who use screen readers, need the error in words.
+who:
+- Screen reader users
+- People with colour-vision deficiency
+steps:
+- Show the error as text next to the field.
+- Link it with aria-describedby and set aria-invalid="true".
+- Say how to fix it.
+examples:
+- stack: html
+  before: <input id="e" type="email" style="border-color:red">
+  after: <input id="e" type="email" aria-invalid="true" aria-describedby="e-err"><p id="e-err">Enter an email address like
+    name@example.com.</p>
+links:
+- title: 3.3.1 Error Identification
+  url: https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html
+test: Submit the form with a mistake using a screen reader.
+machine_check: false
+manual_reason: Whether an error is explained in text needs a person.

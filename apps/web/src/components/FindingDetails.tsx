@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Dialog, DialogTrigger } from "@a11y/ui";
+import { RuleGuidance } from "@/components/RuleGuidance";
 import { CONFIDENCE_LABEL, KIND_LABEL, SEVERITY_LABEL, type Finding } from "@/lib/scans";
 
 export function FindingDetails({ f }: { f: Finding }) {
@@ -19,6 +20,7 @@ export function FindingDetails({ f }: { f: Finding }) {
         <p className="font-semibold">HTML of the element</p>
         <pre className="overflow-x-auto rounded border border-border p-2"><code>{f.element.html}</code></pre>
         {f.help_url && <p><a href={f.help_url} className="underline" target="_blank" rel="noreferrer">Read more about this rule<span className="a11y-sr-only"> (opens in a new tab)</span></a></p>}
+        <RuleGuidance rule={f.rule} />
       </Dialog>
     </DialogTrigger>
   );

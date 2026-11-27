@@ -1,0 +1,17 @@
+id: aria-roles
+status: draft
+summary: The role attribute must contain a valid ARIA role.
+why: An unknown role is ignored, so the element loses its meaning.
+who:
+- Screen reader users
+steps:
+- Replace the role with a valid one, or remove it.
+- Prefer the native element that already has that role.
+examples:
+- stack: html
+  before: <div role="bogus">Text</div>
+  after: <div>Text</div>
+links:
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+test: Compare the role with the ARIA role list.

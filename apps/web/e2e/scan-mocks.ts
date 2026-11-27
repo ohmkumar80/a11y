@@ -24,6 +24,14 @@ const detail = (status: string, pages = 1) => ({
     disclaimer: "Automated tests cover only part of WCAG. This is not a statement of conformance." },
 });
 
+export const GUIDANCE = {
+  rule: "image-alt", review_status: "draft", summary: "Every image that carries information needs a short text description.",
+  why: "A screen reader reads the alt text aloud in place of the image.", who: ["Blind and low-vision people using screen readers"],
+  steps: ["Decide whether the image carries information.", "Write what it conveys in a short phrase."],
+  examples: [{ stack: "html", before: '<img src="a.png">', after: '<img src="a.png" alt="Sales chart">' }, { stack: "react", before: "<img src={a} />", after: '<img src={a} alt="Sales chart" />' }],
+  links: [{ title: "1.1.1 Non-text Content", url: "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html" }],
+  how_to_check: "Move to the image with a screen reader.", machine_checked: true,
+};
 export const SCANS = [
   { ...detail("SUCCEEDED"), pages: undefined },
   { ...detail("RUNNING", 0), id: "22222222-aaaa-4bbb-8ccc-222222222222", url: "https://shop.example.com/", pages: undefined },
@@ -31,6 +39,10 @@ export const SCANS = [
 
 /** Mocks the scan, standards and domain endpoints. `state` lets a test pick what a scan looks like. */
 export async function mockScanApi(page: Page, state: { status?: string } = {}) {
+  await page.route("**/api/rules/*/guidance", (r) => {
+    if (r.request().url().includes("/image-alt/")) return r.fulfill({ json: GUIDANCE });
+    return r.fulfill({ status: 404, json: { detail: "No guidance for this rule yet." } });
+  });
   await page.route("**/api/standards", (r) => r.fulfill({ json: { review: { status: "draft" }, standards } }));
   await page.route("**/api/domains", (r) => r.fulfill({ json: [{ id: "d1", host: "example.com", verified: false, method: null, instructions: { file: { url: "https://example.com/.well-known/a11y-verification.txt", content: "a11y-token" }, meta: { tag: '<meta name="a11y-verification" content="a11y-token">' } } }] }));
   await page.route("**/api/scans?*", (r) => r.fulfill({ json: { total: 2, scans: SCANS } }));

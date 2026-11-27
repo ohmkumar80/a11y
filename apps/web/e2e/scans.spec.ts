@@ -44,6 +44,10 @@ for (const scheme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog", { name: "Images need a text alternative" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('<img src="logo.png">')).toBeVisible();
+    await expect(dialog.getByRole("heading", { level: 3, name: "How to fix this" })).toBeVisible();
+    await expect(dialog.getByText("awaiting expert review")).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Example in React (JSX)" })).toBeVisible();
+    await expect(dialog.getByRole("link", { name: /1\.1\.1 Non-text Content/ })).toHaveAttribute("href", /w3\.org/);
     await audit(page, "details dialog");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();

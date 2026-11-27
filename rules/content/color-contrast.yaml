@@ -1,0 +1,22 @@
+id: color-contrast
+status: draft
+summary: 'Text must contrast enough with its background: at least 4.5 to 1 for normal text and 3 to 1 for large text.'
+why: Low-contrast text is hard or impossible to read for people with low vision or colour-vision differences, and for anyone
+  in bright light.
+who:
+- People with low vision
+- People with colour-vision deficiency
+- Older people
+- Anyone in bright sunlight
+steps:
+- Darken the text colour, or lighten the background, until the ratio passes.
+- Check hover, focus and disabled states too.
+- Do not rely on a lighter weight to fix contrast.
+examples:
+- stack: html
+  before: <p style="color:#bbbbbb;background:#ffffff">Hard to read</p>
+  after: <p style="color:#595959;background:#ffffff">Easier to read</p>
+links:
+- title: 1.4.3 Contrast (Minimum)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html
+test: Use a contrast checker on the text and background colours.

@@ -99,6 +99,57 @@ class CanonicalRule(BaseModel):
         return {e for e in ("axe", "ibm", "htmlcs") if getattr(self, e)}
 
 
+class ContentLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    url: str
+
+    @model_validator(mode="after")
+    def _https(self):
+        if not self.url.startswith("https://"):
+            raise ValueError(f"link {self.url!r} must be https")
+        return self
+
+
+class ContentExample(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    stack: Literal["html", "react"]
+    before: str
+    after: str
+
+
+class RuleContent(BaseModel):
+    """Plain-language guidance for one canonical rule (PROJECT_PLAN 3.13). ``draft`` until an
+    accessibility SME reviews it, like the standards mappings; the UI says so."""
+
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    status: Literal["draft", "reviewed"] = "draft"
+    summary: str = Field(min_length=10)
+    why: str = Field(min_length=10)
+    who: list[str] = Field(min_length=1)
+    steps: list[str] = Field(min_length=1)
+    examples: list[ContentExample] = Field(min_length=1)
+    links: list[ContentLink] = []
+    test: str = ""
+    # False when no engine can tell a bad example from a good one: a person must check the fix.
+    machine_check: bool = True
+    manual_reason: str = ""
+
+    def html_example(self) -> ContentExample:
+        return next(e for e in self.examples if e.stack == "html")
+
+    @model_validator(mode="after")
+    def _needs_html_example(self):
+        if not self.machine_check and not self.manual_reason:
+            raise ValueError(f"{self.id}: say why it cannot be machine-checked")
+        if not any(e.stack == "html" for e in self.examples):
+            raise ValueError(
+                f"{self.id}: needs an html example (it is what the re-scan oracle checks)"
+            )
+        return self
+
+
 @dataclass(frozen=True)
 class Summary:
     """Per-standard result. Deliberately NOT a pass/fail or a percentage 'score': automated tools
@@ -134,6 +185,14 @@ class Registry:
             if cr.id in self.canonical:
                 raise ValueError(f"duplicate canonical rule {cr.id}")
             self.canonical[cr.id] = cr
+        self.content: dict[str, RuleContent] = {}
+        for f in sorted((root / "content").glob("*.yaml")):
+            rc = RuleContent(**yaml.safe_load(f.read_text()))
+            if rc.id != f.stem:
+                raise ValueError(f"content file {f.name} declares id {rc.id!r}")
+            if rc.id in self.content:
+                raise ValueError(f"duplicate content for {rc.id}")
+            self.content[rc.id] = rc
         self.engine_versions: dict[str, str] = cat["engine_versions"]
         self.automated_sc: set[str] = set(cat["automated_sc_coverage"])
         self._catalog = cat
@@ -152,6 +211,9 @@ class Registry:
                 s.base not in self.standards or self.standards[s.base].kind != "wcag"
             ):
                 raise ValueError(f"{s.id}: base {s.base!r} must be a wcag standard")
+        for cid in self.content:
+            if cid not in self.canonical:
+                raise ValueError(f"content for unknown canonical rule {cid}")
         for cr in self.canonical.values():
             for sc in cr.sc:
                 if sc not in self.criteria:

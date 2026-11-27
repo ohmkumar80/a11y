@@ -1,0 +1,16 @@
+id: viewport-zoom
+status: draft
+summary: People must be able to zoom the page.
+why: Disabling zoom stops people with low vision from enlarging text.
+who:
+- People with low vision
+steps:
+- Remove user-scalable=no and any maximum-scale below 5 from the viewport meta tag.
+examples:
+- stack: html
+  before: <meta name="viewport" content="width=device-width, user-scalable=no">
+  after: <meta name="viewport" content="width=device-width, initial-scale=1">
+links:
+- title: 1.4.4 Resize Text
+  url: https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html
+test: Try pinch-zooming on a phone.
