@@ -1,6 +1,6 @@
 # Project Plan: Omni-Channel AI Accessibility Platform
 
-**Status:** Draft v3 · 2026-11-27. v2 added model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent and Razorpay billing (3.13 to 3.16). v3 adds the Phase 1 staging (1a and 1b) around work already built, the public API and enterprise integrations (3.17), and positioning, unit economics and trust (3.18).
+**Status:** Draft v4 · 2026-11-27. v2 added model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent and Razorpay billing (3.13 to 3.16). v3 added the Phase 1 staging (1a and 1b) around work already built, the public API and enterprise integrations (3.17), and positioning, unit economics and trust (3.18). v4 adds subscription, discount and coupon management (3.19), the accessibility knowledge base with AI-assisted article authoring (3.20), and refunds and support tickets in the admin area (3.21). All v4 additions are additive and do not change Phase 1 work in progress.
 **Inputs:** [MASTER_BUILD_PROMPT.md](MASTER_BUILD_PROMPT.md) (product spec) · [ARCHITECTURE.md](ARCHITECTURE.md) (blueprint)
 
 This plan sets out the build order and the changes recommended to the spec. It also commits us to making our own product accessible: an accessibility vendor whose app fails WCAG will not win enterprise or government deals.
@@ -25,6 +25,9 @@ This plan sets out the build order and the changes recommended to the spec. It a
 14. **Stage Phase 1 instead of rebuilding it.** What is already built stays as it is. The remaining Phase 1 work is split into 1a (sellable to design partners) and 1b (breadth and hardening), with an item-by-item status table. Admin MFA moves into 1a, because the admin panel already controls keys, prices and billing. See [Phase 1](#phase-1-mvp-sellable-web-accessibility-audits).
 15. **Make the product integrable with a versioned public API and Swagger/OpenAPI docs.** A `/v1` API with API keys, scopes, webhooks, rate limits, generated SDKs and a CLI, added next to the existing internal routes, which are not renamed. See [section 3.17](#317-public-api-and-enterprise-integrations).
 16. **Settle the market wedge and the unit economics before scaling the build.** Web scanning is a commodity. The plan needs a defined wedge, a cost-per-unit model that sets plan quotas, and the legal, security and ownership items that enterprise buyers ask for. See [section 3.18](#318-positioning-unit-economics-and-trust).
+17. **Manage plans, discounts and coupons as versioned data, with one pricing function.** Plan versions with grandfathering, per-customer overrides, add-ons, automatic promotions and coupon campaigns, all feeding a single `price_quote` function that checkout, Payment Links, invoices and the pricing page share. See [section 3.19](#319-subscription-pricing-and-promotions-management).
+18. **Publish accessibility articles, drafted by AI and published by people.** A knowledge base at `/learn`, with a Content Agent that plans, drafts, validates (our own scanner checks every code sample) and refreshes articles, and never publishes without a named human reviewer. See [section 3.20](#320-accessibility-knowledge-base-article-management-and-ai-authoring).
+19. **Keep refunds and support in the admin area, small and auditable.** A policy-driven refund workflow with approvals and credit notes, and a lightweight built-in ticket system with SLA timers, both on the existing template, notification and audit systems. See [section 3.21](#321-refunds-and-support-tickets-admin-area).
 
 ---
 
@@ -227,6 +230,7 @@ Different workers need very different runtimes, so build **separate images and C
 | `billing` | Lightweight Python | Razorpay webhooks, reconciliation, invoice generation (3.16) |
 | `ops` | Lightweight Python | Ops Agent and runbook executor, with its own least-privilege credentials (3.15) |
 | `integrations` | Lightweight Python | Outbound webhooks and Jira, GitHub and Slack sync, aware of each provider's rate limits (3.17) |
+| `content` | Lightweight Python | Content Agent: article planning, drafting, validation, refresh and link checks. Its code-sample check calls the scanner through the `web` queue (3.20) |
 
 Celery on Redis: use `acks_late`, idempotent task IDs, and set `visibility_timeout` above the longest job (video), or move long media jobs to RabbitMQ.
 
@@ -316,6 +320,9 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **AI tiers and validation** | Tier per model, tier ladder per task, validation mode and sample rate, escalation limits (3.13) | 1 |
 | **Ops Agent** | Autonomy level per action, runbooks, canaries, escalation contacts, token budgets (3.15) | 2 |
 | **Public API and integrations** | API access and rate limits per plan, key lifetime, webhook limits, docs visibility, enabled integrations and their OAuth app credentials (3.17) | 1 |
+| **Plan versions, promotions and coupon rules** | Plan versions and grandfathering, entitlement overrides, add-ons and top-ups, automatic promotions, coupon eligibility, stacking and caps, campaigns, pricing-page content (3.19) | 1a (quote), 1b, 2 |
+| **Knowledge base and Content Agent** | Content types and templates, source pack, style guide and banned phrases, task routes, review periods, weekly cap, autonomy per type (3.20) | 2 |
+| **Refunds and support** | Refund policy and thresholds, ticket categories, priorities, SLA targets, canned replies, retention, AI help on or off (3.21) | 5 (basic refund in 2) |
 
 ### 3.12 Proposed repository layout
 
@@ -689,6 +696,150 @@ Autonomy levels, set per action and per environment: **Observe → Suggest → A
 | Chartered accountant | GST rate, SAC code, e-invoicing, invoice retention | Before the first invoice |
 | Privacy contact | DPA, data requests, retention | Before the first customer |
 | Ops owner and on-call | Approvals for Ops Agent actions, incident response | 1b |
+| Content owner and editor | Editorial calendar, style guide, final approval of every published article (3.20). The accessibility lead is the reviewer for law and compliance articles | 2 |
+| Pricing owner | Plan prices, discount policy, grandfathering decisions (3.19) | Before the first paid customer |
+
+### 3.19 Subscription, pricing and promotions management
+
+**What exists.** The SaaS core already has `Plan`, `PlanEntitlement` (a row per feature, so new quotas need no migration), `PlanPrice` (per plan, currency and cycle, in minor units), `Coupon` with a concurrency-safe redemption counter, `CouponRedemption`, trials, seat limits, and admin screens for plans and coupons. Nothing below replaces them. Every item is additive: new tables and new columns with defaults, so Phase 1 work in progress is not disturbed.
+
+**What is missing.** Plans are edited in place, so a price or quota change would silently change every subscriber. A coupon is global and has one shape. There is no single function that turns "organisation, plan, cycle, coupon" into a price, so checkout, Payment Links, invoices and previews could disagree. There are no add-ons, no per-customer overrides and no campaign tooling.
+
+**One pricing function.** `price_quote(org, plan_version, cycle, add_ons, coupons, billing_profile, at)` is a pure function that returns list price, each discount line, taxable value, GST split and total, all as integer minor units. Checkout, Payment Links (3.16), invoices, the pricing page, the admin preview and the tests all call it, so there is one source of truth. Property tests: never negative, never above list price, deterministic, the rounding rule is documented, and stacking never exceeds the configured cap. Razorpay only ever sees the final amount (3.16).
+
+**Plan management**
+
+| Capability | Design |
+|---|---|
+| **Plan versions** | A published plan version is immutable. Editing a price or entitlement creates a new draft version. Existing subscribers stay on their version (grandfathering) until an admin moves them. A price change needs two-person approval (3.16) and shows an impact preview first: subscribers affected, MRR change and who gets notified. |
+| **Moving subscribers** | Scheduled for the next renewal, never mid-cycle unless the customer agrees. The notice email comes from a template (3.14). A downgrade is blocked while the organisation exceeds the new limits (for example more seats), with a message saying what to remove. Data is never deleted by a downgrade. |
+| **Price book** | Prices per currency and cycle, with a tax-inclusive or tax-exclusive flag and an annual-discount setting. INR first; other currencies only when Razorpay international payments are enabled (3.16 spike item 7). |
+| **Visibility** | `public` (on the pricing page), `hidden` (assigned by an admin or by link) and `legacy` (existing subscribers only). The public pricing page is generated from published versions, so it cannot disagree with billing. It uses a real comparison table with header cells. |
+| **Custom enterprise terms** | `OrgEntitlementOverride(org, feature_key, limit, reason, expires_at, approved_by)` overrides a plan limit for one organisation, with an expiry and an audit entry. The entitlement resolver reads plan version, then add-ons, then overrides. |
+| **Add-ons and top-ups** | Extra seats, extra quota packs (URLs, document pages, alt texts, video minutes), human-review credits and white-label. Recurring or one-off. Prepaid credit packs expire after an admin-set period. Add-ons add to plan limits through the same entitlement resolver. |
+| **Subscription operations** (`/admin/subscriptions`) | Per organisation: change plan, extend trial, grant a credit or a complimentary period (reason required, approval above a threshold), pause, cancel, reactivate, view the entitlement breakdown and every change. |
+| **Metrics** | MRR and ARR, average revenue per account, trial conversion, churn, expansion, plan mix and margin per tenant (3.18). CSV export. |
+
+**Discounts and coupons.** Several kinds exist, and they differ in how they are found, who may use them and how they stack.
+
+| Kind | How it applies | Notes |
+|---|---|---|
+| **Coupon code** (built) | The customer enters it | Extended below |
+| **Automatic promotion** | Applies without a code when its rules match, inside a date window | Annual prepay discount, launch offer, seat or volume tiers |
+| **Eligibility discount** | An admin verifies eligibility, then applies it | Non-profit, education, government. Evidence is stored, and re-verification is yearly |
+| **Partner or referral code** | Attributes the customer to a partner or referrer | Revenue and discount reporting only. Commission payouts are out of scope |
+| **Goodwill or win-back credit** | An admin grants a one-off credit, or a targeted code goes to lapsed accounts | Reason required, approval above a threshold |
+
+**Coupon rules (extend the existing table).**
+- **Eligibility:** plans and cycles, first purchase only, minimum organisation age, email-domain allow-list (for example a university domain), country, minimum and maximum order value.
+- **Duration:** first cycle, first N cycles, a fixed number of months, or the life of the subscription (the same choices as 3.16).
+- **Stacking:** an admin setting with `exclusive`, `best_of` or `stack`, plus a cap on the total discount, so an automatic promotion and a code cannot add up to a free product.
+- **Limits:** global and per-organisation redemption limits (built), plus an optional per-user limit.
+- **Campaigns:** a campaign groups codes. Bulk generation produces N unique single-use codes from an unambiguous character set, with expiry and a CSV export.
+- **Abuse controls:** rate-limit code attempts, return the same error for an unknown and an expired code so codes cannot be enumerated, one trial per organisation domain, and a per-coupon kill switch. Redemption is confirmed only on payment success, and an abandoned checkout releases it (3.16).
+- **Invoice presentation:** list price, discount lines and tax are shown separately, and the GST base is the discounted value. Confirm the treatment with the chartered accountant (open decision 12).
+- **Analytics:** redemptions, discount given, revenue influenced, conversion by code or campaign, and unused or expired codes.
+
+**Accessibility of buying.** The coupon field keeps its value after an error (SC 3.3.7), uses no cognitive test (SC 3.3.8) and announces the result through a live region. A price change after choosing a plan or cycle is announced too. No countdown timers or fake-urgency banners: a time limit must be extendable (SC 2.2.1), and artificial urgency is a poor fit for an accessibility vendor.
+
+**Settings (3.11.3):** stacking policy and discount cap, coupon attempt limits, grandfathering default, approval thresholds, top-up expiry, visibility defaults and the pricing-page content.
+
+**Stages.** `price_quote` and the Payment Link flow arrive in **1a** with Razorpay, because Payment Links need a quote. Plan versions with grandfathering, entitlement overrides, bulk coupon campaigns and stacking rules arrive in **1b**. Automatic promotions, add-ons and top-ups, eligibility discounts, partner attribution, analytics and the generated pricing page arrive in **Phase 2**, together with self-serve checkout.
+
+### 3.20 Accessibility knowledge base: article management and AI authoring
+
+**Why.** Three jobs: attract search traffic from people looking for accessibility help, give customers a "learn more" page behind every rule explanation, and show real expertise. This is long-form editorial content. It is not the rule content library (3.14), which is structured per-rule data used at scan time. The two are linked: an article cites rules and the rule page links to its articles.
+
+**Content types:** how-to guides (for example "Label form fields in React"), WCAG criterion explainers, law and standard explainers (EAA, ADA Title II, GIGW 3.0, RPwD), checklists, product and release notes, case studies and glossary entries. Tags: WCAG criterion, standard, rule, audience (developer, designer, content author, compliance), stack and locale.
+
+**Data model.** `Article(slug, type, status, locale, translation_group, title, summary, author, reviewer, ai_assisted, review_due_at, published_at)`, immutable `ArticleVersion(body, change_note, validation_report, created_by)`, `ArticleSource` (the source pack, with licence and last-checked date), `ArticleBrief`, `ArticleSeries`, `ArticleRedirect` and `ArticleAsset`. Bodies are restricted Markdown with typed blocks (callout, code sample, comparison table, figure), so we control the HTML and can check it. No arbitrary HTML.
+
+**Workflow.** `Idea → Brief → Drafting → Validation → In review → Approved → Scheduled → Published → Review due → Archived`. Every transition is audited. Roles are Content editor, Accessibility reviewer and Publisher (they use the granular admin roles in 1b), and the author cannot publish their own article. Law and compliance articles always need the accessibility reviewer.
+
+**Publishing and our own accessibility.**
+- Public `/learn` with static or incremental rendering, search (Postgres full text first, with no new infrastructure), RSS, sitemap and structured data.
+- Rule detail pages and the Fix Workbench show "Learn more" links by rule reference.
+- An accessibility vendor's own articles must be accessible. Publishing is blocked unless our own scanner passes on the rendered page. Other gates: alt text on every image, a valid heading outline, descriptive link text, `lang` on text in another language, table header cells, keyboard-focusable scrollable code blocks, captions or transcripts for any media, and a reading-level target. Technical writing aims for plain language (the AI-assisted style guide enforces it).
+- Articles are `noindex` until approved.
+
+**Management screen (`/admin/content`).** Article list with filters, a source editor with live preview (no WYSIWYG widget, the same rule as decision 13), a brief editor, a review queue with a diff between the AI draft and the edited text, a validation panel, a calendar, and a **content gaps** view: criteria and rules with no article, search terms with no result, and the most common finding types across scans (aggregated across several tenants and anonymised, with no customer data). Performance uses privacy-friendly analytics with no third-party trackers by default.
+
+**Automated authoring (the Content Agent).** It is a pipeline on the AI gateway (3.13) with its own task keys: `content.plan`, `content.draft`, `content.validate`, `content.translate` and `content.refresh`. It reuses the principles of templates first, validate before delivery, and tokens only where they add value.
+
+1. **Plan (`LIGHT` or `STANDARD`).** From the content gaps, the topic backlog and the editorial themes set in admin, it proposes briefs: audience, angle, target criteria and laws, outline, sources and length. A similarity check against existing titles prevents duplicates.
+2. **Ground.** The drafter may use only the **source pack**: our rule content library, the WCAG text and Understanding documents, official legal texts, and admin-approved URLs. Each source records its licence and when it was last checked. Sources are paraphrased and cited, and long quotation is avoided. The licence terms of each source (W3C documents have their own) are confirmed in an ADR before the pack is built. Fetching a page at generation time goes through the same SSRF-guarded fetcher as the scanner (3.6).
+3. **Draft (`STANDARD`).** A fixed structure per article type (for example what the criterion says, who is affected, how to test, how to fix, common mistakes, further reading), as with report templates: the structure is permanent and the model fills slots. Code samples come from the rule content library first, which costs no tokens, and the model writes only the connecting prose. Every factual statement carries a source reference.
+4. **Validate, cheapest first.**
+   - **V1, deterministic, no tokens:** schema; every cited criterion exists in the registry with the right name and level; every legal statement points to a source and matches the stored clause text; **every code sample is run through our scanner, so a "before" sample must trigger the rule the article names and an "after" sample must pass**; links resolve; the accessibility gates above; reading level; a lint for overclaiming ("guarantees compliance", "fully compliant", anything that reads as legal advice), the same discipline as recommendation 7; near-duplicate and copied-passage detection against the source pack and existing articles; every date and "as of" statement is explicit.
+   - **V2 (`PREMIUM`, a different model family from the drafter):** claim-by-claim check against the cited sources, marking each claim supported, unsupported or contradicted, and flagging legal statements. Always on for law and compliance articles, sampled for others.
+   - **V3, human:** an editor approves every article. The default is that **nothing is published without a named human reviewer**.
+5. **Review and publish.** The editor sees the draft, the sources next to each claim and the validation results, then edits and approves. Publishing is scheduled and passes the accessibility gate.
+6. **Maintain.** Each article has a `review_due_at` (shorter for law). A change to a WCAG or standard mapping, to a rule's content, or a legal update marked by an admin flags the affected articles as "needs review". The agent then proposes a refreshed draft as a diff (Suggest mode). A monthly job checks links.
+7. **Translate (`LIGHT`, reviewed).** Drafts for Tamil, Hindi and others, linked through `translation_group`. V1 checks that code blocks, numbers and links are unchanged. A reviewer for that language approves before publishing. This supports the Indian-market wedge (3.18).
+
+**Autonomy and quality policy (same ladder as the Ops Agent, 3.15).** At launch the Content Agent is **draft-only**: AI drafts, a human publishes. Auto-publish is never available for law, compliance, pricing or claims about our own product. It may be considered later for low-risk types (for example glossary entries built from the rule library), only after a track record (a set number of consecutive drafts accepted with no material edits, and a measured validator precision), per type, off by default, with a kill switch and a sampled human audit. We recommend keeping human publishing for everything in version 1.
+- **Disclosure:** pages say "Drafted with AI assistance and reviewed by [name]". The named human is accountable.
+- **No scaled thin content:** a weekly publishing cap (admin setting), every article must offer something original (code samples verified by our scanner, our own data, an expert contribution), and unreviewed drafts are `noindex`. Search engines act against mass-produced low-value pages, so volume is not a goal.
+- **Style guide as a setting:** voice, plain language, inclusive and consistent disability language, a banned-phrase list and prompt versions, all versioned, with evaluation-gated activation (Phase 2 configuration, round 2).
+- **Privacy:** no customer scan data, URLs or findings appear in an article or in a prompt. Gap analytics use only aggregates across several tenants.
+- **Cost:** `max_cost_per_item` and a monthly content budget, metered in `AIUsage` per task key, with cost per published article on the FinOps view.
+
+**Notifications (3.14), to editors:** brief ready, draft awaiting review, validation failed, review due, translation ready.
+
+**Settings (3.11.3):** content types and templates, source pack, style guide and banned phrases, task routes and tiers, review periods, weekly cap, autonomy per type, analytics on or off, and the `/learn` page content.
+
+**Stage.** Phase 2. The CMS, public `/learn` and the first articles come before the agent: the agent needs 20 or so human-written, reviewed articles as style examples and as the golden set for evaluation. Two tasks can start earlier, without disturbing Phase 1: the owner writes a handful of launch articles in a Markdown repository folder, and the 1b rule content library already carries the explanation and fix text that the agent will reuse.
+
+### 3.21 Refunds and support tickets (admin area)
+
+Two admin-area functions that every paid product needs. Both are deliberately small. They sit in the existing admin and organisation areas, use the template, notification and audit systems already planned, and do not add a separate helpdesk product.
+
+**Where they sit in the plan.** The basic admin-initiated refund with a credit note stays in Phase 2 with self-serve billing (3.16), because the first live payments need it. The policy-driven refund workflow, customer refund requests, dispute handling and the support ticket system described here are added to **Phase 5, the last phase**, as requested. If design partners need tickets earlier, the section can move up without changes, because it depends only on pieces built in Phases 1 and 2.
+
+**Refund mechanism** (extends the Razorpay design in 3.16)
+
+| Step | Design |
+|---|---|
+| **Policy (settings)** | Refund window in days, eligible reasons, full or partial, pro-rata for the unused part of an annual plan, non-refundable items (consumed AI or human-review credits), trial rules, and approval thresholds. Terms of service carry the matching wording (3.18). |
+| **Request** | From `/org/billing` ("Request a refund" with a reason), from a support ticket, or started by an admin. |
+| **Eligibility** | A pure function, like `price_quote` (3.19): refundable amount = amount paid minus the value of what was used, capped at the captured amount, summing all earlier refunds. It shows its working to the admin. |
+| **Approval** | Two-person approval above the configured amount (3.16). Reason is mandatory on approve and reject. |
+| **Execution** | Razorpay Refund API, idempotent (our refund id is the key). The status changes only on the `refund.processed` or `refund.failed` webhook, never on the API response alone. Refund speed and timing depend on Razorpay and the customer's bank, and we state that to the customer. |
+| **Paper trail** | A GST credit note (accessible PDF/UA) is issued from the template system. Entitlements change according to policy: cancel at period end, or immediately. The coupon redemption is handled per policy. Templates send the notices. Everything is audited. |
+| **Failure path** | A failed refund opens an admin task and an incident. The fallback is a bank transfer recorded with its reference. |
+
+States: `Requested → Under review → Approved | Rejected → Processing → Refunded | Failed`.
+
+Other cases covered: payments made through Payment Links or bank transfer (the transfer is refunded by a manual transfer with TDS considered), partial refunds, a refund larger than what was captured (blocked), and **disputes and chargebacks** (the Razorpay dispute events open a ticket and an incident, evidence can be attached, and the deadline is tracked). The nightly reconciliation (3.16) includes refunds, credit notes and disputes. A report shows refunds by reason and by plan, and a repeated refund-then-new-trial pattern is flagged.
+
+**Admin screens:** `/admin/billing/refunds` (queue, detail with payment, usage and policy calculation, approve or reject, status, export) and the customer's request form and history in `/org/billing`. Needs a Billing admin role (granular roles, 1b).
+
+**Support tickets (small, built in)**
+
+*Customer side* (`/org/support`, with a consistent "Help" link on every screen, SC 3.2.6):
+- Create a ticket with a category (billing and refunds, scan problem, report or file problem, account and access, **accessibility barrier in our product**, other), subject and description. Context is attached only with the customer's consent: organisation, plan, and the chosen scan or report.
+- Attachments with type and size limits, and malware scanning (3.6).
+- A ticket list, a conversation thread, reply, close and reopen, and a one-click satisfaction rating after resolution.
+- The "accessibility barrier" category is a feedback channel that honours the commitment in section 2.8: higher default priority and a published response target.
+
+*Admin side* (`/admin/support`):
+- A queue with filters (status, priority, category, assignee, organisation), assignment, tags, search, merge for duplicates, CSV export.
+- Statuses `New, Open, Waiting on customer, Waiting on us, Resolved, Closed`. Private internal notes that are never visible to the customer.
+- Canned replies, which are templates (3.14), editable in admin and versioned.
+- **SLA timers per plan** (first response and resolution targets are settings), warnings before a breach and an alert on breach through the `notify` queue.
+- Links from a ticket to the organisation, scan, report, payment and refund, so an admin sees context without asking the customer. No "log in as the customer" feature, and no passwords ever.
+
+*Optional AI help* (admin toggle, off by default, tiered under 3.13): a light model suggests category, priority, language and duplicates; a draft reply built from the rule library and the knowledge base (3.20) for the agent to edit. It is **never sent automatically**, and V1 checks block secrets and personal data in drafts.
+
+*Not in scope:* live chat, phone, social channels and inbound email parsing in version 1. If volume grows, tickets sync to an external helpdesk through the integrations in 3.17.
+
+**Data model.** `RefundRequest` (linked to the existing `Refund` and `CreditNote`), `RefundPolicy` (settings), `SupportTicket`, `SupportMessage` (with a `visibility` of public or internal), `SupportAttachment`, `TicketEvent`, `SupportSlaPolicy`. All are tenant-scoped under RLS, so customers see only their own organisation's tickets. The isolation suite covers them, with a test that internal notes never leave the admin API. Retention is a setting.
+
+**Notification events (3.14):** to customers: refund requested, approved, rejected, processed, failed; ticket received, replied, resolved. To admins: new ticket, SLA warning and breach, refund awaiting approval, dispute opened.
+
+**Accessibility.** Both areas meet section 2: the thread is a structured list with headings, a new reply is announced without moving focus, the page does not refresh itself under the user, attachments work by keyboard, and every status is conveyed by text as well as colour.
+
+**Settings (3.11.3):** refund policy and thresholds, ticket categories, priorities and SLA targets, canned replies, satisfaction survey on or off, retention, AI help on or off.
 
 ---
 
@@ -729,19 +880,19 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|---|
 | Settings framework, `/admin/settings`, schema-generated admin forms (3.11.1) | 1a | Built |
 | SaaS core: plans and entitlements, trial, seat guard, quota reservations, coupons; admin screens for organisations, plans and coupons | 1a | Built |
-| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built with the fake adapter only; two real adapters not started |
-| Rule registry and switching standards | 1a | Not started |
-| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Not started |
-| SSRF protection, domain verification, rate limits | 1a | Not started |
+| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built. Adapters: DeepSeek, Azure OpenAI, OpenAI, OpenAI-compatible (and fake); enterprise own-key (BYOK) built. Anthropic and Bedrock not started |
+| Rule registry and switching standards | 1a | Built (87 criteria, 12 standards, 42 canonical rules; mappings still `draft` until SME review) |
+| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built except screenshots. Benchmark baseline recorded and gated in CI: [docs/benchmark.md](benchmark.md) (own fixtures 60 of 60 planted defects, 0 false failures; independent GOV.UK suite 54 of the 92 failures that at least one of 13 other tools reported, 59%) |
+| SSRF protection, domain verification, rate limits | 1a | Built (egress proxy, domain verification, per-org rate and concurrency limits) |
 | Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Not started |
-| Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Not started |
-| Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Not started |
+| Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Built: audit PDF (veraPDF-gated), DOCX (structure-checked), CSV, and the VPAT (WCAG tables) with draft defaults, editing, sign-off and export ([ADR 0008](adr/0008-pdf-ua-generation.md), [ADR 0009](adr/0009-reports-and-vpat.md)). Not yet: the 508/EU/INT chapters, per-element screenshots |
+| Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Report templates built (sandboxed, versioned, accessibility-checked, golden-tested); admin template editor and the email events not started |
 | Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
-| Admin MFA for every admin role, and session refresh | 1a | Not started |
+| Admin MFA for every admin role, and session refresh | 1a | Built: MFA admin-configurable (dev default off, refused in production) and rotating Super Admin sessions ([ADR 0010](adr/0010-admin-two-step-verification.md)) |
 | Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
-| Workspace screens: new scan, findings list, Fix Workbench | 1a | Not started |
+| Workspace screens: new scan, findings list, Fix Workbench | 1a | New scan, scans list, results and findings built; Fix Workbench and screenshots not started |
 | Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |
-| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Not started |
+| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Built for scans (state machine, heartbeat, idempotent redelivery, stuck-scan sweeper, credit rules); orphaned-reservation sweeper not started |
 | Remaining notification events, in-app notification centre | 1b | Not started |
 | Content library for all rules | 1b | Not started |
 | Outbound webhooks and the audit-log endpoint (3.17) | 1b | Not started |
@@ -749,6 +900,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | Canaries, first runbooks, read-only `/admin/ops` | 1b | Not started |
 | Sampled premium validation (V2) and shadow-mode promotion (3.13) | 1b | Not started |
 | Remaining admin settings (email provider, legal pages, scan engines, feature flags), granular admin roles, two-person approval | 1b | Not started |
+| `price_quote`: one pure pricing function (plan, cycle, coupon, tax) shared by checkout, Payment Links, invoices and previews (3.19) | 1a | Not started. Plans, prices and coupons exist, but there is no single quote function yet. Built together with the Razorpay Payment Link flow |
+| Plan versions with grandfathering, per-organisation entitlement overrides, coupon campaigns (bulk codes) and stacking rules (3.19) | 1b | Not started. Additive tables and columns only, so the built plan and coupon screens keep working |
 | Our own ACR from a human audit, Accessibility Statement, manual NVDA and VoiceOver pass | 1b | Not started |
 
 **Stage gates.** Design partners onboard when **1a** exits: the scanner benchmark is recorded; the quota and coupon concurrency tests pass; exported PDFs pass veraPDF; switching the code-fix provider needs no redeploy and falls back automatically (two real adapters); a worker killed mid-scan resumes or fails with a reason and leaves no credits reserved; a Razorpay Payment Link activates a plan through the webhook, including the duplicate, out-of-order and forged-signature tests; admin MFA is enforced for every admin role; the `/v1` exit criteria in 3.17 pass; and no Critical or Serious accessibility issue is open on any screen shipped so far. **1b** closes when the remaining exit criteria below pass, 3 to 5 design partners are actively scanning, and our own ACR is done before the first paid customer.
@@ -794,6 +947,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - **Ops Agent (3.15):** start it once real production incidents exist, because runbooks are written from real failures (layers 0 to 2 ship earlier, in Phase 1). Suggest and Approve-to-run modes, action catalogue with policy engine, approvals in `/admin/ops`, billing-reconciliation incidents, public status page; proven runbooks promoted to Auto.
 - **AI tiering, round 2 (3.13):** sampled premium validation, shadow-mode promotion of cheaper models, cost-versus-quality dashboard.
 - **Notifications, round 2 (3.14):** Slack or Teams alerts, per-user preferences and digests, Indian-language template variants (for example Tamil and Hindi). Outbound webhooks arrive earlier, in 1b (3.17).
+- **Subscription and promotions, round 2 (3.19):** automatic promotions, add-ons and top-ups, eligibility discounts (non-profit, education, government), partner and referral attribution, coupon analytics, and the pricing page generated from published plan versions.
+- **Accessibility knowledge base (3.20):** article data model and workflow, `/admin/content` editor and review queue, public `/learn` with search, RSS and sitemap, "Learn more" links from rule pages, and the accessibility publishing gate. About 20 human-written, reviewed articles first. Then the Content Agent in **draft-only** mode: plan, ground, draft, validate (V1 code-sample check with our scanner, V2 fact check), refresh when a standard or rule changes, and reviewed translations.
 - Super Admin: MRR/ARR, trial conversion, AI FinOps (token cost per tenant), budget caps.
 - Configuration, round 2: payment gateway registry, tax settings, bring-your-own AI key for Enterprise, per-org data policy (regions, zero retention), prompt versioning with evaluation-gated activation, staged rollouts, two-person approval for high-risk changes.
 - White-label: contrast-validated brand colours, custom report branding.
@@ -806,6 +961,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - A self-serve payment through Razorpay works end to end in live mode, and the nightly reconciliation shows no unexplained differences over a full billing cycle.
 - In Suggest mode the Ops Agent makes correct proposals for injected faults (provider outage, stuck queue, orphaned reservations), and every action and proposal is in the audit log.
 - A sample customer pipeline fails a build on a new violation through the CLI or GitHub Action, and a finding can be sent to Jira from the UI and through the API.
+- Plan versioning: a price change on a published plan leaves existing subscribers on their version until moved, and `price_quote` property tests pass (never negative, never above list, stacking cap respected).
+- At least 20 reviewed articles are live and every one passes our own scanner at publish. The Content Agent's V1 checks catch planted defects in test drafts (a wrong criterion number, a code sample that does not trigger its rule, an overclaiming phrase, a copied passage). The accepted-draft rate, edit effort and cost per published article are reported. No article is published without a named reviewer.
 
 ### Phase 3: Documents and eBooks
 
@@ -846,9 +1003,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - iOS (XCUITest + VoiceOver on on-demand macOS hosts) and real NVDA/VoiceOver capture for web: backlog, prioritised by customer demand.
 - Mobile runbooks (emulator recycle, host failover) and the mobile report template (3.15, 3.14).
 - Public API: the `/v1/mobile` endpoints (3.17).
+- **Refunds in the admin area (3.21):** refund policy settings, customer refund requests from `/org/billing`, the eligibility calculation, approval with two-person approval above a threshold, execution through Razorpay confirmed by webhook, GST credit notes, failure path, dispute and chargeback handling, and `/admin/billing/refunds`. (The basic admin-initiated refund from Phase 2 stays and is folded into this workflow.)
+- **Support tickets in the admin area (3.21):** `/org/support` and `/admin/support` with categories, assignment, internal notes, canned replies from templates, SLA timers per plan, notifications, satisfaction rating, and an "accessibility barrier" channel. Optional AI triage and draft replies, off by default and never auto-sent.
 
 **Exit criteria**
 - Benchmark against a known-bad sample APK set; sandbox escape and network-isolation tests pass.
+- A refund goes from request through approval to a confirmed Razorpay refund and a credit note, including the failure, partial, over-refund and dispute cases. Reconciliation includes refunds, and every step is in the audit log.
+- Tickets can be created, answered and resolved end to end by keyboard and screen reader. Tenant-isolation tests prove that customers see only their own tickets and never see internal notes. SLA warnings and breaches notify the assigned admin.
 
 ---
 
@@ -873,7 +1034,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | 15 | Public API contract | `/v1` as a sub-application next to the internal routes; API keys first, OAuth client credentials in Phase 2; additive-only changes within a version; 12-month deprecation window (3.17) |
 | 16 | Hosting region and security assurance | India region at launch; penetration test before the first paying customer; SOC 2 or ISO 27001 when the pipeline requires it (3.18) |
 | 17 | Product brand | A distinctive name and domain with a trademark check before public launch; keep `a11y` as the code and repository name |
-| 18 | Named owners | Accessibility lead, rule-mapping SME, security owner, chartered accountant, privacy contact, ops owner (3.18) |
+| 18 | Named owners | Accessibility lead, rule-mapping SME, security owner, chartered accountant, privacy contact, ops owner (3.18), content owner and pricing owner (3.19, 3.20) |
+| 19 | Plan change policy | Published plan versions are immutable; existing subscribers are grandfathered and moved only at renewal with notice (3.19). Confirm with the pricing owner |
+| 20 | Discount stacking | One coupon plus automatic promotions under a total discount cap, `best_of` by default (3.19) |
+| 21 | AI-authored articles | Draft-only at launch; a named human reviewer publishes every article; no auto-publish for law, compliance, pricing or product claims; AI assistance disclosed on the page (3.20) |
+| 22 | Source licences for the article source pack | Confirm the licence terms of each source (W3C documents, legal texts) in an ADR before building the pack; paraphrase and cite (3.20) |
+| 23 | Refund policy | Window, pro-rata rules, non-refundable items and approval thresholds are set by the business and reviewed by the chartered accountant and legal advisor, then stored as settings (3.21) |
+| 24 | Support scope and timing | A small built-in ticket system in Phase 5 as requested; move earlier if design partners need it; sync to an external helpdesk if volume grows (3.21) |
 
 ## 6. Top risks
 
@@ -898,3 +1065,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | API key leaks | Hashed storage, recognisable key format for secret scanners, scopes, IP allow-lists, rotation, anomaly alerts |
 | Liability from customers relying on our reports | Terms with liability limits, "not a guarantee" wording, human-signed VPATs, insurance review |
 | Engine and rule drift over time | Pinned engine versions per scan, versioned rule registry, benchmark suite in CI |
+| A price or plan edit changes existing subscribers' bills | Immutable plan versions, grandfathering, impact preview, two-person approval, notice before any move (3.19) |
+| Discounts stack into near-free plans, or codes are guessed | Total discount cap, stacking policy, attempt rate limits with uniform errors, per-coupon kill switch, coupon analytics (3.19) |
+| AI-written articles contain wrong accessibility or legal statements | Source-grounded drafting, V1 checks (our scanner runs every code sample), V2 claim check, mandatory named human reviewer, SME for law, overclaim lint, review dates (3.20) |
+| Search penalties or lost trust from mass-produced AI content | Draft-only, weekly cap, original verified examples, `noindex` until reviewed, AI disclosure (3.20) |
+| Our own articles are inaccessible | The publish gate runs our scanner on the rendered page and blocks on failure (3.20) |
+| Refund errors or fraud (over-refund, refund-then-retrial) | One eligibility function, capped at captured amount, two-person approval, webhook-confirmed status, credit notes, reconciliation, abuse flags (3.21) |
+| Support data leaks between tenants, or internal notes reach customers | RLS on all ticket tables, `visibility` column with tests, isolation suite coverage, attachment scanning, retention limit (3.21) |

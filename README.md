@@ -27,6 +27,8 @@ The full breakdown, with item-by-item status for Phase 1, is in the plan.
 - **Report** for the law that applies: WCAG 2.0/2.1/2.2, ADA, Section 508, EU EAA / EN 301 549, Australia DDA and India GIGW 3.0. Switching the standard recalculates scores from the same scan. Reports are accessible PDFs, DOCX and CSV. VPATs are drafts that a person signs off, because automated testing cannot prove full conformance.
 - **Remediate documents and media** (later phases): PDF, DOCX, PPTX, EPUB, captions and audio description, with a human-review queue for complex files.
 - **Integrate.** A versioned public API (`/v1`, OpenAPI/Swagger), API keys, webhooks, a CLI and CI integrations, and Jira, GitHub, Slack and SSO/SCIM for enterprise customers.
+- **Sell and support.** Subscription plans with versions, add-ons, discounts and coupon campaigns; Razorpay payments with GST invoices; admin-managed refunds and a small built-in support ticket system (planned).
+- **Learn.** An accessibility knowledge base at `/learn`. Articles are drafted with AI assistance, checked by our own scanner and reviewed by a named person before publishing (planned).
 - **Configure everything from the admin panel:** AI providers and models (OpenAI, Azure OpenAI, Claude, Bedrock, Gemini, DeepSeek, any OpenAI-compatible endpoint), plans, quotas, coupons, trials, email templates and more. Settings are typed, scoped, versioned, audited and reversible.
 
 ## Documentation
