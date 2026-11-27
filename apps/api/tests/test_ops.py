@@ -315,3 +315,40 @@ async def test_runbook_names_cannot_escape_the_folder(client, slug):
     r = await client.get(f"/admin/ops/runbooks/{slug}", headers=super_admin_headers())
     assert r.status_code in (404, 422)
     assert "root:" not in r.text
+
+
+async def test_every_module_that_defines_tasks_is_loaded_by_the_workers():
+    """A worker runs only the tasks of the modules in the include list. A module missing from it silently never runs its
+    tasks or its schedule (found once by a live check: the mail canary), so every core module that defines a task must be
+    listed. Checked on the SOURCE, because importing the module in a test would hide the mistake."""
+    from pathlib import Path
+
+    import a11y_core
+    from a11y_core.celery_app import celery_app
+
+    core = Path(a11y_core.__file__).parent
+    defining = {
+        f"a11y_core.{p.stem}"
+        for p in core.glob("*.py")
+        if "celery_app.task" in p.read_text() and p.stem != "celery_app"
+    }
+    assert {
+        "a11y_core.canaries",
+        "a11y_core.notify",
+        "a11y_core.webhooks",
+        "a11y_core.scan_jobs",
+        "a11y_core.billing_jobs",
+    } <= defining
+    missing = defining - set(celery_app.conf.include)
+    assert not missing, f"not loaded by any worker: {sorted(missing)}"
+
+
+async def test_every_scheduled_task_exists():
+    from a11y_core.celery_app import celery_app
+
+    celery_app.loader.import_default_modules()
+    owned_elsewhere = {"web.canary", "docs.canary"}  # these live in the web and docs worker images
+    for name, entry in celery_app.conf.beat_schedule.items():
+        assert entry["task"] in celery_app.tasks or entry["task"] in owned_elsewhere, (
+            f"{name} schedules {entry['task']}"
+        )

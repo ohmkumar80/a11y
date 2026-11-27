@@ -20,6 +20,7 @@ _include = [
     "a11y_core.scan_jobs",
     "a11y_core.notify",
     "a11y_core.webhooks",
+    "a11y_core.canaries",
 ]
 if importlib.util.find_spec("a11y_web_audit"):
     _include.append("a11y_web_audit.tasks")
