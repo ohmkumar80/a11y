@@ -43,6 +43,7 @@ class UserOut(BaseModel):
     role: str
     organization_id: str
     organization_name: str
+    mfa_enabled: bool = False
 
 
 class SessionOut(BaseModel):
@@ -58,3 +59,35 @@ class Problem(BaseModel):
     detail: str
     code: str | None = None
     field: str | None = None
+
+
+class MfaChallenge(BaseModel):
+    """Returned INSTEAD of a session when a second step is needed. Not a session: it opens only the MFA endpoints."""
+
+    mfa: Literal["verify", "enroll"]
+    mfa_token: str
+    expires_in: int
+    issuer: str
+
+
+class MfaVerifyIn(BaseModel):
+    mfa_token: str = Field(max_length=2000)
+    code: str = Field("", max_length=32)
+    recovery_code: str = Field("", max_length=32)
+
+
+class MfaTokenIn(BaseModel):
+    mfa_token: str = Field(max_length=2000)
+
+
+class MfaConfirmIn(BaseModel):
+    mfa_token: str = Field(max_length=2000)
+    code: str = Field(max_length=32)
+
+
+class MfaCodeIn(BaseModel):
+    code: str = Field(max_length=32)
+
+
+class EnrolledSession(SessionOut):
+    recovery_codes: list[str]

@@ -32,6 +32,7 @@ async def me(p: Principal = Depends(current_principal)):
         role=u.role,
         organization_id=str(p.org_id),
         organization_name=org or "",
+        mfa_enabled=u.mfa_enabled_at is not None,
     )
 
 

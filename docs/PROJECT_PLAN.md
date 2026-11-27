@@ -737,7 +737,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Built: audit PDF (veraPDF-gated), DOCX (structure-checked), CSV, and the VPAT (WCAG tables) with draft defaults, editing, sign-off and export ([ADR 0008](adr/0008-pdf-ua-generation.md), [ADR 0009](adr/0009-reports-and-vpat.md)). Not yet: the 508/EU/INT chapters, per-element screenshots |
 | Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Report templates built (sandboxed, versioned, accessibility-checked, golden-tested); admin template editor and the email events not started |
 | Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
-| Admin MFA for every admin role, and session refresh | 1a | Not started |
+| Admin MFA for every admin role, and session refresh | 1a | MFA built and admin-configurable ([ADR 0010](adr/0010-admin-two-step-verification.md)); session refresh for Super Admins not started |
 | Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
 | Workspace screens: new scan, findings list, Fix Workbench | 1a | New scan, scans list, results and findings built; Fix Workbench and screenshots not started |
 | Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |

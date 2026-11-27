@@ -315,3 +315,60 @@ register(
         tags=("scan",),
     )
 )
+
+
+# --- Two-step verification policy ------------------------------------------------------------------------
+
+
+def _mfa_default(attr: str):
+    """Starting value comes from the environment (so development can start with MFA off); admins override it in /admin."""
+
+    def make() -> str:
+        from ..settings import get_settings
+
+        return getattr(get_settings(), attr)
+
+    return make
+
+
+class MfaPolicy(BaseModel):
+    """Who must use two-step verification at sign-in. Change it in /admin -> Settings -> auth.mfa.
+
+    required  everyone in the group must enrol and enter a code at every sign-in
+    optional  only people who have enrolled are asked for a code
+    off       nobody is asked, even if enrolled. DEVELOPMENT ONLY: refused for platform administrators when
+              ENV=production (and a banner shows in /admin while it is off)."""
+
+    super_admin: Literal["required", "optional", "off"] = Field(
+        default_factory=_mfa_default("mfa_super_admin_default"),
+        description="Platform administrators (the /admin console)",
+    )
+    org_admin: Literal["required", "optional", "off"] = Field(
+        default_factory=_mfa_default("mfa_org_admin_default"),
+        description="Organisation administrators",
+    )
+    issuer: str = Field(
+        "a11y", min_length=1, max_length=40, description="Name shown in authenticator apps"
+    )
+
+
+def _mfa_guard(new: MfaPolicy, prev: MfaPolicy) -> None:
+    from ..settings import get_settings
+
+    if get_settings().env == "production" and new.super_admin == "off":
+        raise GuardrailError(
+            "Two-step verification cannot be switched off for platform administrators in production."
+        )
+
+
+register(
+    SettingDef(
+        key="auth.mfa",
+        model=MfaPolicy,
+        default=MfaPolicy(),
+        description="Two-step verification policy for administrators. 'off' is for development only.",
+        guard=_mfa_guard,
+        high_risk=True,
+        tags=("auth", "security"),
+    )
+)

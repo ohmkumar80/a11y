@@ -78,7 +78,7 @@ pnpm --filter @a11y/web dev                   # web app (set API_INTERNAL_URL if
 pnpm --filter @a11y/web e2e                   # axe on every route, role and colour scheme
 ```
 
-**Platform admin (Super Admin).** Create a platform operator with `python -m a11y_api.admin_cli you@example.com` (prompts for a password), sign in through `POST /auth/login`, then use the `/admin/*` endpoints and screens. Settings are declared in `libs/core/a11y_core/config/definitions.py`; the design is in the plan (section 3.11) and ADR 0006.
+**Platform admin (Super Admin).** Create a platform operator with `python -m a11y_api.admin_cli you@example.com` (prompts for a password), sign in through the login page (or `POST /auth/login`), then use the `/admin/*` endpoints and screens. Two-step verification for administrators is controlled in `/admin` → Security: development starts with it **off** (`MFA_SUPER_ADMIN_DEFAULT` in `.env`), production refuses that. Locked out? `python -m a11y_api.admin_cli --reset-mfa you@example.com`, or `--mfa-super-admin off`. Settings are declared in `libs/core/a11y_core/config/definitions.py`; the design is in the plan (section 3.11) and ADR 0006.
 
 ### Repository layout
 

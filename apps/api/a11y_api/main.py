@@ -13,9 +13,11 @@ from sqlalchemy import text
 from .routers import (
     admin_ai,
     admin_billing,
+    admin_security,
     admin_settings,
     auth,
     domains,
+    mfa,
     org,
     org_ai,
     reports,
@@ -81,8 +83,10 @@ async def ready():
 
 
 app.include_router(auth.router)
+app.include_router(mfa.router)
 app.include_router(org.router)
 app.include_router(admin_settings.router)
+app.include_router(admin_security.router)
 app.include_router(admin_billing.router)
 app.include_router(admin_ai.router)
 app.include_router(org_ai.router)

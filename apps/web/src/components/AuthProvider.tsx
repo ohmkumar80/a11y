@@ -1,13 +1,22 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { post, refreshSession, setAccessToken, type Problem, type Session, type User } from "@/lib/api";
+import { post, refreshSession, setAccessToken, type EnrolInfo, type MfaChallenge, type Problem, type Session, type User } from "@/lib/api";
+
+export type LoginResult = { kind: "ok" } | { kind: "problem"; problem: Problem } | { kind: "mfa"; challenge: MfaChallenge };
 
 interface AuthState {
   /** undefined while the first refresh is in flight; null when signed out */
   user: User | null | undefined;
-  login: (email: string, password: string) => Promise<Problem | null>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
+  /** Second step of signing in (the mfa token proves the password step succeeded). */
+  verifyMfa: (token: string, input: { code?: string; recovery_code?: string }) => Promise<Problem | null>;
+  enrolStart: (token: string) => Promise<{ info: EnrolInfo } | { problem: Problem }>;
+  /** Confirms the code and signs in; returns the one-time recovery codes. */
+  enrolConfirm: (token: string, code: string) => Promise<{ codes: string[] } | { problem: Problem }>;
+  /** Replace the signed-in user's cached profile (e.g. after turning MFA on or off). */
+  patchUser: (p: Partial<User>) => void;
 }
 
 const Ctx = createContext<AuthState | null>(null);
@@ -48,10 +57,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       async login(email, password) {
-        const r = await post<Session>("/auth/login", { email, password });
+        const r = await post<Session | MfaChallenge>("/auth/login", { email, password });
+        if (!r.ok) return { kind: "problem", problem: r.problem };
+        if ("mfa" in r.data) return { kind: "mfa", challenge: r.data };
+        adopt(r.data);
+        return { kind: "ok" };
+      },
+      async verifyMfa(token, input) {
+        const r = await post<Session>("/auth/mfa/verify", { mfa_token: token, ...input });
         if (!r.ok) return r.problem;
         adopt(r.data);
         return null;
+      },
+      async enrolStart(token) {
+        const r = await post<EnrolInfo>("/auth/mfa/enroll/start", { mfa_token: token });
+        return r.ok ? { info: r.data } : { problem: r.problem };
+      },
+      async enrolConfirm(token, code) {
+        const r = await post<Session & { recovery_codes: string[] }>("/auth/mfa/enroll/confirm", { mfa_token: token, code });
+        if (!r.ok) return { problem: r.problem };
+        adopt(r.data);
+        return { codes: r.data.recovery_codes };
+      },
+      patchUser(p) {
+        setUser((u) => (u ? { ...u, ...p } : u));
       },
       async logout() {
         await post("/auth/logout");

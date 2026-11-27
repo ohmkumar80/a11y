@@ -27,6 +27,7 @@ export async function mockApi(page: Page, role: Role) {
   await page.route("**/api/org/ai", (r) => r.fulfill({ json: BYOK }));
   await page.route("**/api/org/ai/test", (r) => r.fulfill({ json: { ok: false, detail: "authentication failed (check the API key)" } }));
   await mockAdminApi(page);
+  await page.route("**/api/auth/mfa/status", (r) => r.fulfill({ json: { enabled: false, mode: "optional", required: false, recovery_codes_left: 0, available: role === "COMPANY_ADMIN" || role === "SUPER_ADMIN" } }));
   await mockScanApi(page);
   await mockReportApi(page);
   await page.route("**/api/invites/**", (r) =>

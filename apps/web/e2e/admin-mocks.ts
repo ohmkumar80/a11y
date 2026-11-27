@@ -21,11 +21,16 @@ const PLANS = [
   { id: "GROWTH", name: "Growth", description: "", is_public: true, is_active: true, sort_order: 2, entitlements: [{ feature_key: "seats", enabled: true, limit_value: null }], prices: [{ currency: "INR", cycle: "MONTHLY", amount_minor: 499900 }] },
 ];
 
+/** Tests can flip the platform-admin MFA policy the mocked API reports. */
+export const mfaState = { superAdmin: "required" as "required" | "optional" | "off" };
+
 /** Mocks every /api/admin/* call the admin UI makes. */
 export async function mockAdminApi(page: Page) {
   await page.route("**/api/admin/**", (r) => {
     const url = new URL(r.request().url());
     const p = url.pathname.replace(/^\/api/, "");
+    if (p === "/admin/security/mfa") return r.fulfill({ json: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y", environment: "development" } });
+    if (p === "/admin/settings/auth.mfa") return r.fulfill({ json: { key: "auth.mfa", source: "default", version: null, value: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y" } } });
     if (p.startsWith("/admin/ai/providers/") && p.endsWith("/test")) return r.fulfill({ json: { ok: true, detail: "Connected.", model_id: "m", latency_ms: 120 } });
     if (r.request().method() !== "GET") return r.fulfill({ json: {} });
     if (p === "/admin/ai/providers") return r.fulfill({ json: [{ id: "deepseek", type: "deepseek", display_name: "DeepSeek", base_url: null, is_enabled: true, key_set: true, data_policy: { zero_retention: false, processing_regions: ["cn"] }, models: [{ id: "deepseek-chat", model_name: "deepseek-chat", capabilities: ["text", "json"], is_enabled: true }] }] });

@@ -78,6 +78,16 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(server_default=text("true"))
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Two-step verification (a11y_core.mfa). The secret is encrypted at rest; recovery codes are stored hashed.
+    mfa_secret_ct: Mapped[str | None] = mapped_column(Text)
+    mfa_pending_ct: Mapped[str | None] = mapped_column(
+        Text
+    )  # secret shown during enrolment, not yet confirmed
+    mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_last_step: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    mfa_recovery: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    mfa_failed: Mapped[int] = mapped_column(Integer, server_default="0")
+    mfa_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

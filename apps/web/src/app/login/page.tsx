@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Form, Button, ErrorSummary, StatusMessage, TextField } from "@a11y/ui";
 import { useAuth } from "@/components/AuthProvider";
+import { SignInSteps } from "@/components/mfa/SignInSteps";
+import type { MfaChallenge } from "@/lib/api";
 import { Page } from "@/components/Page";
 import { useForm } from "@/components/useForm";
 
@@ -15,6 +17,11 @@ function LoginForm() {
   const form = useForm();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
+
+  if (challenge) {
+    return <SignInSteps challenge={challenge} onDone={() => router.push("/workspace")} onRestart={() => { setChallenge(null); setPassword(""); }} />;
+  }
 
   return (
     <Page title="Log in" narrow>
@@ -24,7 +31,15 @@ function LoginForm() {
         className="flex flex-col gap-4"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await form.submit(() => login(email, password))) router.push("/workspace");
+          let next: MfaChallenge | null = null;
+          const ok = await form.submit(async () => {
+            const r = await login(email, password);
+            if (r.kind === "problem") return r.problem;
+            if (r.kind === "mfa") next = r.challenge;
+            return null;
+          });
+          if (!ok) return;
+          if (next) { setPassword(""); setChallenge(next); } else router.push("/workspace");
         }}
       >
         <TextField id="field-email" label="Email" type="email" autoComplete="username" value={email} onChange={setEmail} isRequired error={form.fieldError("email")} />

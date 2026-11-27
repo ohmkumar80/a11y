@@ -10,6 +10,8 @@ x-api-env: &api-env
   REDIS_URL: redis://redis:6379/0
   JWT_SECRET: ${JWT_SECRET}
   ENV: ${ENV:-development}
+  MFA_SUPER_ADMIN_DEFAULT: ${MFA_SUPER_ADMIN_DEFAULT:-required}
+  MFA_ORG_ADMIN_DEFAULT: ${MFA_ORG_ADMIN_DEFAULT:-optional}
   A11Y_MASTER_KEYS: ${A11Y_MASTER_KEYS:-Q2OoEdjRtijEf6Bd8VUo4q6_2oBKlFXaQopiFpf0lgc=}
   COOKIE_SECURE: ${COOKIE_SECURE:-false}
   PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}

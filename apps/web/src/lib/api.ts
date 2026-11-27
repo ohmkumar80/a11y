@@ -14,7 +14,17 @@ export interface User {
   role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "STANDARD_USER";
   organization_id: string;
   organization_name: string;
+  mfa_enabled?: boolean;
 }
+
+/** Returned instead of a session when a second step is needed. */
+export interface MfaChallenge {
+  mfa: "verify" | "enroll";
+  mfa_token: string;
+  expires_in: number;
+  issuer: string;
+}
+export interface EnrolInfo { key: string; otpauth_uri: string; issuer: string; account: string }
 
 export interface Session {
   access_token: string;

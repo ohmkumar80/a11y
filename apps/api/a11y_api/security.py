@@ -90,6 +90,9 @@ class Principal:
     user_id: uuid.UUID
     org_id: uuid.UUID | None
     role: str
+    email: str | None = (
+        None  # lets a Super Admin (no tenant) find their own row for account-security actions
+    )
 
 
 def issue_access_token(p: Principal) -> tuple[str, int]:
@@ -101,6 +104,7 @@ def issue_access_token(p: Principal) -> tuple[str, int]:
             "sub": str(p.user_id),
             "org": str(p.org_id) if p.org_id else "",
             "role": p.role,
+            "eml": p.email or "",
             "iat": now,
             "exp": now + ttl,
         },
@@ -121,6 +125,65 @@ def decode_access_token(token: str) -> Principal | None:
         org = uuid.UUID(c["org"]) if c["org"] else None
         if (c["role"] == "SUPER_ADMIN") != (org is None):
             return None
-        return Principal(uuid.UUID(c["sub"]), org, c["role"])
+        return Principal(uuid.UUID(c["sub"]), org, c["role"], c.get("eml") or None)
+    except (jwt.PyJWTError, ValueError):
+        return None
+
+
+# --- short-lived tokens for the two-step verification sign-in steps -------------------------------------------
+# Audience "mfa": decode_access_token() refuses these (PyJWT rejects an unexpected audience), so a half-finished
+# sign-in can never be used as a session. 10 minutes, announced on screen (WCAG 2.2.1).
+
+MFA_TOKEN_TTL = timedelta(minutes=10)
+
+
+@dataclass(frozen=True)
+class MfaChallengeToken:
+    user_id: uuid.UUID
+    org_id: uuid.UUID | None
+    role: str
+    email: str
+    purpose: str  # "verify" | "enroll"
+
+
+def issue_mfa_token(
+    user_id: uuid.UUID, org_id: uuid.UUID | None, role: str, email: str, purpose: str
+) -> tuple[str, int]:
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "aud": "mfa",
+            "sub": str(user_id),
+            "org": str(org_id) if org_id else "",
+            "role": role,
+            "eml": email,
+            "pur": purpose,
+            "iat": now,
+            "exp": now + MFA_TOKEN_TTL,
+        },
+        get_settings().jwt_secret,
+        algorithm="HS256",
+    )
+    return token, int(MFA_TOKEN_TTL.total_seconds())
+
+
+def decode_mfa_token(token: str, purpose: str | None = None) -> MfaChallengeToken | None:
+    try:
+        c = jwt.decode(
+            token,
+            get_settings().jwt_secret,
+            algorithms=["HS256"],
+            audience="mfa",
+            options={"require": ["exp", "sub", "pur", "eml"]},
+        )
+        if purpose and c["pur"] != purpose:
+            return None
+        return MfaChallengeToken(
+            uuid.UUID(c["sub"]),
+            uuid.UUID(c["org"]) if c["org"] else None,
+            c["role"],
+            c["eml"],
+            c["pur"],
+        )
     except (jwt.PyJWTError, ValueError):
         return None

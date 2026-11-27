@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import quote
 
 from pydantic import Field, model_validator
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     public_web_url: str = "http://localhost:3000"
     cors_origins: str = "http://localhost:3000"
 
+    # Starting value of the platform-administrator MFA policy (admins can change it in /admin -> Settings -> auth.mfa).
+    # "off" is for development only and is refused when ENV=production. Everything else asks for a code.
+    mfa_super_admin_default: Literal["required", "optional", "off"] = "required"
+    mfa_org_admin_default: Literal["required", "optional", "off"] = "optional"
+
     # DEV/TEST ONLY: comma-separated hosts the scanner may reach even though they are private
     # (e.g. "127.0.0.1" for a local fixture server). Refused when ENV=production.
     scan_dev_allow_hosts: str = ""
@@ -51,6 +57,8 @@ class Settings(BaseSettings):
                 raise ValueError("A11Y_MASTER_KEYS must be set to real keys in production")
             if self.jwt_secret.startswith("dev-only"):
                 raise ValueError("JWT_SECRET must be set to a real secret in production")
+            if self.mfa_super_admin_default == "off":
+                raise ValueError("MFA_SUPER_ADMIN_DEFAULT=off is not allowed in production")
             if self.scan_dev_allow_hosts:
                 raise ValueError("SCAN_DEV_ALLOW_HOSTS is not allowed in production")
         return self

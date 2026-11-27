@@ -15,6 +15,7 @@ from .. import mail as mailmod
 from ..schemas import (
     EmailIn,
     LoginIn,
+    MfaChallenge,
     ResetConfirmIn,
     SessionOut,
     SignupIn,
@@ -82,6 +83,7 @@ def _user_out(u: User, org_name: str) -> UserOut:
         role=u.role,
         organization_id=str(u.organization_id),
         organization_name=org_name,
+        mfa_enabled=u.mfa_enabled_at is not None,
     )
 
 
@@ -203,19 +205,13 @@ async def verify_email(body: TokenIn):
         )
 
 
-@router.post("/login", response_model=SessionOut)
-async def login(body: LoginIn, response: Response):
-    async with login_lookup_session(body.email) as db:
-        user = (
-            await db.execute(select(User).where(User.email == body.email.lower()))
-        ).scalar_one_or_none()
-    ok = verify_password(body.password, user.hashed_password if user else None)
-    if not (ok and user and user.is_active):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
+async def finish_login(
+    user: User, response: Response, *, password: str | None = None
+) -> SessionOut:
+    """The final step of signing in, after the password (and any second step) succeeded."""
     if user.role == Role.SUPER_ADMIN:
-        # No tenant, so no refresh token or cookie: a short-lived access token only, then log in
-        # again. (Mandatory MFA + a proper platform session ship with the /admin UI.)
-        access, ttl = issue_access_token(Principal(user.id, None, user.role))
+        # No tenant, so no refresh token or cookie: a short-lived access token only, then log in again.
+        access, ttl = issue_access_token(Principal(user.id, None, user.role, user.email))
         return SessionOut(
             access_token=access,
             expires_in=ttl,
@@ -225,27 +221,45 @@ async def login(body: LoginIn, response: Response):
                 role=user.role,
                 organization_id="",
                 organization_name="",
+                mfa_enabled=user.mfa_enabled_at is not None,
             ),
         )
-    if not user.organization_id:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
-    if user.email_verified_at is None:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            detail={
-                "detail": "Confirm your email address before logging in. Check your inbox.",
-                "code": "email_not_verified",
-            },
-        )
     async with tenant_session(user.organization_id) as db:
-        if needs_rehash(user.hashed_password):
+        if password is not None and needs_rehash(user.hashed_password):
             await db.execute(
                 update(User)
                 .where(User.id == user.id)
-                .values(hashed_password=hash_password(body.password))
+                .values(hashed_password=hash_password(password))
             )
         org_name = (await db.execute(select(Organization.name))).scalar_one()
     return await _start_session(user, org_name, response)
+
+
+@router.post("/login", response_model=SessionOut | MfaChallenge)
+async def login(body: LoginIn, response: Response):
+    async with login_lookup_session(body.email) as db:
+        user = (
+            await db.execute(select(User).where(User.email == body.email.lower()))
+        ).scalar_one_or_none()
+    ok = verify_password(body.password, user.hashed_password if user else None)
+    if not (ok and user and user.is_active):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
+    if user.role != Role.SUPER_ADMIN:
+        if not user.organization_id:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
+        if user.email_verified_at is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail={
+                    "detail": "Confirm your email address before logging in. Check your inbox.",
+                    "code": "email_not_verified",
+                },
+            )
+    from .mfa import challenge_for  # noqa: PLC0415  (mfa imports finish_login from this module)
+
+    if (challenge := await challenge_for(user)) is not None:
+        return challenge
+    return await finish_login(user, response, password=body.password)
 
 
 @router.post("/refresh", response_model=SessionOut)
