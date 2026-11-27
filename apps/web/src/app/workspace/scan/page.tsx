@@ -144,7 +144,7 @@ function Results({ id }: { id: string }) {
                   { id: "sc", header: "Criteria", render: (f) => (f.criteria.length ? f.criteria.map((c) => c.clause).join(", ") : "Best practice") },
                   { id: "conf", header: "Confidence", render: (f) => `${CONFIDENCE_LABEL[f.confidence].split(":")[0]} (${f.agreement})` },
                   { id: "el", header: "Element", render: (f) => <code className="block max-w-xs [overflow-wrap:anywhere]">{f.element.css}</code> },
-                  { id: "d", header: "More", render: (f) => <FindingDetails f={f} /> },
+                  { id: "d", header: "More", render: (f) => <FindingDetails f={f} scanId={scan.id} /> },
                 ]}
               />
             )}

@@ -59,3 +59,24 @@ export async function mockScanApi(page: Page, state: { status?: string } = {}) {
   await page.route(`**/api/scans/${SCAN_ID}`, (r) => r.fulfill({ json: detail(state.status ?? "SUCCEEDED") }));
   await page.route(`**/api/scans/${SCAN_ID}?*`, (r) => r.fulfill({ json: detail(state.status ?? "SUCCEEDED") }));
 }
+
+export const FIX_ID = "22222222-aaaa-4bbb-8ccc-222222222222";
+const fixBase = { id: FIX_ID, finding_id: "f1", rule: "button-name", original_html: "<button></button>", explanation: "", notes: [], checks: [], reason: null, detail: null, model_id: null, attempts: 0, from_cache: false, rung: null, fixed_html: null };
+export const FIX_READY = {
+  ...fixBase, status: "READY", rung: "light", model_id: "m-light", attempts: 1,
+  fixed_html: '<button aria-label="Close"></button>', explanation: "Gives the button a name so screen readers can say what it does.",
+  notes: ["Written by an AI model: read it before you use it."],
+  checks: [{ name: "The fix is valid HTML", passed: true, detail: "" }, { name: "The problem no longer appears in our checks", passed: true, detail: "" }, { name: "The fix creates no new problems", passed: true, detail: "" }],
+};
+export const FIX_NO_MODEL = { ...fixBase, status: "NEEDS_REVIEW", reason: "ai_unavailable", detail: "No AI model is available for this right now, and there is no ready-made fix for this rule." };
+
+/** First POST returns PENDING; the next poll returns `final`. A retry POST (retry: true) starts again and returns `afterRetry`. */
+export async function mockFixApi(page: Page, final: object, afterRetry?: object) {
+  let phase: "idle" | "pending" | "retry" = "idle";
+  await page.route(`**/api/scans/${SCAN_ID}/findings/*/fix`, (r) => {
+    const body = r.request().postDataJSON() as { retry?: boolean };
+    phase = body?.retry ? "retry" : "pending";
+    return r.fulfill({ status: 202, json: { ...fixBase, status: "PENDING" } });
+  });
+  await page.route(`**/api/fixes/${FIX_ID}`, (r) => r.fulfill({ json: phase === "retry" && afterRetry ? afterRetry : final }));
+}

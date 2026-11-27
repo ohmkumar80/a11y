@@ -41,10 +41,12 @@ def _problem(http_status: int, detail: str, field: str | None = None, **extra) -
     return HTTPException(http_status, detail={"detail": detail, "field": field, **extra})
 
 
-async def _rate_limit(org_id: uuid.UUID, per_minute: int) -> None:
+async def _rate_limit(
+    org_id: uuid.UUID, per_minute: int, *, bucket: str = "scan", what: str = "scans"
+) -> None:
     r = Redis.from_url(get_settings().redis_url)
     try:
-        key = f"rl:scan:{org_id}:{int(time.time() // 60)}"
+        key = f"rl:{bucket}:{org_id}:{int(time.time() // 60)}"
         n = await r.incr(key)
         if n == 1:
             await r.expire(key, 90)
@@ -56,7 +58,7 @@ async def _rate_limit(org_id: uuid.UUID, per_minute: int) -> None:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
-                "detail": "You are starting scans too quickly. Wait a minute and try again.",
+                "detail": f"You are starting {what} too quickly. Wait a minute and try again.",
                 "code": "rate_limited",
             },
             headers={"Retry-After": "60"},

@@ -17,6 +17,7 @@ from .routers import (
     admin_settings,
     auth,
     domains,
+    fixes,
     mfa,
     org,
     org_ai,
@@ -93,6 +94,7 @@ app.include_router(admin_ai.router)
 app.include_router(org_ai.router)
 app.include_router(standards.router)
 app.include_router(rule_guidance.router)
+app.include_router(fixes.router)
 app.include_router(scans.router)
 app.include_router(domains.router)
 app.include_router(reports.router)

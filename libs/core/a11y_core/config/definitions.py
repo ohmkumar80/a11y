@@ -317,6 +317,31 @@ register(
 )
 
 
+class CodeFixPolicy(BaseModel):
+    enabled: bool = Field(True, description="Offer code-fix suggestions on findings")
+    per_minute: int = Field(
+        20, ge=1, le=600, description="Fix requests per organisation per minute"
+    )
+    use_ai: bool = Field(
+        True,
+        description="Let a model propose fixes when no ready-made recipe applies. Off = recipes only; "
+        "the element's HTML tag is sent to the AI provider when on.",
+    )
+
+
+register(
+    SettingDef(
+        key="ai.code_fix",
+        model=CodeFixPolicy,
+        default=CodeFixPolicy(),
+        description="Code-fix suggestions: on or off, request rate, and whether a model may be used.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        owner_role="AI_OPS",
+        tags=("ai",),
+    )
+)
+
+
 # --- Two-step verification policy ------------------------------------------------------------------------
 
 

@@ -579,3 +579,48 @@ class PlatformSession(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FixSuggestion(Base):
+    """One validated (or honestly absent) code fix for one finding. ``fixed_html`` exists only when the fix passed
+    our checks and the re-scan oracle; the table constraint ``ck_fix_only_if_ready`` enforces it."""
+
+    __tablename__ = "fix_suggestions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING', 'RUNNING', 'READY', 'NEEDS_REVIEW', 'FAILED')",
+            name="ck_fix_status",
+        ),
+        CheckConstraint(
+            "fixed_html IS NULL OR status = 'READY' OR status = 'PENDING'",
+            name="ck_fix_only_if_ready",
+        ),
+        UniqueConstraint("finding_id", name="uq_fix_finding"),
+        Index("ix_fix_suggestions_cache", "organization_id", "rule", "input_hash"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    finding_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("scan_findings.id", ondelete="CASCADE")
+    )
+    rule: Mapped[str] = mapped_column(String(120))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(12), server_default="PENDING")
+    rung: Mapped[str | None] = mapped_column(String(10))
+    original_html: Mapped[str] = mapped_column(Text)
+    fixed_html: Mapped[str | None] = mapped_column(Text)
+    explanation: Mapped[str] = mapped_column(Text, server_default="")
+    notes: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    checks: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    reason: Mapped[str | None] = mapped_column(String(30))
+    model_id: Mapped[str | None] = mapped_column(String(80))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    from_cache: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

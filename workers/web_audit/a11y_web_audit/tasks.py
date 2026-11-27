@@ -24,7 +24,7 @@ from a11y_core.db import dispose_engines, tenant_session
 from a11y_core.models import ScanFinding, ScanPage
 from a11y_core.rules import get_registry
 from a11y_core.scan_jobs import USAGE_FEATURE, fail_scan
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from .engines import load_bundles
 from .scanner import PageResult, ScanOptions, scan_site
@@ -207,5 +207,111 @@ def scan_task(org_id: str, scan_id: str) -> str:
             return await run_scan(uuid.UUID(org_id), uuid.UUID(scan_id))
         finally:
             await dispose_engines()  # asyncio.run closes the loop; drop its connections
+
+    return asyncio.run(run())
+
+
+# -- AI code-fix suggestion (PROJECT_PLAN 3.13) ----------------------------------------------------
+FIX_FAILED = "We could not check a fix right now. Please try again in a few minutes."
+
+
+async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
+    """Resolve one fix suggestion: recipe, then model, each judged by the re-scan oracle. Idempotent: a finished
+    suggestion is never recomputed, so a redelivered task cannot change what the person already saw."""
+    from a11y_core.ai import LLMRequest, get_gateway
+    from a11y_core.models import FixSuggestion
+    from playwright.async_api import async_playwright
+    from sqlalchemy import select, update
+
+    from .fixes.ladder import suggest
+
+    async with tenant_session(org_id) as db:
+        row = (
+            await db.execute(select(FixSuggestion).where(FixSuggestion.id == fix_id))
+        ).scalar_one_or_none()
+        if row is None or row.status not in ("PENDING", "RUNNING"):
+            return row.status if row else "MISSING"
+        f = (
+            await db.execute(
+                text("SELECT title, sc, message FROM scan_findings WHERE id=:i"),
+                {"i": row.finding_id},
+            )
+        ).first()
+        sub = await billing.load_subscription(db)
+        await db.execute(
+            update(FixSuggestion).where(FixSuggestion.id == fix_id).values(status="RUNNING")
+        )
+        rule, original = row.rule, row.original_html
+
+    gw = get_gateway()
+    policy = (await get_config().effective("ai.code_fix", org_id=org_id, plan_id=sub.plan_id)).value
+
+    async def complete(messages):
+        return await gw.complete(
+            LLMRequest(
+                task="code_fix",
+                messages=messages,
+                org_id=org_id,
+                job_id=str(fix_id),
+                plan_id=sub.plan_id,
+                json_mode=True,
+            )
+        )
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(chromium_sandbox=False)
+            try:
+                out = await suggest(
+                    browser,
+                    rule=rule,
+                    title=f.title if f else rule,
+                    criteria=list(f.sc) if f else [],
+                    message=f.message if f else "",
+                    original_html=original,
+                    complete=complete if policy.use_ai else None,
+                )
+            finally:
+                await browser.close()
+    except Exception:  # noqa: BLE001 - a platform fault: say so plainly, keep the detail in our logs
+        log.exception("fix %s failed", fix_id)
+        async with tenant_session(org_id) as db:
+            await db.execute(
+                update(FixSuggestion)
+                .where(FixSuggestion.id == fix_id)
+                .values(status="FAILED", error_detail=FIX_FAILED, finished_at=func.now())
+            )
+        return "FAILED"
+
+    from .fixes.ladder import REASONS
+
+    async with tenant_session(org_id) as db:
+        await db.execute(
+            update(FixSuggestion)
+            .where(FixSuggestion.id == fix_id)
+            .values(
+                status=out.status,
+                rung=out.rung,
+                fixed_html=out.fixed_html,
+                explanation=out.explanation,
+                notes=out.notes,
+                checks=out.checks,
+                reason=out.reason,
+                model_id=out.model_id,
+                attempts=out.attempts,
+                error_detail=REASONS.get(out.reason or "") if out.status != "READY" else None,
+                finished_at=func.now(),
+            )
+        )
+    return out.status
+
+
+@celery_app.task(name="web.suggest_fix", acks_late=True, max_retries=0)
+def suggest_fix_task(org_id: str, fix_id: str) -> str:
+    async def run() -> str:
+        try:
+            return await run_fix(uuid.UUID(org_id), uuid.UUID(fix_id))
+        finally:
+            await dispose_engines()
 
     return asyncio.run(run())

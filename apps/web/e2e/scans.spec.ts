@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, mockApi, test } from "./fixtures";
-import { SCAN_ID, mockScanApi } from "./scan-mocks";
+import { FIX_NO_MODEL, FIX_READY, SCAN_ID, mockFixApi, mockScanApi } from "./scan-mocks";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 async function audit(page: import("@playwright/test").Page, what: string) {
@@ -105,4 +105,61 @@ test("standard member can scan but does not see site verification", async ({ pag
   await page.goto("/workspace");
   await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Verified sites" })).toHaveCount(0);
+});
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`a checked code fix appears, is announced once, and can be copied (${scheme})`, async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.emulateMedia({ colorScheme: scheme });
+    await mockApi(page, "COMPANY_ADMIN");
+    await mockFixApi(page, FIX_READY);
+    await page.goto(`/workspace/scan?id=${SCAN_ID}`);
+    await page.getByRole("button", { name: /Group by/ }).click();
+    await page.getByRole("option", { name: "Each occurrence" }).click();
+    await page.getByRole("button", { name: /Details for Images need a text alternative/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Images need a text alternative" });
+    await expect(dialog.getByRole("heading", { level: 3, name: "Suggested code fix" })).toBeVisible();
+    await expect(dialog.getByText(/sends only this element/)).toBeVisible(); // the data use is stated before the click
+    await audit(page, "fix: before asking");
+    await dialog.getByRole("button", { name: "Suggest a fix" }).click();
+    await expect(dialog.getByText('<button aria-label="Close"></button>')).toBeVisible();
+    await expect(dialog.getByRole("status").filter({ hasText: "A checked fix is ready." })).toHaveCount(1);
+    await expect(dialog.getByText("Suggested by an AI model")).toBeVisible();
+    await expect(dialog.getByText("The problem no longer appears in our checks")).toBeVisible();
+    await expect(dialog.getByText(/do not prove the page is accessible/)).toBeVisible();
+    await expect(dialog.getByText("Written by an AI model: read it before you use it.")).toBeVisible();
+    await audit(page, "fix: ready");
+    await dialog.getByRole("button", { name: "Copy fix" }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('<button aria-label="Close"></button>');
+  });
+}
+
+test("when no fix can be trusted we say why and offer a retry, never code", async ({ page }) => {
+  await mockApi(page, "COMPANY_ADMIN");
+  await mockFixApi(page, FIX_NO_MODEL, FIX_READY);
+  await page.goto(`/workspace/scan?id=${SCAN_ID}`);
+  await page.getByRole("button", { name: /Group by/ }).click();
+  await page.getByRole("option", { name: "Each occurrence" }).click();
+  await page.getByRole("button", { name: /Details for Images need a text alternative/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Images need a text alternative" });
+  await dialog.getByRole("button", { name: "Suggest a fix" }).click();
+  await expect(dialog.getByText(/No AI model is available/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Copy fix" })).toHaveCount(0);
+  await audit(page, "fix: needs review");
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect(dialog.getByText('<button aria-label="Close"></button>')).toBeVisible();
+});
+
+test("a refused request (rate limit or switched off) is explained in words", async ({ page }) => {
+  await mockApi(page, "COMPANY_ADMIN");
+  await mockScanApi(page);
+  await page.route(`**/api/scans/${SCAN_ID}/findings/*/fix`, (r) => r.fulfill({ status: 403, json: { detail: "Fix suggestions are turned off for your account.", code: "fixes_disabled" } }));
+  await page.goto(`/workspace/scan?id=${SCAN_ID}`);
+  await page.getByRole("button", { name: /Group by/ }).click();
+  await page.getByRole("option", { name: "Each occurrence" }).click();
+  await page.getByRole("button", { name: /Details for Images need a text alternative/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Images need a text alternative" });
+  await dialog.getByRole("button", { name: "Suggest a fix" }).click();
+  await expect(dialog.getByText("Fix suggestions are turned off for your account.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Suggest a fix" })).toBeVisible(); // can try again later
 });
