@@ -1,0 +1,20 @@
+id: multiple-labels
+status: draft
+summary: A form field should have one clear label. Several labels pointing at the same field can be read in an unpredictable
+  way.
+why: Screen readers and voice-control tools do not agree on which label to use when there are several, so people may hear
+  the wrong or a partial name.
+who:
+- Screen reader users
+- Voice control users
+steps:
+- Keep one <label> for each field.
+- Put any extra help in a description linked with aria-describedby instead of a second label.
+examples:
+- stack: html
+  before: <label for="email">Email</label><label for="email">Required</label><input id="email" type="email">
+  after: <label for="email">Email</label><input id="email" type="email" aria-describedby="email-help"><span id="email-help">Required</span>
+links:
+- title: 3.3.2 Labels or Instructions
+  url: https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions.html
+test: 'Focus the field with a screen reader: it should read one clear name.'

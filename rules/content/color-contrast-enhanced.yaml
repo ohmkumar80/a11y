@@ -1,0 +1,24 @@
+id: color-contrast-enhanced
+status: draft
+summary: For the enhanced level (AAA), text needs a contrast of at least 7 to 1 with its background, or 4.5 to 1 for large
+  text.
+why: Higher contrast helps people with moderately low vision who do not use assistive technology, and everyone in poor light
+  or on a worn screen.
+who:
+- People with low vision
+- Older people
+- Anyone reading in bright light or on a low-quality screen
+steps:
+- Darken the text, or lighten the background, until the ratio reaches 7 to 1.
+- Check large text (18pt, or 14pt bold) against 4.5 to 1.
+- This is an enhanced target, not required for AA conformance.
+examples:
+- stack: html
+  before: <p style="color:#767676;background:#ffffff">Readable but not enhanced</p>
+  after: <p style="color:#4d4d4d;background:#ffffff">Readable at the enhanced level</p>
+links:
+- title: 1.4.6 Contrast (Enhanced)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/contrast-enhanced.html
+test: Use a contrast checker and compare against 7 to 1.
+machine_check: false
+manual_reason: The enhanced (AAA) contrast check is not run by the current engine settings; measure with a contrast checker.

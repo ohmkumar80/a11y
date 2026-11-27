@@ -1,0 +1,23 @@
+id: meta-refresh-no-exceptions
+status: draft
+summary: At the strictest level (AAA), a page must not refresh or redirect itself on a timer, even for an instant redirect.
+why: Automatic changes can disorient people, and pull a screen reader user away from the content they were reading.
+who:
+- Screen reader users
+- People who read slowly
+- People with cognitive disabilities
+steps:
+- Remove the meta refresh tag.
+- Redirect on the server instead (an HTTP 301 or 302), or give a link people choose to follow.
+examples:
+- stack: html
+  before: <meta http-equiv="refresh" content="0;url=/new">
+  after: <!-- redirect on the server instead -->
+links:
+- title: 2.2.3 No Timing
+  url: https://www.w3.org/WAI/WCAG22/Understanding/no-timing.html
+- title: 3.2.5 Change on Request
+  url: https://www.w3.org/WAI/WCAG22/Understanding/change-on-request.html
+test: Look for <meta http-equiv="refresh"> in the page head.
+machine_check: false
+manual_reason: This AAA check is not run by the current engine settings; look for the tag in the page head.

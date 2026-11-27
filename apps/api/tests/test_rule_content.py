@@ -20,6 +20,11 @@ def test_every_content_file_names_a_real_rule():
     assert set(REG.content) <= set(REG.canonical)
 
 
+def test_every_canonical_rule_has_guidance():
+    # the content library is complete: nothing the scanner can report is left without an explanation and a fix
+    assert set(REG.content) == set(REG.canonical), sorted(set(REG.canonical) - set(REG.content))
+
+
 def test_the_most_common_rules_are_covered():
     # the rules that account for most real-world findings must have guidance
     core = {

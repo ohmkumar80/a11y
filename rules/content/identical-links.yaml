@@ -1,0 +1,22 @@
+id: identical-links
+status: draft
+summary: Links with the same text should go to the same place. If two links say the same thing but go to different pages,
+  add detail so people can tell them apart.
+why: Screen reader users browse a list of links out of context. Several identical "Read more" links give them no way to choose.
+who:
+- Screen reader users
+- Voice control users
+- People with cognitive disabilities
+steps:
+- Make each link's text describe its own destination.
+- If the visible text must stay short, add hidden text or aria-label that starts with the visible words.
+examples:
+- stack: html
+  before: <a href="/pricing">Read more</a> <a href="/careers">Read more</a>
+  after: <a href="/pricing">Read more about pricing</a> <a href="/careers">Read more about careers</a>
+links:
+- title: 2.4.9 Link Purpose (Link Only)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-link-only.html
+test: List the page's links with a screen reader and check no two identical names lead to different pages.
+machine_check: false
+manual_reason: Whether two links with the same text lead to the same purpose needs a person to judge.
