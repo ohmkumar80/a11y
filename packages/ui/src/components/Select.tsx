@@ -28,9 +28,11 @@ export interface SelectProps {
   name?: string;
   isRequired?: boolean;
   className?: string;
+  /** Keep the label for assistive technology but do not show it (e.g. inside a table row). */
+  labelHidden?: boolean;
 }
 
-export function Select({ label, options, error, className, ...props }: SelectProps) {
+export function Select({ label, options, error, className, labelHidden, ...props }: SelectProps) {
   return (
     <AriaSelect
       {...props}
@@ -41,7 +43,7 @@ export function Select({ label, options, error, className, ...props }: SelectPro
       validationBehavior="aria"
       className={cn("flex flex-col gap-1", className)}
     >
-      <Label className="font-semibold">{label}</Label>
+      <Label className={cn("font-semibold", labelHidden && "a11y-sr-only")}>{label}</Label>
       <Button className="flex min-h-11 items-center justify-between gap-2 rounded-md border-2 border-border bg-bg px-3 py-2 text-left data-[invalid]:border-danger">
         <SelectValue />
         <span aria-hidden="true">▾</span>

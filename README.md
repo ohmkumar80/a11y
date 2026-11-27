@@ -11,7 +11,7 @@ Planning is complete and published here. Application code is in active developme
 | Phase | Scope | State |
 |---|---|---|
 | 0. Foundations | Monorepo, Docker stack, CI accessibility gates, accessible component library, auth, tenant isolation | Built (manual screen-reader smoke test still to do) |
-| 1a. Sellable core | Web scanner, rule registry, reports and VPAT drafts, public API skeleton, Razorpay Payment Links, admin MFA | In progress (SaaS core, settings, admin screens, AI providers incl. enterprise own-key, rule registry and the web scanner with its workspace screens built; reports, templates, billing and the public API to do) |
+| 1a. Sellable core | Web scanner, rule registry, reports and VPAT drafts, public API skeleton, Razorpay Payment Links, admin MFA | In progress (SaaS core, settings, admin screens, AI providers incl. enterprise own-key, rule registry, the web scanner with its workspace screens, and accessible reports (PDF, Word, CSV, VPAT with sign-off) built; email templates, billing and the public API to do) |
 | 1b. Breadth and hardening | Full notification catalogue, webhooks, canaries, sampled AI validation, our own ACR | Planned |
 | 2. Deep web audit and monetisation | Authenticated scans, vision audit, monitoring, self-serve billing, SSO/SCIM, CI/CD and Jira/GitHub integrations | Planned |
 | 3. Documents and eBooks | PDF, DOCX, PPTX, EPUB remediation and the human review console | Planned |
@@ -87,6 +87,7 @@ apps/web         Next.js App Router: all dashboards and auth
 apps/api         FastAPI + Alembic (RLS migrations)
 libs/core        Models, tenant-scoped DB sessions, settings, rule registry, AI gateway, billing, SSRF guard
 workers/web_audit  Browser scanner: three engines in one page, egress proxy, scan job runner
+workers/documents  Accessible reports: PDF/UA (WeasyPrint + veraPDF gate), DOCX, CSV, VPAT; report templates
 packages/ui      React Aria component library, design tokens, Storybook
 packages/engine-bundles  Pinned, hash-checked axe / IBM / HTMLCS browser bundles
 rules/           WCAG criteria, standards mappings, canonical cross-engine rules (SME-reviewed data)

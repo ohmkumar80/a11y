@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Button, ProgressBar, Select, StatusMessage, Table } from "@a11y/ui";
 import { FindingDetails } from "@/components/FindingDetails";
+import { ReportsPanel } from "@/components/ReportsPanel";
+import { VpatStart } from "@/components/VpatStart";
 import { Page } from "@/components/Page";
 import { RequireAuth } from "@/components/RequireAuth";
 import { get } from "@/lib/api";
@@ -156,6 +158,9 @@ function Results({ id }: { id: string }) {
           </section>
         </>
       )}
+
+      {done && <ReportsPanel scanId={scan.id} standard={sm.standard} />}
+      {done && <VpatStart scanId={scan.id} standard={sm.standard} />}
 
       {scan.pages.length > 1 && (
         <section aria-labelledby="pages" className="flex flex-col gap-3">

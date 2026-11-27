@@ -70,3 +70,29 @@ export function refreshSession(): Promise<Result<Session>> {
   })();
   return inflight;
 }
+
+/** Download a file from an authenticated endpoint. A plain link cannot send the bearer token, so fetch, then save the blob. */
+export async function download(path: string): Promise<{ ok: true } | { ok: false; problem: Problem }> {
+  const headers = new Headers();
+  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { headers, credentials: "same-origin" });
+  } catch {
+    return { ok: false, problem: { detail: "We could not reach the server. Check your connection and try again." } };
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, problem: { detail: typeof body?.detail === "string" ? body.detail : "The download failed. Try again.", code: body?.code } };
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "report";
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return { ok: true };
+}

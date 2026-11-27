@@ -28,24 +28,15 @@
 <section aria-labelledby="summary">
   <h2 id="summary">Summary</h2>
   {% for line in d.narrative %}<p>{{ line }}</p>{% endfor %}
-  <figure>
-    {% set bar_max = ([d.severity_counts.values()|max, 1]|max) %}
-    <svg role="img" aria-labelledby="sev-t sev-d" width="360" height="{{ 4 * 22 + 8 }}" viewBox="0 0 360 {{ 4 * 22 + 8 }}" xmlns="http://www.w3.org/2000/svg">
-      <title id="sev-t">Failures by severity</title>
-      <desc id="sev-d">{% for s in ["critical","serious","moderate","minor"] %}{{ d.severity_counts.get(s, 0) }} {{ s }}{% if not loop.last %}, {% endif %}{% endfor %}.</desc>
-      {% for s in ["critical","serious","moderate","minor"] %}
-      <rect x="4" y="{{ 4 + loop.index0 * 22 }}" width="{{ (d.severity_counts.get(s, 0) / bar_max * 340)|round(0)|int }}" height="16" fill="#1a1a1a"/>
-      {% endfor %}
-    </svg>
-    <figcaption>Figure 1. Failures by severity (the same numbers are in the table below).</figcaption>
-  </figure>
-  <table>
-    <caption>Results at a glance</caption>
-    <thead><tr><th scope="col">Result</th><th scope="col">Count</th></tr></thead>
+  {% set counts = [d.severity_counts.get("critical", 0), d.severity_counts.get("serious", 0), d.severity_counts.get("moderate", 0), d.severity_counts.get("minor", 0), d.needs_review, d.best_practices] %}
+  {% set bar_max = ([counts|max, 1]|max) %}
+  <table class="keep">
+    <caption>Results at a glance. The bars repeat the numbers visually; the numbers are the information.</caption>
+    <thead><tr><th scope="col">Result</th><th scope="col">Count</th><th scope="col">Size</th></tr></thead>
     <tbody>
-      {% for s in ["critical","serious","moderate","minor"] %}<tr><th scope="row">{{ s|capitalize }} failures</th><td>{{ d.severity_counts.get(s, 0) }}</td></tr>{% endfor %}
-      <tr><th scope="row">Items that need a person to review</th><td>{{ d.needs_review }}</td></tr>
-      <tr><th scope="row">Best-practice suggestions</th><td>{{ d.best_practices }}</td></tr>
+      {% for label, n in [("Critical failures", counts[0]), ("Serious failures", counts[1]), ("Moderate failures", counts[2]), ("Minor failures", counts[3]), ("Items that need a person to review", counts[4]), ("Best-practice suggestions", counts[5])] %}
+      <tr><th scope="row">{{ label }}</th><td>{{ n }}</td><td><span class="bar" style="width: {{ (n / bar_max * 100)|round(0)|int }}%"></span></td></tr>
+      {% endfor %}
     </tbody>
   </table>
 </section>
@@ -53,7 +44,7 @@
 <section aria-labelledby="criteria">
   <h2 id="criteria">Criteria in {{ d.standard.label }}</h2>
   <p>Automated checks exist for {{ d.criteria.tested }} of {{ d.criteria.total }} criteria.</p>
-  <table>
+  <table class="keep">
     <caption>Criteria by result</caption>
     <thead><tr><th scope="col">Result</th><th scope="col">Number</th><th scope="col">Criteria</th></tr></thead>
     <tbody>

@@ -2,6 +2,7 @@ export { Button, type ButtonProps } from "./components/Button";
 export { Link } from "./components/Link";
 export { TextField, type TextFieldProps } from "./components/TextField";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";
+export { TextArea, type TextAreaProps } from "./components/TextArea";
 export { Select, type SelectProps, type SelectOption } from "./components/Select";
 export { Dialog, DialogTrigger, type DialogProps } from "./components/Dialog";
 export { Tabs, type TabItem } from "./components/Tabs";

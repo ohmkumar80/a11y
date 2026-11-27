@@ -15,13 +15,15 @@
   table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; }
   th, td { border: 1px solid #555; padding: 3pt 5pt; text-align: left; vertical-align: top; font-size: 9.5pt; overflow-wrap: anywhere; }
   thead { display: table-header-group; } tr { break-inside: avoid; }
+  table.keep { break-inside: avoid; }
   caption { text-align: left; font-weight: bold; margin-bottom: 3pt; }
   pre { background: #f3f3f3; border: 1px solid #bbb; padding: 4pt 6pt; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 8.5pt; margin: 3pt 0; }
   code { font-family: "Noto Sans Mono", "Courier New", monospace; }
   a { color: #0b4f9e; }
   .notice { border: 2px solid #1a1a1a; padding: 6pt 9pt; margin: 10pt 0; }
   dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 2pt 14pt; } dl.facts dt { font-weight: bold; } dl.facts dd { margin: 0; }
-  .bar { height: 14pt; }
+  /* Bars are decoration drawn with a CSS background (an artifact in the PDF); the number beside them is the information. */
+  .bar { display: inline-block; height: 10pt; background: #1a1a1a; min-width: 1pt; }
   figure { margin: 8pt 0; break-inside: avoid; } figcaption { font-size: 9pt; }
 </style>
 </head>

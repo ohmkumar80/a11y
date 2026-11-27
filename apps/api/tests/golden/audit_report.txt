@@ -14,12 +14,13 @@ WCAG 2.2 Level AA: A reference standard.
 The mapping of this standard to individual criteria has not yet been signed off by an accessibility expert.
 Summary
 On 26 November 2026 we scanned 3 pages of www.example.com with three automated accessibility engines and checked the results against WCAG 2.2 Level AA.The tests reported 7 failures (4 critical, 2 serious, 1 moderate) caused by 3 distinct problems.The most widespread problem is "Images need a text alternative", with 4 occurrences on 2 pages.A further 5 items need a person to judge whether it is a problem.2 of the 55 criteria in this standard had at least one automated failure. Automated checks exist for 30 of the 55 criteria, so 25 need to be evaluated by a person.
-Failures by severity
-4 critical, 2 serious, 1 moderate, 0 minor.
-Figure 1. Failures by severity (the same numbers are in the table below).
-Results at a glance
-ResultCount
-Critical failures4Serious failures2Moderate failures1Minor failures0 Items that need a person to review5
+Results at a glance. The bars repeat the numbers visually; the numbers are the information.
+ResultCountSize
+Critical failures4
+Serious failures2
+Moderate failures1
+Minor failures0
+Items that need a person to review5
 Best-practice suggestions3
 Criteria in WCAG 2.2 Level AA
 Automated checks exist for 30 of 55 criteria.

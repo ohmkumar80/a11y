@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { describe, expect, it, vi } from "vitest";
-import { Button, Checkbox, Dialog, DialogTrigger, ErrorSummary, Link, Meter, ProgressBar, Select, Table, Tabs, TextField } from "../index";
+import { Button, Checkbox, TextArea, Dialog, DialogTrigger, ErrorSummary, Link, Meter, ProgressBar, Select, Table, Tabs, TextField } from "../index";
 
 describe("Button", () => {
   it("has no axe violations and fires on keyboard Enter and Space", async () => {
@@ -160,5 +160,28 @@ describe("Checkbox", () => {
     await user.keyboard(" ");
     expect(onChange).toHaveBeenCalledWith(true);
     expect(box).toBeChecked();
+  });
+});
+
+describe("TextArea", () => {
+  it("is a named multi-line field, keeps a hidden label for AT, links its error, and allows paste", async () => {
+    const { container } = render(<TextArea label="Remarks" description="Explain your answer" error="Explain why." labelHidden />);
+    const box = screen.getByRole("textbox", { name: "Remarks" });
+    expect(box.tagName).toBe("TEXTAREA");
+    expect(box).toHaveAccessibleDescription(/Explain why\./);
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(await axe(container)).toHaveNoViolations();
+    const user = userEvent.setup();
+    await user.click(box);
+    await user.paste("pasted text");
+    expect(box).toHaveValue("pasted text");
+  });
+});
+
+describe("Select with a hidden label", () => {
+  it("still has an accessible name", async () => {
+    const { container } = render(<Select label="Level for 1.1.1" labelHidden options={[{ id: "a", label: "Supports" }]} />);
+    expect(screen.getByRole("button", { name: /Level for 1\.1\.1/ })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
