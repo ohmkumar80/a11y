@@ -15,6 +15,7 @@ x-api-env: &api-env
   A11Y_MASTER_KEYS: ${A11Y_MASTER_KEYS:-Q2OoEdjRtijEf6Bd8VUo4q6_2oBKlFXaQopiFpf0lgc=}
   COOKIE_SECURE: ${COOKIE_SECURE:-false}
   PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8010}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
   SMTP_HOST: mailpit
   SMTP_PORT: "1025"
