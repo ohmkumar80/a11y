@@ -1,0 +1,4 @@
+{
+  "_doc": "Every entry needs: rule (axe rule id), route, issue (tracking URL) and expires (YYYY-MM-DD). Expired entries FAIL the build. Keep this list empty if you can.",
+  "entries": []
+}

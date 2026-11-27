@@ -1,0 +1,408 @@
+[
+ {
+  "key": "ai.models",
+  "description": "Model catalogue: capabilities and prices (prices drive FinOps cost reports).",
+  "scopes": [
+   "global"
+  ],
+  "owner_role": "AI_OPS",
+  "high_risk": false,
+  "tags": [
+   "ai"
+  ],
+  "schema": {
+   "$defs": {
+    "AIModel": {
+     "properties": {
+      "id": {
+       "pattern": "^[a-z0-9][a-z0-9_.-]{0,59}$",
+       "title": "Id",
+       "type": "string"
+      },
+      "provider_id": {
+       "title": "Provider Id",
+       "type": "string"
+      },
+      "model_name": {
+       "description": "The provider's own model/deployment name",
+       "maxLength": 200,
+       "title": "Model Name",
+       "type": "string"
+      },
+      "capabilities": {
+       "items": {
+        "enum": [
+         "text",
+         "vision",
+         "json",
+         "tools"
+        ],
+        "type": "string"
+       },
+       "title": "Capabilities",
+       "type": "array"
+      },
+      "context_window": {
+       "default": 8192,
+       "minimum": 1,
+       "title": "Context Window",
+       "type": "integer"
+      },
+      "input_cost_per_1m": {
+       "default": 0,
+       "description": "USD per million input tokens",
+       "minimum": 0,
+       "title": "Input Cost Per 1M",
+       "type": "number"
+      },
+      "output_cost_per_1m": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Output Cost Per 1M",
+       "type": "number"
+      },
+      "is_enabled": {
+       "default": true,
+       "title": "Is Enabled",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "id",
+      "provider_id",
+      "model_name"
+     ],
+     "title": "AIModel",
+     "type": "object"
+    }
+   },
+   "properties": {
+    "items": {
+     "items": {
+      "$ref": "#/$defs/AIModel"
+     },
+     "title": "Items",
+     "type": "array"
+    }
+   },
+   "title": "AIModels",
+   "type": "object"
+  }
+ },
+ {
+  "key": "ai.providers",
+  "description": "AI providers and their credentials (write-only). Add a row to add a provider.",
+  "scopes": [
+   "global"
+  ],
+  "owner_role": "AI_OPS",
+  "high_risk": true,
+  "tags": [
+   "ai"
+  ],
+  "schema": {
+   "$defs": {
+    "AIProvider": {
+     "properties": {
+      "id": {
+       "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$",
+       "title": "Id",
+       "type": "string"
+      },
+      "type": {
+       "enum": [
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "bedrock",
+        "gemini",
+        "deepseek",
+        "mistral",
+        "groq",
+        "openai_compatible",
+        "fake"
+       ],
+       "title": "Type",
+       "type": "string"
+      },
+      "display_name": {
+       "maxLength": 100,
+       "title": "Display Name",
+       "type": "string"
+      },
+      "base_url": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Base Url"
+      },
+      "region": {
+       "anyOf": [
+        {
+         "maxLength": 50,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Region"
+      },
+      "api_key": {
+       "$ref": "#/$defs/Secret"
+      },
+      "options": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "title": "Options",
+       "type": "object"
+      },
+      "data_policy": {
+       "$ref": "#/$defs/DataPolicy"
+      },
+      "is_enabled": {
+       "default": true,
+       "title": "Is Enabled",
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "id",
+      "type",
+      "display_name"
+     ],
+     "title": "AIProvider",
+     "type": "object"
+    },
+    "DataPolicy": {
+     "properties": {
+      "zero_retention": {
+       "default": false,
+       "title": "Zero Retention",
+       "type": "boolean"
+      },
+      "processing_regions": {
+       "description": "e.g. ['us','eu','in']",
+       "items": {
+        "type": "string"
+       },
+       "title": "Processing Regions",
+       "type": "array"
+      },
+      "gov_approved": {
+       "default": false,
+       "title": "Gov Approved",
+       "type": "boolean"
+      }
+     },
+     "title": "DataPolicy",
+     "type": "object"
+    },
+    "Secret": {
+     "additionalProperties": false,
+     "description": "Write-only credential.\n\nClients send ``{\"$secret\": true, \"plaintext\": \"...\"}`` to set or replace it, or\n``{\"$secret\": true}`` to keep the stored one. The store keeps only ``ct`` (ciphertext) and\n``hint`` (last 4 characters). The API returns ``set`` and ``hint`` - never ``ct``/plaintext.",
+     "properties": {
+      "$secret": {
+       "const": true,
+       "default": true,
+       "title": "$Secret",
+       "type": "boolean"
+      },
+      "plaintext": {
+       "anyOf": [
+        {
+         "maxLength": 4096,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Plaintext"
+      },
+      "ct": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Ct"
+      },
+      "hint": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Hint"
+      }
+     },
+     "title": "Secret",
+     "type": "object"
+    }
+   },
+   "properties": {
+    "items": {
+     "items": {
+      "$ref": "#/$defs/AIProvider"
+     },
+     "title": "Items",
+     "type": "array"
+    }
+   },
+   "title": "AIProviders",
+   "type": "object"
+  }
+ },
+ {
+  "key": "ai.route.code_fix",
+  "description": "Primary model and fallback chain for 'code_fix' (needs: text).",
+  "scopes": [
+   "global",
+   "org",
+   "plan"
+  ],
+  "owner_role": "AI_OPS",
+  "high_risk": false,
+  "tags": [
+   "ai",
+   "routing"
+  ],
+  "schema": {
+   "description": "Which model serves a task, and what to try if it fails.",
+   "properties": {
+    "primary_model_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Primary Model Id"
+    },
+    "fallback_model_ids": {
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 5,
+     "title": "Fallback Model Ids",
+     "type": "array"
+    },
+    "temperature": {
+     "default": 0.0,
+     "maximum": 2,
+     "minimum": 0,
+     "title": "Temperature",
+     "type": "number"
+    },
+    "max_tokens": {
+     "default": 1024,
+     "maximum": 200000,
+     "minimum": 1,
+     "title": "Max Tokens",
+     "type": "integer"
+    },
+    "timeout_seconds": {
+     "default": 60,
+     "maximum": 900,
+     "minimum": 1,
+     "title": "Timeout Seconds",
+     "type": "integer"
+    },
+    "monthly_budget_usd": {
+     "anyOf": [
+      {
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Cap per organisation; empty = none",
+     "title": "Monthly Budget Usd"
+    }
+   },
+   "title": "AIRoute",
+   "type": "object"
+  }
+ },
+ {
+  "key": "billing.trial",
+  "description": "Trial length, plan, grace period and what happens at expiry.",
+  "scopes": [
+   "global",
+   "org"
+  ],
+  "owner_role": "PLATFORM_OWNER",
+  "high_risk": false,
+  "tags": [
+   "billing"
+  ],
+  "schema": {
+   "properties": {
+    "length_days": {
+     "default": 14,
+     "description": "Length of a new organisation's trial",
+     "maximum": 365,
+     "minimum": 1,
+     "title": "Length Days",
+     "type": "integer"
+    },
+    "plan_id": {
+     "default": "TRIAL",
+     "description": "Plan active during the trial",
+     "maxLength": 64,
+     "minLength": 1,
+     "title": "Plan Id",
+     "type": "string"
+    },
+    "grace_days": {
+     "default": 0,
+     "description": "Extra days of full access after the trial ends",
+     "maximum": 90,
+     "minimum": 0,
+     "title": "Grace Days",
+     "type": "integer"
+    },
+    "after_expiry": {
+     "const": "LOCKED_READ_ONLY",
+     "default": "LOCKED_READ_ONLY",
+     "title": "After Expiry",
+     "type": "string"
+    },
+    "reminder_days_before": {
+     "items": {
+      "type": "integer"
+     },
+     "title": "Reminder Days Before",
+     "type": "array"
+    }
+   },
+   "title": "TrialPolicy",
+   "type": "object"
+  }
+ }
+]

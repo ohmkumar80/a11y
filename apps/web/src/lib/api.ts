@@ -1,0 +1,72 @@
+export interface Problem {
+  detail: string;
+  code?: string;
+  field?: string;
+  /** Whole error body, for structured errors (seat limit, limit below usage ...). */
+  body?: Record<string, unknown>;
+}
+
+export type Result<T> = { ok: true; data: T } | { ok: false; status: number; problem: Problem };
+
+export interface User {
+  id: string;
+  email: string;
+  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "STANDARD_USER";
+  organization_id: string;
+  organization_name: string;
+}
+
+export interface Session {
+  access_token: string;
+  expires_in: number;
+  user: User;
+}
+
+let accessToken: string | null = null;
+export function setAccessToken(t: string | null) {
+  accessToken = t;
+}
+
+async function raw<T>(path: string, init: RequestInit & { json?: unknown }): Promise<Result<T>> {
+  const headers = new Headers(init.headers);
+  if (init.json !== undefined) headers.set("content-type", "application/json");
+  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      ...init,
+      headers,
+      credentials: "same-origin",
+      body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
+    });
+  } catch {
+    return { ok: false, status: 0, problem: { detail: "We could not reach the server. Check your connection and try again." } };
+  }
+  if (res.ok) return { ok: true, data: (res.status === 204 ? undefined : await res.json().catch(() => undefined)) as T };
+  const body = await res.json().catch(() => ({}));
+  const detail = typeof body?.detail === "string" ? body.detail : "Something went wrong. Try again.";
+  return { ok: false, status: res.status, problem: { detail, code: body?.code, field: body?.field ?? undefined, body } };
+}
+
+export const post = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "POST", json });
+export const get = <T>(path: string) => raw<T>(path, { method: "GET" });
+export const put = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PUT", json });
+export const patch = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PATCH", json });
+
+/**
+ * Refresh is single-flight within the tab AND across tabs (Web Locks). Refresh tokens rotate and
+ * a replayed token revokes the whole session family, so two concurrent refreshes (React strict
+ * mode, two tabs) would otherwise log the user out.
+ */
+let inflight: Promise<Result<Session>> | null = null;
+export function refreshSession(): Promise<Result<Session>> {
+  inflight ??= (async () => {
+    const run = () => post<Session>("/auth/refresh");
+    try {
+      return navigator.locks ? await navigator.locks.request("a11y-refresh", run) : await run();
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
+}
