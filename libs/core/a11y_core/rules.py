@@ -187,19 +187,44 @@ class Registry:
         return fmt.format(sc=sc.replace(".", ".")) if fmt else f"WCAG {sc}"
 
     # -- mapping findings -------------------------------------------------------------------------
+    @staticmethod
+    def element_key(tag: str | None, type_: str | None = None) -> str | None:
+        """'input:button' for <input type=button>, else the tag name."""
+        return f"{tag}:{type_.lower()}" if tag == "input" and type_ else tag
+
     def canonical_for(
-        self, engine: str, rule_id: str, tag: str | None = None
+        self, engine: str, rule_id: str, tag: str | None = None, type_: str | None = None
     ) -> CanonicalRule | None:
-        """Canonical rule for an engine rule. HTML_CodeSniffer ids match by `*` prefix patterns."""
-        if engine == "htmlcs":
-            for (eng, pattern), entries in self._index.items():
-                if eng == "htmlcs" and fnmatchcase(rule_id, pattern):
-                    return entries[0][1]
-            return None
-        for ref, cr in self._index.get((engine, rule_id), []):
-            if not ref.tags or (tag and tag in ref.tags):
-                return cr
-        return None
+        """Canonical rule for an engine rule, resolved by the most SPECIFIC matching entry:
+        an entry restricted to `input:button` beats one for `input`, which beats an unrestricted one;
+        for HTML_CodeSniffer (patterns ending in `*`) a longer pattern beats a shorter one."""
+        key, base = self.element_key(tag, type_), tag
+        best: tuple[int, int, CanonicalRule] | None = None
+        for (eng, pattern), entries in self._index.items():
+            if eng != engine:
+                continue
+            if engine == "htmlcs":
+                if not fnmatchcase(rule_id, pattern):
+                    continue
+                plen = len(
+                    pattern.replace("*", "")
+                )  # literal characters: more literal = more specific
+            elif pattern == rule_id:
+                plen = 0
+            else:
+                continue
+            for ref, cr in entries:
+                if not ref.tags:
+                    spec = 0
+                elif key in ref.tags:
+                    spec = 2
+                elif base in ref.tags:
+                    spec = 1
+                else:
+                    continue
+                if best is None or (spec, plen) > (best[0], best[1]):
+                    best = (spec, plen, cr)
+        return best[2] if best else None
 
     # -- summaries --------------------------------------------------------------------------------
     def summarise(self, standard_id: str, findings: list[dict]) -> Summary:

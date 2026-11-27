@@ -39,5 +39,11 @@ forms embedding such IPv4: mapped, NAT64, 6to4, Teredo), enforces the port allow
 
 ## Not done yet
 Screenshots (full-page and element) and their storage; authenticated scans; template-level crawl deduplication beyond
-`cluster_key`; benchmark suite (recall/precision against W3C BAD, GOV.UK fixtures) with a recorded baseline; the other
-Phase 1 exit criteria listed in PROJECT_PLAN.
+`cluster_key`; custom deterministic checks for the gaps the benchmark shows (see docs/benchmark.md); the other Phase 1 exit
+criteria listed in PROJECT_PLAN.
+
+## Benchmark
+`python -m a11y_web_audit.benchmark` scores the scanner against fixtures with embedded ground truth and against the
+independent GOV.UK accessibility-tool-audit pages, and `tests/test_benchmark.py` fails CI if recall falls or false failures
+rise. Results and their limits are in [docs/benchmark.md](../benchmark.md). It found, and we fixed: iframe content colliding
+with the page's own xpath, unmapped engine rule ids, and generic rules that must resolve by element type.

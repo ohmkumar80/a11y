@@ -23,6 +23,13 @@ SEVERITY_ORDER = {"minor": 0, "moderate": 1, "serious": 2, "critical": 3}
 ENGINE_PREFERENCE = ("axe", "ibm", "htmlcs")  # whose message/element wins
 _NTH = re.compile(r":nth-of-type\(\d+\)")
 DOC_XPATH = "/html[1]"
+_DOC_ROOT = re.compile(r"(?:^|/iframe\[\d+\])(/html\[1\])")
+
+
+def doc_root_xpath(xpath: str) -> str:
+    """The <html> of the document an element lives in: the page's own, or that of the iframe it is inside."""
+    m = list(_DOC_ROOT.finditer(xpath))
+    return xpath[: m[-1].end()] if m else DOC_XPATH
 
 
 @dataclass
@@ -64,9 +71,9 @@ def normalise(raw: list[dict], reg: Registry, *, ran_ok: set[str]) -> list[Findi
     groups: dict[tuple[str, str], list[tuple[dict, object]]] = {}
     for f in raw:
         el = f["element"]
-        cr = reg.canonical_for(f["engine"], f["rule_id"], el.get("tag"))
+        cr = reg.canonical_for(f["engine"], f["rule_id"], el.get("tag"), el.get("type"))
         cid = cr.id if cr else f"{f['engine']}:{f['rule_id']}"
-        xpath = DOC_XPATH if (cr and cr.scope == "document") else el["xpath"]
+        xpath = doc_root_xpath(el["xpath"]) if (cr and cr.scope == "document") else el["xpath"]
         groups.setdefault((cid, xpath), []).append((f, cr))
 
     out: list[Finding] = []
@@ -108,7 +115,7 @@ def normalise(raw: list[dict], reg: Registry, *, ran_ok: set[str]) -> list[Findi
         el = (
             primary["element"]
             if not (cr and cr.scope == "document")
-            else {**primary["element"], "xpath": DOC_XPATH}
+            else {**primary["element"], "xpath": xpath}
         )
         out.append(
             Finding(

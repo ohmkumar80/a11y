@@ -212,3 +212,14 @@ def test_tampered_engine_bundle_is_refused(tmp_path, monkeypatch):
     finally:
         monkeypatch.undo()
         engines.load_bundles.cache_clear()
+
+
+async def test_content_inside_an_iframe_is_scanned_with_a_distinct_identity(site):
+    r = await one(f"{site}/frames.html")
+    assert r.status == "OK"
+    by = {(f.canonical_rule_id, f.xpath): f for f in r.findings}
+    # the framed document has no lang and an image without alt: attributed to the frame, not the page
+    assert ("html-lang", "/html[1]/body[1]/main[1]/iframe[1]/html[1]") in by
+    assert ("html-lang", "/html[1]") not in by  # the page itself declares lang="en"
+    img = next(f for f in r.findings if f.canonical_rule_id == "image-alt")
+    assert "/iframe[1]/html[1]" in img.xpath and ">>>" in img.css

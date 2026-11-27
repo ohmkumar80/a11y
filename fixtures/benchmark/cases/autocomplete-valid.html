@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: autocomplete-valid</title></head>
+<body>
+<main><h1>autocomplete-valid</h1>
+<form>
+<label for="a">Email</label><input id="a" type="text" autocomplete="foo-bar" data-bench-expect="autocomplete-valid">
+<label for="b">Name</label><input id="b" type="text" autocomplete="family-name given-name" data-bench-expect="autocomplete-valid">
+<label for="c">Email address</label><input id="c" type="email" autocomplete="email" data-bench-expect="none">
+<label for="d">Phone</label><input id="d" type="tel" autocomplete="tel" data-bench-expect="none">
+<button type="submit">Save</button>
+</form></main>
+</body>
+</html>

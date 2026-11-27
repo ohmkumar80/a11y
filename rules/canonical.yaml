@@ -28,13 +28,20 @@ rules:
     title: Image buttons need a text alternative
     sc: ["1.1.1", "4.1.2"]
     axe: [input-image-alt]
-    ibm: [imagebutton_alt_exists]
-    htmlcs: ["H36*"]
+    ibm:
+      - imagebutton_alt_exists
+      - {id: input_label_exists, tags: ["input:image"]}
+    htmlcs:
+      - "H36*"
+      - {id: "F68*", tags: ["input:image"]}
+      - "H91.InputImage.Name"
   - id: area-alt
     title: Image map areas need a text alternative
     sc: ["1.1.1", "2.4.4"]
     axe: [area-alt]
-    ibm: [area_alt_exists]
+    ibm:
+      - area_alt_exists
+      - {id: a_text_purpose, tags: [area]}
     htmlcs: ["H24*"]
   # --- 1.2 media -----------------------------------------------------------------------------------
   - id: audio-caption
@@ -120,7 +127,7 @@ rules:
     sc: ["2.1.1", "2.1.3"]
     verified: fixture
     axe: [scrollable-region-focusable, frame-focusable-content, server-side-image-map]
-    ibm: [element_mouseevent_keyboard, script_onclick_misuse, widget_tabbable_exists, aria_keyboard_handler_exists, aria_child_tabbable]
+    ibm: [element_mouseevent_keyboard, script_onclick_misuse, widget_tabbable_exists, aria_keyboard_handler_exists, aria_child_tabbable, aria_eventhandler_role_valid]
     htmlcs: ["G90*", "SCR20*"]
   - id: meta-refresh
     title: Pages must not refresh or redirect on a timer
@@ -170,7 +177,7 @@ rules:
     sc: ["2.4.6"]
     axe: [empty-heading]
     ibm: [heading_content_exists]
-    htmlcs: []
+    htmlcs: ["H42.2"]
   - id: focus-visible
     title: Keyboard focus must be visible
     sc: ["2.4.7"]
@@ -237,8 +244,12 @@ rules:
     verified: fixture
     axe: [button-name, input-button-name, summary-name]
     ibm:
-      - {id: input_label_exists, tags: [button]}
-    htmlcs: ["H91.Button.Name", "H91.InputButton.Name", "H91.Summary.Name"]
+      - {id: input_label_exists, tags: [button, "input:button", "input:submit", "input:reset"]}
+    htmlcs:
+      - "H91.Button.Name"
+      - "H91.InputButton.Name"
+      - "H91.Summary.Name"
+      - {id: "F68*", tags: ["input:button", "input:submit", "input:reset"]}
   - id: widget-name
     title: Custom controls (ARIA widgets) need an accessible name
     sc: ["4.1.2"]
@@ -248,7 +259,7 @@ rules:
       - aria_widget_labelled
       - aria_accessiblename_exists
       - {id: input_label_exists, tags: [div, span, li, td, p]}
-    htmlcs: []
+    htmlcs: ["H91.Div.Name", "H91.Span.Name"]
   - id: progress-meter-name
     title: Progress bars and meters need an accessible name
     sc: ["1.1.1"]
@@ -266,7 +277,7 @@ rules:
     title: ARIA attributes must be valid and allowed
     sc: ["4.1.2"]
     axe: [aria-valid-attr, aria-valid-attr-value, aria-allowed-attr, aria-required-attr, aria-prohibited-attr, aria-conditional-attr]
-    ibm: [aria_attribute_allowed, aria_attribute_required, aria_attribute_value_valid, aria_attribute_conflict, aria_activedescendant_valid]
+    ibm: [aria_attribute_allowed, aria_attribute_required, aria_attribute_value_valid, aria_attribute_valid, aria_attribute_conflict, aria_activedescendant_valid]
     htmlcs: []
   - id: aria-roles
     title: ARIA roles must be valid

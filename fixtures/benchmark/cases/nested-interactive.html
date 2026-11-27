@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: nested-interactive</title></head>
+<body>
+<main><h1>nested-interactive</h1>
+<div role="button" tabindex="0" aria-label="Inner" data-bench-expect="nested-interactive"><button type="button">Inner</button></div>
+<div role="tablist" aria-label="Sections"><div role="tab" tabindex="0" aria-selected="true" aria-label="Link inside a tab" data-bench-expect="nested-interactive"><a href="/x">Link inside a tab</a></div></div>
+<button type="button" data-bench-expect="none">Plain button</button>
+</main>
+</body>
+</html>

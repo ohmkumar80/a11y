@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: list-structure</title></head>
+<body>
+<main><h1>list-structure</h1>
+<ul data-bench-expect="list-structure"><div>Not a list item</div></ul>
+<ol data-bench-expect="list-structure"><span>Also not a list item</span></ol>
+<li data-bench-expect="list-structure">A list item outside any list</li>
+<ul data-bench-expect="none"><li>One</li><li>Two</li></ul>
+<ol data-bench-expect="none"><li>First</li><li>Second</li></ol>
+<dl data-bench-expect="none"><dt>Term</dt><dd>Definition</dd></dl>
+</main>
+</body>
+</html>

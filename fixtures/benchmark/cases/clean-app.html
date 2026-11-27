@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Clean dashboard page</title>
+<style>body{font:16px/1.5 Arial,sans-serif;color:#1a1a1a;background:#fff} button,[role=tab]{min-width:44px;min-height:44px;color:#1a1a1a;background:#f0f0f0;border:2px solid #333}</style></head>
+<body data-bench-expect="none">
+<header><h1>Dashboard</h1><nav aria-label="Primary"><a href="/">Overview</a> <a href="/reports">Reports</a></nav></header>
+<main>
+<h2>Scans</h2>
+<div role="tablist" aria-label="Views">
+<button role="tab" id="t1" aria-selected="true" aria-controls="p1" type="button">Summary</button>
+<button role="tab" id="t2" aria-selected="false" aria-controls="p2" tabindex="-1" type="button">Details</button>
+</div>
+<div role="tabpanel" id="p1" aria-labelledby="t1" tabindex="0"><p>Summary content.</p></div>
+<div role="tabpanel" id="p2" aria-labelledby="t2" tabindex="0" hidden><p>Details content.</p></div>
+<h2>Actions</h2>
+<button type="button" aria-expanded="false" aria-controls="more">More options</button>
+<div id="more" hidden><ul><li><a href="/export">Export results</a></li><li><a href="/share">Share</a></li></ul></div>
+<button type="button" aria-label="Refresh results"><svg aria-hidden="true" width="16" height="16"><circle cx="8" cy="8" r="6"/></svg></button>
+<div role="status" aria-live="polite">3 results loaded.</div>
+<h2>Filters</h2>
+<label for="q">Search findings</label><input id="q" type="search" autocomplete="off">
+<label for="s">Severity</label><select id="s"><option>All</option><option>Critical</option><option>Serious</option></select>
+<label><input type="checkbox"> Only show new issues</label>
+<details><summary>What do these mean?</summary><p>Severity reflects the impact on users.</p></details>
+</main>
+<footer><a href="/help">Help</a></footer>
+</body></html>

@@ -731,10 +731,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | SaaS core: plans and entitlements, trial, seat guard, quota reservations, coupons; admin screens for organisations, plans and coupons | 1a | Built |
 | `LLMGateway`: routing, fallback, budgets, metering | 1a | Built. Adapters: DeepSeek, Azure OpenAI, OpenAI, OpenAI-compatible (and fake); enterprise own-key (BYOK) built. Anthropic and Bedrock not started |
 | Rule registry and switching standards | 1a | Built (87 criteria, 12 standards, 42 canonical rules; mappings still `draft` until SME review) |
-| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built except screenshots and the benchmark baseline |
+| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built except screenshots. Benchmark baseline recorded and gated in CI: [docs/benchmark.md](benchmark.md) (own fixtures 60 of 60 planted defects, 0 false failures; independent GOV.UK suite 54 of the 92 failures that at least one of 13 other tools reported, 59%) |
 | SSRF protection, domain verification, rate limits | 1a | Built (egress proxy, domain verification, per-org rate and concurrency limits) |
 | Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Not started |
-| Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Not started |
+| Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | In-app results built. PDF/UA path proven and gated (WeasyPrint + veraPDF, [ADR 0008](adr/0008-pdf-ua-generation.md)); report templates, CSV, DOCX and VPAT not started |
 | Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Not started |
 | Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
 | Admin MFA for every admin role, and session refresh | 1a | Not started |

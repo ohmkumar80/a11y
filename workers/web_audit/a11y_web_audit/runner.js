@@ -5,27 +5,35 @@
 (() => {
   const MAX_HTML = 300;
 
+  // Elements inside same-origin iframes get the iframe's path as a prefix (the same convention IBM uses:
+  // parent path + "/html[1]/..."), so a frame's <html> can never collide with the page's own <html>.
+  const frameOf = (el) => {
+    const w = el.ownerDocument && el.ownerDocument.defaultView;
+    try { return w && w.frameElement ? w.frameElement : null; } catch (_) { return null; }
+  };
   const xpathOf = (el) => {
     const parts = [];
-    for (; el && el.nodeType === 1; el = el.parentElement) {
+    const fe = frameOf(el);
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
       let i = 1;
-      for (let s = el.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === el.tagName) i++;
-      parts.unshift(`${el.tagName.toLowerCase()}[${i}]`);
+      for (let s = n.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === n.tagName) i++;
+      parts.unshift(`${n.tagName.toLowerCase()}[${i}]`);
     }
-    return "/" + parts.join("/");
+    return (fe ? xpathOf(fe) : "") + "/" + parts.join("/");
   };
   const cssOf = (el) => {
     const parts = [];
-    for (; el && el.nodeType === 1 && el !== document.documentElement; el = el.parentElement) {
-      if (el.id && /^[A-Za-z][\w-]*$/.test(el.id) && document.querySelectorAll(`#${el.id}`).length === 1) {
-        parts.unshift(`#${el.id}`);
-        return parts.join(" > ");
+    const fe = frameOf(el);
+    for (let n = el; n && n.nodeType === 1 && n !== n.ownerDocument.documentElement; n = n.parentElement) {
+      if (n.id && /^[A-Za-z][\w-]*$/.test(n.id) && n.ownerDocument.querySelectorAll(`#${n.id}`).length === 1) {
+        parts.unshift(`#${n.id}`);
+        return (fe ? cssOf(fe) + " >>> " : "") + parts.join(" > ");
       }
-      let n = 1;
-      for (let s = el.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === el.tagName) n++;
-      parts.unshift(`${el.tagName.toLowerCase()}:nth-of-type(${n})`);
+      let k = 1;
+      for (let s = n.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === n.tagName) k++;
+      parts.unshift(`${n.tagName.toLowerCase()}:nth-of-type(${k})`);
     }
-    return ["html", ...parts].join(" > ");
+    return (fe ? cssOf(fe) + " >>> " : "") + ["html", ...parts].join(" > ");
   };
   const identity = (el) => {
     if (!el || el.nodeType !== 1) el = document.documentElement;
@@ -33,12 +41,23 @@
     let html = "";
     try { html = el.cloneNode(false).outerHTML; } catch (_) { html = `<${el.tagName.toLowerCase()}>`; }
     return {
-      xpath: xpathOf(el), css: cssOf(el), tag: el.tagName.toLowerCase(), html: html.slice(0, MAX_HTML),
+      xpath: xpathOf(el), css: cssOf(el), tag: el.tagName.toLowerCase(), type: (el.getAttribute && el.getAttribute("type")) || null,
+      html: html.slice(0, MAX_HTML),
       rect: { x: Math.round(r.x + scrollX), y: Math.round(r.y + scrollY), w: Math.round(r.width), h: Math.round(r.height) },
     };
   };
+  // Resolves an xpath, descending into same-origin iframes: ".../iframe[1]/html[1]/body[1]/p[1]".
   const byXpath = (xp) => {
-    try { return document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; } catch (_) { return null; }
+    if (!xp) return null;
+    const segs = xp.split(/(?<=\/iframe\[\d+\])(?=\/html\[1\])/);
+    let doc = document;
+    let node = null;
+    for (let i = 0; i < segs.length; i++) {
+      try { node = doc.evaluate(segs[i], doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; } catch (_) { return null; }
+      if (!node) return null;
+      if (i < segs.length - 1) { doc = node.contentDocument; if (!doc) return null; }
+    }
+    return node;
   };
   const scOfAxeTags = (tags) =>
     tags.filter((t) => /^wcag\d{3,}$/.test(t)).map((t) => `${t[4]}.${t[5]}.${t.slice(6)}`);
@@ -110,6 +129,8 @@
         resolve(out);
       });
     });
+
+  window.__a11yIdentity = identity; // used by the benchmark harness to locate ground-truth elements
 
   window.__a11yScan = async (enabled) => {
     const result = { findings: [], engines: {}, title: document.title, lang: document.documentElement.lang || null };

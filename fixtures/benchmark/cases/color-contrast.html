@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: color-contrast</title></head>
+<body>
+<main><h1>color-contrast</h1>
+<p style="color:#bbbbbb;background:#ffffff" data-bench-expect="color-contrast">Very light grey text on white.</p>
+<p style="color:#999999;background:#ffffff" data-bench-expect="color-contrast">Mid grey text on white (2.8:1).</p>
+<p style="color:#ffffff;background:#ffcc00" data-bench-expect="color-contrast">White text on yellow.</p>
+<p style="color:#777777;background:#ffffff;font-size:24px;font-weight:bold" data-bench-expect="none">Large bold text at 4.5:1 passes the large-text threshold.</p>
+<p style="color:#222222;background:#ffffff" data-bench-expect="none">Dark text on white.</p>
+<p style="color:#595959;background:#ffffff" data-bench-expect="none">Grey text at 7:1.</p>
+<p style="color:#ffffff;background:#0b4f9e" data-bench-expect="none">White text on dark blue.</p>
+</main>
+</body>
+</html>

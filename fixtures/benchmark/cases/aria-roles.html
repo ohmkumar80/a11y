@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: aria-roles</title></head>
+<body>
+<main><h1>aria-roles</h1>
+<div role="bogus" data-bench-expect="aria-roles">Not a role.</div>
+<div role="foo bar" data-bench-expect="aria-roles">Neither of these is a role.</div>
+<div role="button" tabindex="0" aria-label="Go" data-bench-expect="none"></div>
+<div role="status" data-bench-expect="none">Saved</div>
+</main>
+</body>
+</html>

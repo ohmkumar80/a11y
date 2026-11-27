@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: aria-required-structure</title></head>
+<body>
+<main><h1>aria-required-structure</h1>
+<div role="menu" data-bench-expect="aria-required-structure"><div>Not a menu item</div></div>
+<div role="listitem" data-bench-expect="aria-required-structure">A list item with no list</div>
+<div role="list" data-bench-expect="none"><div role="listitem">Fine</div></div>
+<div role="menu" data-bench-expect="none"><div role="menuitem" tabindex="0">Fine</div></div>
+</main>
+</body>
+</html>

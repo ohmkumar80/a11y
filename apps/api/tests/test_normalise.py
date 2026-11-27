@@ -194,3 +194,52 @@ def test_ordering_is_most_severe_first():
         ran_ok=ALL,
     )
     assert [f.severity for f in out] == ["critical", "serious"]
+
+
+def test_document_root_is_the_frame_s_own_html_not_the_page_s():
+    from a11y_web_audit.normalise import doc_root_xpath as d
+
+    assert d("/html[1]/head[1]/title[1]") == "/html[1]"
+    assert (
+        d("/html[1]/body[1]/main[1]/iframe[1]/html[1]/body[1]/p[1]")
+        == "/html[1]/body[1]/main[1]/iframe[1]/html[1]"
+    )
+    assert (
+        d("/html[1]/body[1]/iframe[2]/html[1]/body[1]/iframe[1]/html[1]/body[1]")
+        == "/html[1]/body[1]/iframe[2]/html[1]/body[1]/iframe[1]/html[1]"
+    )
+
+
+def test_a_frames_page_level_finding_does_not_merge_into_the_pages():
+    page = raw("axe", "html-has-lang", element=el("/html[1]", "html", "html"))
+    frame = raw(
+        "ibm", "html_lang_exists", element=el("/html[1]/body[1]/iframe[1]/html[1]", "html", "html")
+    )
+    out = normalise([page, frame], REG, ran_ok=ALL)
+    assert sorted(f.xpath for f in out) == ["/html[1]", "/html[1]/body[1]/iframe[1]/html[1]"]
+    assert all(len(f.engines) == 1 for f in out)
+
+
+def test_generic_engine_rules_resolve_by_element_type():
+    def one(engine, rule_id, tag, type_):
+        r = raw(engine, rule_id, element={**el("/x", tag), "type": type_})
+        return normalise([r], REG, ran_ok=ALL)[0].canonical_rule_id
+
+    assert one("ibm", "input_label_exists", "input", "text") == "form-field-label"
+    assert one("ibm", "input_label_exists", "input", "button") == "button-name"
+    assert one("ibm", "input_label_exists", "input", "submit") == "button-name"
+    assert one("ibm", "input_label_exists", "input", "image") == "input-image-alt"
+    assert one("htmlcs", "F68", "input", "image") == "input-image-alt"
+    assert one("htmlcs", "F68", "input", "text") == "form-field-label"
+    assert one("ibm", "a_text_purpose", "area", None) == "area-alt"
+    assert one("ibm", "a_text_purpose", "a", None) == "link-name"
+
+
+def test_most_specific_html_codesniffer_pattern_wins():
+    assert (
+        REG.canonical_for("htmlcs", "H91.InputImage.Name", "input", "image").id == "input-image-alt"
+    )
+    assert (
+        REG.canonical_for("htmlcs", "H91.InputText.Name", "input", "text").id == "form-field-label"
+    )
+    assert REG.canonical_for("htmlcs", "H91.Button.Name", "button").id == "button-name"

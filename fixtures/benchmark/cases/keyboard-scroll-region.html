@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: keyboard-scroll-region</title></head>
+<body>
+<main><h1>keyboard-scroll-region</h1>
+<div style="height:40px;overflow:auto;border:1px solid #333" data-bench-expect="keyboard-operable"><p>Line one.</p><p>Line two.</p><p>Line three.</p><p>Line four.</p><p>Line five.</p><p>Line six.</p></div>
+<div style="height:40px;overflow:auto;border:1px solid #333" tabindex="0" role="region" aria-label="Notes" data-bench-expect="none"><p>Line one.</p><p>Line two.</p><p>Line three.</p><p>Line four.</p><p>Line five.</p><p>Line six.</p></div>
+</main>
+</body>
+</html>
