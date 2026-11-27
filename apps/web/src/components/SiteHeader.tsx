@@ -3,6 +3,7 @@
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@a11y/ui";
+import { LegalLinks } from "./LegalLinks";
 import { NotificationsLink } from "./NotificationsLink";
 import { useAuth } from "./AuthProvider";
 
@@ -43,6 +44,7 @@ export function SiteFooter() {
       <nav aria-label="Footer" className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 px-4 py-4">
         <NextLink href="/accessibility" className={navLink}>Accessibility statement</NextLink>
         <NextLink href="/help" className={navLink}>Help and contact</NextLink>
+        <LegalLinks />
       </nav>
     </footer>
   );

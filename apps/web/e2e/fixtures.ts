@@ -7,6 +7,19 @@ import { mockNotifications } from "./notification-mocks";
 import { mockReportApi } from "./report-mocks";
 import { mockScanApi } from "./scan-mocks";
 
+const LEGAL_BODY = `# 1. Who we are
+
+These terms are a **test document** written for the automated tests, not real legal text. See [our site](https://example.com/about).
+
+## 1.1 What you can do
+- Use the service lawfully.
+- Keep your account secure.
+
+1. First numbered point.
+2. Second numbered point.
+
+<script>window.__pwned = true</script> and [a bad link](javascript:alert(1)) stay as plain text.`;
+
 export type Role = "ANON" | "COMPANY_ADMIN" | "STANDARD_USER" | "SUPER_ADMIN";
 
 const user = (role: Exclude<Role, "ANON">) => ({
@@ -28,6 +41,11 @@ export async function mockApi(page: Page, role: Role) {
     r.fulfill({ json: [user("COMPANY_ADMIN"), { ...user("STANDARD_USER"), id: "33333333-3333-4333-8333-333333333333", email: "member@example.com" }] }),
   );
   await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: true, crawl_scans: true, notification_center: true } }));
+  await page.route("**/api/legal", (r) => r.fulfill({ json: [{ slug: "terms", title: "Terms of service" }, { slug: "privacy", title: "Privacy policy" }] }));
+  await page.route("**/api/legal/*", (r) => {
+    if (r.request().url().endsWith("/privacy")) return r.fulfill({ status: 404, json: { detail: "This page has not been published." } });
+    return r.fulfill({ json: { slug: "terms", title: "Terms of service", version: "2026-12", effective_date: "2026-12-01", body: LEGAL_BODY } });
+  });
   await page.route("**/api/org/subscription", (r) => r.fulfill({ json: SUBSCRIPTION }));
   await page.route("**/api/org/ai", (r) => r.fulfill({ json: BYOK }));
   await page.route("**/api/org/ai/test", (r) => r.fulfill({ json: { ok: false, detail: "authentication failed (check the API key)" } }));

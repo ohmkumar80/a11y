@@ -45,12 +45,16 @@ export function curl(base: string, method: string, path: string, op: Operation, 
   if (body !== undefined) { lines.push(`  -H "Content-Type: application/json"`, `  -d '${JSON.stringify(body)}'`); }
   return lines.join(" \\\n");
 }
-/** Tiny, safe formatter for the descriptions we write: paragraphs, **bold** and `code`. Never injects HTML. */
-export function inline(text: string): Array<{ kind: "text" | "code" | "bold"; value: string }> {
-  const out: Array<{ kind: "text" | "code" | "bold"; value: string }> = [];
-  for (const part of text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)) {
+/** Tiny, safe formatter for text we write or admins write: paragraphs, **bold**, `code` and [links](https://...). Only https
+ *  links are recognised; anything else stays plain text. Never injects HTML. */
+export type Piece = { kind: "text" | "code" | "bold"; value: string } | { kind: "link"; value: string; href: string };
+export function inline(text: string): Piece[] {
+  const out: Piece[] = [];
+  for (const part of text.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\(https:\/\/[^\s)]+\))/g)) {
     if (!part) continue;
-    if (part.startsWith("`")) out.push({ kind: "code", value: part.slice(1, -1) });
+    const link = /^\[([^\]]+)\]\((https:\/\/[^\s)]+)\)$/.exec(part);
+    if (link) out.push({ kind: "link", value: link[1]!, href: link[2]! });
+    else if (part.startsWith("`")) out.push({ kind: "code", value: part.slice(1, -1) });
     else if (part.startsWith("**")) out.push({ kind: "bold", value: part.slice(2, -2) });
     else out.push({ kind: "text", value: part });
   }

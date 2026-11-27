@@ -19,3 +19,12 @@
 
 ## Not built yet
 - Per-percentage rollouts and scheduled flag changes; a managed email provider API (SES, Postmark) beyond SMTP.
+
+## Update (2026-11-28): legal pages
+- **The platform ships no legal text.** Setting `legal.pages` (high risk, versioned, audited) holds optional pages (terms, privacy,
+  cookies, data processing agreement, acceptable use, refunds), each `draft` or `published`, with a version label and effective
+  date. Publishing requires real text and an effective date, so a half-written page cannot go live. Published pages are public
+  without signing in (`GET /legal`, `GET /legal/{slug}`), appear at `/legal/<slug>`, and are linked from the footer only when
+  published. Text is plain with simple formatting (`#` headings, lists, bold, `https` links); it is rendered by our own safe
+  renderer and is never interpreted as HTML, and a non-https address is never a link. The history of the setting answers which text
+  was live on a given day. Asking customers to accept terms at sign-up is a legal and product decision and is not built.

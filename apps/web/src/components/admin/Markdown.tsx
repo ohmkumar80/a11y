@@ -4,7 +4,16 @@ import { Fragment } from "react";
 import { inline } from "@/lib/openapi";
 
 function Inline({ text }: { text: string }) {
-  return <>{inline(text).map((t, i) => (t.kind === "code" ? <code key={i}>{t.value}</code> : t.kind === "bold" ? <strong key={i}>{t.value}</strong> : <Fragment key={i}>{t.value}</Fragment>))}</>;
+  return (
+    <>
+      {inline(text).map((t, i) =>
+        t.kind === "code" ? <code key={i}>{t.value}</code>
+        : t.kind === "bold" ? <strong key={i}>{t.value}</strong>
+        : t.kind === "link" ? <a key={i} href={t.href} className="underline" rel="noopener noreferrer">{t.value}</a>
+        : <Fragment key={i}>{t.value}</Fragment>,
+      )}
+    </>
+  );
 }
 
 /** The small subset of Markdown our own runbooks use: headings (`#`, `##`), numbered and bullet lists, paragraphs, `code`

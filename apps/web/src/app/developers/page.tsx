@@ -20,7 +20,7 @@ function Text({ text }: { text: string }) {
   return (
     <>
       {text.trim().split(/\n{2,}/).map((para, i) => (
-        <p key={i}>{inline(para).map((t, j) => (t.kind === "code" ? <code key={j}>{t.value}</code> : t.kind === "bold" ? <strong key={j}>{t.value}</strong> : <Fragment key={j}>{t.value}</Fragment>))}</p>
+        <p key={i}>{inline(para).map((t, j) => (t.kind === "code" ? <code key={j}>{t.value}</code> : t.kind === "bold" ? <strong key={j}>{t.value}</strong> : t.kind === "link" ? <a key={j} href={t.href} className="underline" rel="noopener noreferrer">{t.value}</a> : <Fragment key={j}>{t.value}</Fragment>))}</p>
       ))}
     </>
   );

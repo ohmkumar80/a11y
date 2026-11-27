@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from a11y_core import flags, notify, webhooks  # noqa: F401  (registers settings and tasks)
+from a11y_core import legal as _legal_setting  # noqa: F401
 from a11y_core.billing import BillingError
 from a11y_core.db import app_engine, dispose_engines
 from a11y_core.settings import get_settings
@@ -21,6 +22,7 @@ from .routers import (
     auth,
     domains,
     fixes,
+    legal,
     me_notifications,
     mfa,
     org,
@@ -103,6 +105,7 @@ app.include_router(admin_ai.router)
 app.include_router(org_ai.router)
 app.include_router(standards.router)
 app.include_router(rule_guidance.router)
+app.include_router(legal.router)
 app.include_router(fixes.router)
 app.include_router(me_notifications.router)
 app.include_router(org_api_keys.router)

@@ -13,8 +13,10 @@ test("every page in src/app is covered by the axe route matrix", () => {
     }
   };
   walk(root, "");
-  const covered = new Set(ROUTES.map((r) => r.path.split("?")[0]));
-  expect(found.filter((p) => !covered.has(p))).toEqual([]);
+  const covered = ROUTES.map((r) => r.path.split("?")[0]!);
+  // A dynamic folder such as /legal/[slug] is covered by any concrete route that fits it (e.g. /legal/terms).
+  const fits = (pattern: string, path: string) => new RegExp(`^${pattern.replace(/\[[^\]]+\]/g, "[^/]+")}$`).test(path);
+  expect(found.filter((p) => !covered.some((c) => c === p || fits(p, c)))).toEqual([]);
 });
 
 test.describe("page structure on every route", () => {

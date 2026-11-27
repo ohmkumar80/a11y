@@ -11,6 +11,7 @@ export const ROUTES: Array<{ path: string; roles: Role[] }> = [
   { path: "/forgot-password", roles: ["ANON"] },
   { path: "/reset-password?token=abc", roles: ["ANON"] },
   { path: "/accept-invite?token=abc", roles: ["ANON"] },
+  { path: "/legal/terms", roles: ["ANON", "COMPANY_ADMIN"] },
   { path: "/help", roles: ["ANON", "STANDARD_USER"] },
   { path: "/developers", roles: ["ANON", "COMPANY_ADMIN"] },
   { path: "/accessibility", roles: ["ANON"] },
