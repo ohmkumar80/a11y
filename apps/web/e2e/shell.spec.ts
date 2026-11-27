@@ -38,7 +38,10 @@ test.describe("page structure on every route", () => {
 test("titles are unique per route (SC 2.4.2)", async ({ page }) => {
   await mockApi(page, "COMPANY_ADMIN");
   const titles = new Map<string, string>();
-  for (const { path } of ROUTES.filter((r) => !r.path.includes("?"))) {
+  // One visit per page (the same page with a different query string is the same page), INCLUDING pages that need ?id=.
+  const seen = new Set<string>();
+  const pages = ROUTES.filter((r) => { const base = r.path.split("?")[0]!; if (seen.has(base)) return false; seen.add(base); return true; });
+  for (const { path } of pages) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     const t = await page.title();

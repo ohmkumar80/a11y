@@ -363,3 +363,28 @@ async def test_off_never_calls_the_reviewer_and_recipes_are_not_reviewed():
     assert (
         r.rung == "recipe" and rev.prompts == []
     )  # a deterministic recipe needs no second opinion
+
+
+def test_an_event_handler_the_customer_already_had_may_stay_but_a_new_or_changed_one_may_not():
+    orig = parse_tag('<select onchange="location.href = this.value;"></select>')
+    keep = '<select onchange="location.href = this.value;" aria-label="Choose a page"></select>'
+    assert all(
+        c.passed for c in static_checks(orig, keep, removes=False)
+    )  # found live: this was wrongly refused
+    added = static_checks(
+        orig,
+        '<select onchange="location.href = this.value;" onfocus="x()" aria-label="Pages"></select>',
+        removes=False,
+    )
+    changed = static_checks(
+        orig, '<select onchange="steal()" aria-label="Pages"></select>', removes=False
+    )
+    for checks in (added, changed):
+        assert any("scripts" in c.name and not c.passed for c in checks)
+    # a handler on a different element than the one being fixed is new, so it is refused
+    other = static_checks(
+        parse_tag("<button></button>"),
+        '<button aria-label="Go"></button><i onclick="x()"></i>',
+        removes=False,
+    )
+    assert any("scripts" in c.name and not c.passed for c in other)

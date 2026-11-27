@@ -43,7 +43,6 @@ _GENERIC = {
     "img",
 }
 _URL = re.compile(r"(?:https?:)?//[^\s\"'<>]+", re.I)
-_EVENT = re.compile(r"\son[a-z]+\s*=", re.I)
 
 
 @dataclass
@@ -117,11 +116,20 @@ def static_checks(original: Tag, fixed: str, *, removes: bool) -> list[Check]:
     bad = names & {"script", "style", "iframe", "object", "embed", "form", "base", "link"} - {
         original.name
     }
+    # Event handlers (onclick, onchange...) that the customer's own element already had are theirs and may stay as they are;
+    # a fix must not ADD one or CHANGE one. Compared by name and value on the element itself, never by searching the text.
+    mine = set(original.attrs)
+    handlers = sorted(
+        f"{k}"
+        for n, attrs in tags
+        for k, v in attrs
+        if k.startswith("on") and not (n == original.name and (k, v) in mine)
+    )
     out.append(
         Check(
             "The fix adds no scripts or embedded content",
-            not bad and not _EVENT.search(fixed.replace(original.render(), "")),
-            ", ".join(sorted(bad)),
+            not bad and not handlers,
+            ", ".join(sorted(bad) + handlers),
         )
     )
     js = re.search(
