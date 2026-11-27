@@ -124,7 +124,7 @@ test("invite dialog-free flow: sent invite shows a polite toast, not the only si
 
 test.describe("reflow at 320px (SC 1.4.10)", () => {
   test.use({ viewport: { width: 320, height: 640 } });
-  for (const path of ["/", "/login", "/signup", "/org", "/help", "/accessibility"]) {
+  for (const path of ["/", "/login", "/signup", "/org", "/org/ai", "/help", "/accessibility", "/workspace", "/workspace/scan?id=11111111-aaaa-4bbb-8ccc-111111111111"]) {
     test(`${path} has no horizontal scroll`, async ({ page }) => {
       await mockApi(page, "COMPANY_ADMIN");
       await page.goto(path);

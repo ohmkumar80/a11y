@@ -2,9 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { RequireAuth } from "@/components/RequireAuth";
-import type { User } from "@/lib/api";
+import { DomainsPanel } from "@/components/DomainsPanel";
+import { NewScanForm } from "@/components/NewScanForm";
 import { Page } from "@/components/Page";
+import { RequireAuth } from "@/components/RequireAuth";
+import { ScansTable } from "@/components/ScansTable";
+import type { User } from "@/lib/api";
 
 function ToAdmin({ user }: { user: User }) {
   // Platform operators have no tenant; their home is /admin.
@@ -18,13 +21,16 @@ export default function WorkspacePage() {
     <RequireAuth>
       {(user) => (
         <>
-        <ToAdmin user={user} />
-        <Page title="Workspace" intro={`Signed in as ${user.email} · ${user.organization_name}`}>
-          <section aria-labelledby="scans" className="flex flex-col gap-2">
-            <h2 id="scans" className="text-xl font-bold">Scans</h2>
-            <p className="text-fg-muted">No scans yet. Website scanning arrives in Phase 1.</p>
-          </section>
-        </Page>
+          <ToAdmin user={user} />
+          <Page title="Workspace" intro={`Signed in as ${user.email} · ${user.organization_name}`}>
+            {user.role !== "SUPER_ADMIN" && (
+              <>
+                <NewScanForm canVerify={user.role === "COMPANY_ADMIN"} />
+                <ScansTable />
+                {user.role === "COMPANY_ADMIN" && <DomainsPanel />}
+              </>
+            )}
+          </Page>
         </>
       )}
     </RequireAuth>

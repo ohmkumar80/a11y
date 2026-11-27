@@ -37,9 +37,11 @@ export interface TableProps<T> {
 export function Table<T extends object>({ label, columns, rows, rowKey, emptyText = "No results.", ...sort }: TableProps<T>) {
   return (
     // Wide tables scroll inside their own region (SC 1.4.10 exception for data tables) instead of
-    // scrolling the whole page. The region is focusable so keyboard users can scroll it.
+    // scrolling the whole page. `relative` makes it the containing block for visually-hidden (absolutely
+    // positioned) text inside cells; without it that text escapes the scroller and widens the page.
+    // The region is focusable so keyboard users can scroll it.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable regions MUST be focusable so keyboard users can scroll (axe: scrollable-region-focusable)
-    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="max-w-full overflow-x-auto">
+    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="relative max-w-full overflow-x-auto">
     <AriaTable aria-label={label} sortDescriptor={sort.sortDescriptor} onSortChange={sort.onSortChange} className="w-full border-collapse text-left">
       <TableHeader>
         {columns.map((c) => (
