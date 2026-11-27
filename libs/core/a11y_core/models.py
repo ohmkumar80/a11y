@@ -703,3 +703,63 @@ class ApiKey(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WebhookEndpoint(Base):
+    """Where an organisation wants events sent. The signing secret is stored encrypted and shown once; the URL cannot be
+    edited (the table grants no UPDATE on it): to move an endpoint, create a new one with a new secret."""
+
+    __tablename__ = "webhook_endpoints"
+    __table_args__ = (CheckConstraint("cardinality(events) > 0", name="ck_webhook_events"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    url: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(String(120), server_default="")
+    events: Mapped[list[str]] = mapped_column(ARRAY(String(40)))
+    secret_ct: Mapped[str] = mapped_column(Text)
+    secret_hint: Mapped[str] = mapped_column(String(4))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    disabled_reason: Mapped[str | None] = mapped_column(Text)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WebhookDelivery(Base):
+    """One event for one endpoint. ``(endpoint, event)`` is unique, so emitting twice never sends twice; only delivery
+    progress can change after the row is written."""
+
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (
+        UniqueConstraint("endpoint_id", "event_id", name="uq_webhook_event_once"),
+        CheckConstraint(
+            "status IN ('PENDING', 'SENDING', 'SENT', 'ABANDONED')", name="ck_webhook_status"
+        ),
+        Index("ix_webhook_deliveries_due", "status", "next_attempt_at"),
+        Index("ix_webhook_deliveries_endpoint", "endpoint_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("webhook_endpoints.id", ondelete="CASCADE")
+    )
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    event_type: Mapped[str] = mapped_column(String(40))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(10), server_default="PENDING")
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    response_status: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

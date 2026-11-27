@@ -6,6 +6,15 @@ import { Page } from "@/components/Page";
 import { curl, exampleOf, fields, inline, refName, resolve, type Operation, type Spec } from "@/lib/openapi";
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"];
+const SAMPLE = `import hmac, hashlib, time
+
+def is_valid(secret: str, header: str, body: bytes, tolerance: int = 300) -> bool:
+    parts = dict(p.split("=", 1) for p in header.split(","))
+    t = int(parts["t"])
+    if abs(time.time() - t) > tolerance:          # reject old requests (replay protection)
+        return False
+    expected = hmac.new(secret.encode(), f"{t}.".encode() + body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(f"t={t},v1={expected}", header)`;
 
 function Text({ text }: { text: string }) {
   return (
@@ -100,6 +109,7 @@ function Reference() {
         <ul className="flex flex-col gap-1">
           <li><a className="underline" href="#overview">Overview</a></li>
           <li><a className="underline" href="#errors">Errors and limits</a></li>
+          <li><a className="underline" href="#webhooks">Webhooks</a></li>
           {groups.map((g) => (
             <li key={g.name}>
               <a className="underline" href={`#group-${g.name}`}>{g.name}</a>
@@ -119,6 +129,27 @@ function Reference() {
           <p>Errors use the same JSON shape everywhere:</p>
           <pre className="whitespace-pre-wrap rounded border border-border p-3 [overflow-wrap:anywhere]"><code>{`{ "detail": "You have used 10 of 10 this month. Upgrade your plan for more.", "code": "quota_exceeded" }`}</code></pre>
           <p>Common codes: <code>invalid_api_key</code> (401), <code>scope_missing</code> and <code>api_not_in_plan</code> (403), <code>quota_exceeded</code> (402), <code>rate_limited</code> (429, wait <code>Retry-After</code> seconds).</p>
+        </section>
+        <section aria-labelledby="webhooks" className="flex max-w-prose flex-col gap-3">
+          <h2 id="webhooks" className="text-xl font-bold">Webhooks</h2>
+          <p>Instead of asking whether a scan has finished, give us an address and we tell you. Add one under <em>Organisation → Webhooks</em>; each has a signing secret that is shown once.</p>
+          <h3 className="text-lg font-semibold">Events</h3>
+          <ul className="list-disc pl-6">
+            <li><code>scan.completed</code>: a scan finished successfully (<code>scan_id</code>, <code>url</code>, <code>findings</code>, <code>critical_or_serious</code>, <code>api_path</code>).</li>
+            <li><code>scan.failed</code>: a scan did not finish (<code>scan_id</code>, <code>url</code>, <code>reason</code>, <code>credit_returned</code>).</li>
+            <li><code>report.ready</code>: a report can be downloaded (<code>report_id</code>, <code>scan_id</code>, <code>kind</code>, <code>download_path</code>).</li>
+            <li><code>report.failed</code>: a report could not be produced (<code>report_id</code>, <code>reason</code>).</li>
+            <li><code>ping</code>: only when you press <em>Send a test</em>.</li>
+          </ul>
+          <h3 className="text-lg font-semibold">The request</h3>
+          <p>We send <code>POST</code> with a JSON body and these headers: <code>A11y-Event-Id</code> (the same for every retry, use it to ignore duplicates), <code>A11y-Event-Type</code>, <code>A11y-Delivery-Attempt</code> and <code>A11y-Signature</code>.</p>
+          <pre className="whitespace-pre-wrap rounded border border-border p-3 [overflow-wrap:anywhere]"><code>{`{ "id": "6f1c...", "type": "scan.completed", "created_at": "2026-11-28T09:15:00+00:00",
+  "data": { "scan_id": "b1c2...", "url": "https://www.example.com/", "findings": 12, "critical_or_serious": 3, "api_path": "/v1/scans/b1c2..." } }`}</code></pre>
+          <h3 className="text-lg font-semibold">Check the signature</h3>
+          <p>The header looks like <code>t=1764321300,v1=9a3f...</code>. Compute an HMAC-SHA256 of <code>&quot;&lt;t&gt;.&lt;raw body&gt;&quot;</code> with your signing secret and compare it with <code>v1</code> using a constant-time comparison. Reject requests whose <code>t</code> is more than five minutes old. Use the raw bytes of the body, not a re-serialised copy.</p>
+          <pre className="whitespace-pre-wrap rounded border border-border p-3 [overflow-wrap:anywhere]"><code>{SAMPLE}</code></pre>
+          <h3 className="text-lg font-semibold">Answering, retries and limits</h3>
+          <p>Answer with any <code>2xx</code> status within 10 seconds. Anything else, or no answer, is retried after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours, then given up on; you can retry a delivery by hand. <code>410 Gone</code> switches the webhook off. Redirects are not followed, and addresses on private networks are refused.</p>
         </section>
         {groups.map((g) => (
           <section key={g.name} aria-labelledby={`group-${g.name}`} className="flex flex-col gap-6">

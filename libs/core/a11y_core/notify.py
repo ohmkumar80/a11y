@@ -196,6 +196,22 @@ EVENTS: dict[str, EventDef] = {
             },
         ),
         _e(
+            key="webhook.disabled",
+            label="Webhook switched off",
+            audience="org_admins",
+            category="account",
+            variables={"url": "The webhook address", "reason": "Why it was switched off"},
+            subject="A webhook was switched off: {url}",
+            intro="We switched off the webhook for {url}. {reason} Events are no longer sent to it.",
+            action_label="Review your webhooks",
+            action_path="/org/webhooks",
+            outro="Fix the receiver, then switch the webhook back on. Events that happened while it was off are not re-sent.",
+            sample={
+                "url": "https://hooks.example.com/a11y",
+                "reason": "20 deliveries in a row failed.",
+            },
+        ),
+        _e(
             key="quota.reached",
             label="Monthly scan limit reached",
             audience="org_admins",
@@ -620,6 +636,20 @@ async def notify_scan_done(org_id: uuid.UUID, scan_id: uuid.UUID) -> None:
             if n
             else "We found no failures with our automated tests. Automated tests cover only part of WCAG, so this does not show the site is accessible."
         )
+        from . import webhooks  # noqa: PLC0415
+
+        await webhooks.emit_event(
+            org_id,
+            "scan.completed",
+            {
+                "scan_id": str(scan_id),
+                "url": job.start_url,
+                "status": "SUCCEEDED",
+                "findings": n,
+                "critical_or_serious": serious,
+                "api_path": f"/v1/scans/{scan_id}",
+            },
+        )
         to = await user_email(org_id, job.created_by)
         recipients = [to] if to else await org_admin_emails(org_id)
         await emit(
@@ -645,6 +675,20 @@ async def notify_scan_failed(
             ).first()
         if job is None:
             return
+        from . import webhooks  # noqa: PLC0415
+
+        await webhooks.emit_event(
+            org_id,
+            "scan.failed",
+            {
+                "scan_id": str(scan_id),
+                "url": job.start_url,
+                "status": "FAILED",
+                "reason": reason,
+                "credit_returned": credit_returned,
+                "api_path": f"/v1/scans/{scan_id}",
+            },
+        )
         to = await user_email(org_id, job.created_by)
         recipients = [to] if to else await org_admin_emails(org_id)
         await emit(
@@ -692,3 +736,23 @@ async def notify_trial(
         )
     except Exception:  # noqa: BLE001
         log.exception("could not queue %s for %s", event, org_id)
+
+
+async def notify_webhook_disabled(org_id: uuid.UUID, endpoint_id: uuid.UUID, url: str) -> None:
+    try:
+        async with tenant_session(org_id) as db:
+            reason = (
+                await db.execute(
+                    text("SELECT disabled_reason FROM webhook_endpoints WHERE id=:i"),
+                    {"i": endpoint_id},
+                )
+            ).scalar_one_or_none()
+        await emit(
+            "webhook.disabled",
+            org_id=org_id,
+            recipients=await org_admin_emails(org_id),
+            variables={"url": url, "reason": reason or ""},
+            dedupe_key=f"webhook.disabled:{endpoint_id}:{reason}",
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("could not queue the webhook-disabled email for %s", endpoint_id)

@@ -132,6 +132,7 @@ async def render_report(org_id: uuid.UUID, report_id: uuid.UUID) -> str:
                     error_detail=None,
                 )
             )
+        await _announce(org_id, report_id)
         return "READY"
     except (GateFailed, ReportTemplateError, VeraPdfUnavailable) as e:
         log.error("report %s failed its gate: %s", report_id, e)
@@ -159,7 +160,42 @@ async def _fail(org_id: uuid.UUID, report_id: uuid.UUID, code: str, detail: str)
             ),
             {"c": code, "d": detail, "i": report_id},
         )
+    await _announce(org_id, report_id)
     return "FAILED"
+
+
+async def _announce(org_id: uuid.UUID, report_id: uuid.UUID) -> None:
+    """Tell the organisation's webhooks that a report is ready or could not be made (never raises)."""
+    from a11y_core import webhooks  # noqa: PLC0415
+
+    try:
+        async with tenant_session(org_id) as db:
+            r = (
+                await db.execute(
+                    text(
+                        "SELECT id, scan_id, kind, standard, status, error_detail FROM reports WHERE id=:i"
+                    ),
+                    {"i": report_id},
+                )
+            ).first()
+        if r is None or r.status not in ("READY", "FAILED"):
+            return
+        data = {
+            "report_id": str(r.id),
+            "scan_id": str(r.scan_id),
+            "kind": r.kind,
+            "standard": r.standard,
+            "status": r.status,
+        }
+        if r.status == "READY":
+            data["download_path"] = f"/v1/reports/{r.id}/download"
+        else:
+            data["reason"] = r.error_detail
+        await webhooks.emit_event(
+            org_id, "report.ready" if r.status == "READY" else "report.failed", data
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("could not announce report %s", report_id)
 
 
 @celery_app.task(name="docs.render_report", acks_late=True, max_retries=0)

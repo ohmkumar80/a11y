@@ -20,6 +20,10 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.getByRole("heading", { level: 3, name: new RegExp(summary) })).toBeVisible();
       await expect(page.getByRole("navigation", { name: "API sections" }).getByRole("link", { name: summary })).toBeVisible();
     }
+    const hooks = page.getByRole("region", { name: "Webhooks" });
+    await expect(hooks.getByRole("heading", { level: 3, name: "Check the signature" })).toBeVisible();
+    await expect(hooks.getByText(/hmac\.new/)).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "API sections" }).getByRole("link", { name: "Webhooks" })).toBeVisible();
     const start = page.getByRole("region", { name: /Start a scan/ });
     await expect(start.getByRole("table", { name: /Request body \(ScanIn\)/ })).toBeVisible();
     await expect(start.getByRole("rowheader", { name: "url" })).toBeVisible();

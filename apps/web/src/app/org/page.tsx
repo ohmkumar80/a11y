@@ -83,7 +83,7 @@ function OrgContent({ name }: { name: string }) {
       </section>
       <section aria-labelledby="api" className="flex flex-col gap-2">
         <h2 id="api" className="text-xl font-bold">API access</h2>
-        <p>Let your own systems start scans and read results. <NextLink href="/org/api" className="underline">Manage API keys</NextLink>.</p>
+        <p>Let your own systems start scans and read results. <NextLink href="/org/api" className="underline">Manage API keys</NextLink> or <NextLink href="/org/webhooks" className="underline">manage webhooks</NextLink>, which tell your system when a scan or report finishes.</p>
       </section>
       <section aria-labelledby="security" className="flex flex-col gap-2">
         <h2 id="security" className="text-xl font-bold">Your security</h2>
