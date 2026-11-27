@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/.venv
+.venv
+.git
+**/__pycache__
+**/storybook-static
+**/test-results
+**/playwright-report
+.env

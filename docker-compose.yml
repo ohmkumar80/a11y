@@ -1,0 +1,125 @@
+# One command: `make up` (or `docker compose up --build`). Migrations and seed data run automatically.
+name: a11y
+
+x-api-env: &api-env
+  POSTGRES_HOST: postgres
+  POSTGRES_DB: ${POSTGRES_DB:-a11y}
+  A11Y_OWNER_PASSWORD: ${A11Y_OWNER_PASSWORD}
+  A11Y_APP_PASSWORD: ${A11Y_APP_PASSWORD}
+  A11Y_ADMIN_PASSWORD: ${A11Y_ADMIN_PASSWORD}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET}
+  ENV: ${ENV:-development}
+  A11Y_MASTER_KEYS: ${A11Y_MASTER_KEYS:-Q2OoEdjRtijEf6Bd8VUo4q6_2oBKlFXaQopiFpf0lgc=}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  MAIL_FROM: ${MAIL_FROM:-no-reply@a11y.local}
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-a11y}
+      A11Y_OWNER_PASSWORD: ${A11Y_OWNER_PASSWORD}
+      A11Y_APP_PASSWORD: ${A11Y_APP_PASSWORD}
+      A11Y_ADMIN_PASSWORD: ${A11Y_ADMIN_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/01-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-a11y}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage for local development. MinIO no longer publishes pullable images,
+  # so we use RustFS. Production uses real S3 / Azure Blob behind the storage interface (ADR 0002).
+  s3:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes: [s3data:/data]
+    ports: ["${S3_PORT:-9000}:9000", "${S3_CONSOLE_PORT:-9001}:9001"]
+
+  s3-init:
+    image: amazon/aws-cli:latest
+    depends_on: [s3]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+      S3_BUCKET: ${S3_BUCKET:-a11y-dev}
+    volumes: [./infra/s3-init.sh:/s3-init.sh:ro]
+    entrypoint: ["/bin/sh", "/s3-init.sh"]
+    restart: "no"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025", "1025:1025"]
+
+  migrate:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    environment: *api-env
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: sh -c "cd /app/apps/api && alembic upgrade head && python -m a11y_api.seed"
+    restart: "no"
+
+  api:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    ports: ["${API_PORT:-8000}:8000"]
+    command: uvicorn a11y_api.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    command: celery -A a11y_core.celery_app worker -Q web,docs,media,ai --loglevel=INFO
+
+  # Exactly one scheduler (hourly trial expiry). Never scale this service above 1.
+  beat:
+    build: { context: ., dockerfile: infra/api.Dockerfile }
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    command: celery -A a11y_core.celery_app beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule
+
+  web:
+    build: { context: ., dockerfile: infra/web.Dockerfile }
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      api: { condition: service_healthy }
+    ports: ["${WEB_PORT:-3000}:3000"]
+
+volumes:
+  pgdata:
+  s3data:
