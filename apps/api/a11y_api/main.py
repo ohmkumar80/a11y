@@ -20,6 +20,7 @@ from .routers import (
     auth,
     domains,
     fixes,
+    me_notifications,
     mfa,
     org,
     org_ai,
@@ -101,6 +102,7 @@ app.include_router(org_ai.router)
 app.include_router(standards.router)
 app.include_router(rule_guidance.router)
 app.include_router(fixes.router)
+app.include_router(me_notifications.router)
 app.include_router(org_api_keys.router)
 app.include_router(org_webhooks.router)
 app.include_router(v1.router)

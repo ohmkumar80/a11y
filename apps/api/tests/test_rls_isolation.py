@@ -36,6 +36,8 @@ TENANT_TABLES = [
     "api_keys",
     "webhook_endpoints",
     "webhook_deliveries",
+    "user_notifications",
+    "user_preferences",
 ]
 # Tables that carry organization_id but intentionally also hold platform-wide rows (see policy).
 PLATFORM_AND_TENANT_TABLES = ["setting_versions"]

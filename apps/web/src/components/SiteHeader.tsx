@@ -3,6 +3,7 @@
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@a11y/ui";
+import { NotificationsLink } from "./NotificationsLink";
 import { useAuth } from "./AuthProvider";
 
 const navLink = "inline-flex min-h-11 items-center px-3 underline-offset-4 hover:underline aria-[current=page]:font-bold aria-[current=page]:underline";
@@ -21,6 +22,7 @@ export function SiteHeader() {
           {user?.role === "SUPER_ADMIN" && <NextLink href="/admin" aria-current={cur("/admin")} className={navLink}>Admin</NextLink>}
           {user && <NextLink href="/workspace" aria-current={cur("/workspace")} className={navLink}>Workspace</NextLink>}
           {user?.role === "COMPANY_ADMIN" && <NextLink href="/org" aria-current={cur("/org")} className={navLink}>Organisation</NextLink>}
+          {user && user.role !== "SUPER_ADMIN" && <NotificationsLink />}
           {/* Help is always last in the nav on every page (SC 3.2.6 Consistent Help). */}
           <NextLink href="/help" aria-current={cur("/help")} className={navLink}>Help</NextLink>
           {user === null && <NextLink href="/login" aria-current={cur("/login")} className={navLink}>Log in</NextLink>}

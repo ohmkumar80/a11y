@@ -486,10 +486,65 @@ async def emit(
 
     if event not in EVENTS:
         raise ValueError(f"unknown notification event {event!r}")
+    from . import billing, flags  # noqa: PLC0415
+
     o, _ = await override_for(event, org_id=org_id)
+    # Everything that may touch the database or cache is looked up BEFORE the main transaction opens: a request or job
+    # must never hold one connection while waiting for another.
+    async with tenant_session(org_id) as db:
+        plan_id = (await billing.load_subscription(db)).plan_id
+    centre_on = await flags.enabled("notification_center", org_id=org_id, plan_id=plan_id)
+    ev = EVENTS[event]
+    rendered = render_event(event, variables, o)
+    link = _fill(ev.action_path, variables, html=False) if ev.action_path else None
+    body = _fill(o.intro if o and o.intro else ev.intro, variables, html=False)
+
     queued: list[uuid.UUID] = []
     async with tenant_session(org_id) as db:
-        for to in dict.fromkeys(a.lower() for a in recipients):
+        addresses = list(dict.fromkeys(a.lower() for a in recipients))
+        people = {
+            r.email.lower(): r.id
+            for r in (
+                await db.execute(
+                    text("SELECT id, email FROM users WHERE lower(email) = ANY(:e) AND is_active"),
+                    {"e": addresses},
+                )
+            ).all()
+        }
+        quiet = {
+            r.user_id
+            for r in (
+                await db.execute(text("SELECT user_id FROM user_preferences WHERE NOT email_scan"))
+            ).all()
+        }
+        for to in addresses:
+            uid = people.get(to)
+            if uid is not None and centre_on and rendered.enabled:
+                await db.execute(
+                    text(
+                        "INSERT INTO user_notifications (id, organization_id, user_id, event, title, body, link, dedupe_key) "
+                        "VALUES (gen_random_uuid(), :o, :u, :e, :t, :b, :l, :d) ON CONFLICT (user_id, dedupe_key) DO NOTHING"
+                    ),
+                    {
+                        "o": org_id,
+                        "u": uid,
+                        "e": event,
+                        "t": rendered.subject,
+                        "b": body,
+                        "l": link,
+                        "d": dedupe_key,
+                    },
+                )
+            off = bool(o and not o.enabled)
+            opted_out = ev.category == "scan" and uid in quiet
+            status = "SKIPPED" if (off or opted_out) else "QUEUED"
+            reason = (
+                "Switched off by an administrator."
+                if off
+                else "The recipient chose not to get this kind of email."
+                if opted_out
+                else None
+            )
             row = (
                 await db.execute(
                     text(
@@ -501,16 +556,14 @@ async def emit(
                         "o": org_id,
                         "e": event,
                         "t": to,
-                        "s": "SKIPPED" if (o and not o.enabled) else "QUEUED",
+                        "s": status,
                         "v": json.dumps(variables),
                         "d": dedupe_key,
-                        "err": "Switched off by an administrator."
-                        if (o and not o.enabled)
-                        else None,
+                        "err": reason,
                     },
                 )
             ).first()
-            if row is not None and not (o and not o.enabled):
+            if row is not None and status == "QUEUED":
                 queued.append(row[0])
     for nid in queued:
         try:

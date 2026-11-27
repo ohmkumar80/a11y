@@ -3,6 +3,7 @@ import { BYOK, SUBSCRIPTION, mockAdminApi } from "./admin-mocks";
 import openapi from "./openapi-fixture.json" with { type: "json" };
 import { mockApiKeys } from "./apikey-mocks";
 import { mockWebhooks } from "./webhook-mocks";
+import { mockNotifications } from "./notification-mocks";
 import { mockReportApi } from "./report-mocks";
 import { mockScanApi } from "./scan-mocks";
 
@@ -36,6 +37,7 @@ export async function mockApi(page: Page, role: Role) {
   await mockReportApi(page);
   await mockApiKeys(page);
   await mockWebhooks(page);
+  await mockNotifications(page);
   await page.route("**/api/v1/openapi.json", (r) => r.fulfill({ json: openapi }));
   await page.route("**/api/invites/**", (r) =>
     r.request().method() === "GET"
