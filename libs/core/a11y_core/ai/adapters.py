@@ -42,11 +42,13 @@ class FakeAdapter(ProviderAdapter):
 
 
 def _build() -> dict[str, ProviderAdapter]:
+    from .anthropic import AnthropicAdapter
     from .openai_chat import OpenAIChatAdapter
 
     chat = OpenAIChatAdapter()
     return {
         "fake": FakeAdapter(),
+        "anthropic": AnthropicAdapter(),
         # One wire format, five provider types (see openai_chat.py).
         "deepseek": chat,
         "openai": chat,

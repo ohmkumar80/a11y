@@ -100,6 +100,21 @@ PRESETS = {
         "data_policy": {"zero_retention": False, "processing_regions": [], "gov_approved": False},
         "options": {},
     },
+    "anthropic": {
+        "type": "anthropic",
+        "label": "Anthropic (Claude)",
+        "provider_id": "anthropic",
+        "needs_endpoint": False,
+        "default_model": "claude-haiku-5-5",
+        "capabilities": ["text", "vision", "json", "tools"],
+        "context_window": 200000,
+        "data_policy": {
+            "zero_retention": False,
+            "processing_regions": ["us"],
+            "gov_approved": False,
+        },
+        "options": {},
+    },
     "openai": {
         "type": "openai",
         "label": "OpenAI",
@@ -119,7 +134,7 @@ PRESETS = {
 
 
 class QuickAddIn(BaseModel):
-    preset: Literal["deepseek", "azure_openai", "openai"]
+    preset: Literal["deepseek", "azure_openai", "openai", "anthropic"]
     api_key: str = Field(min_length=8, max_length=4096)
     # Azure: https://<resource>.openai.azure.com ; ignored for fixed-address providers.
     endpoint: str | None = Field(None, max_length=300)
