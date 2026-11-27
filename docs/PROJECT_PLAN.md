@@ -1,6 +1,6 @@
 # Project Plan: Omni-Channel AI Accessibility Platform
 
-**Status:** Draft v2 · 2026-11-27 (v2 adds model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent, and Razorpay billing: sections 3.13 to 3.16)
+**Status:** Draft v3 · 2026-11-27. v2 added model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent and Razorpay billing (3.13 to 3.16). v3 adds the Phase 1 staging (1a and 1b) around work already built, the public API and enterprise integrations (3.17), and positioning, unit economics and trust (3.18).
 **Inputs:** [MASTER_BUILD_PROMPT.md](MASTER_BUILD_PROMPT.md) (product spec) · [ARCHITECTURE.md](ARCHITECTURE.md) (blueprint)
 
 This plan sets out the build order and the changes recommended to the spec. It also commits us to making our own product accessible: an accessibility vendor whose app fails WCAG will not win enterprise or government deals.
@@ -22,6 +22,9 @@ This plan sets out the build order and the changes recommended to the spec. It a
 11. **Templates first, tokens last.** Every report and every notification email is a permanent, versioned template that admins can edit, and every rule has a stored explanation and fix in a content library. AI fills only named dynamic slots, each with a deterministic fallback. See [section 3.14](#314-templates-reports-and-notifications-templates-first).
 12. **Build a monitor-and-heal agent on top of ordinary resilience.** Retries, checkpoints, dead-letter queues and watchdogs handle most failures without any AI. An Ops Agent then diagnoses unfamiliar failures and acts only through an allow-listed, audited, rate-limited action catalogue, starting in suggest-only mode. See [section 3.15](#315-reliability-and-self-healing-monitor-and-heal-agent).
 13. **Payments run on Razorpay.** Webhooks are the source of truth, we issue GST-compliant accessible invoices, and a nightly reconciliation catches drift. See [section 3.16](#316-billing-with-razorpay).
+14. **Stage Phase 1 instead of rebuilding it.** What is already built stays as it is. The remaining Phase 1 work is split into 1a (sellable to design partners) and 1b (breadth and hardening), with an item-by-item status table. Admin MFA moves into 1a, because the admin panel already controls keys, prices and billing. See [Phase 1](#phase-1-mvp-sellable-web-accessibility-audits).
+15. **Make the product integrable with a versioned public API and Swagger/OpenAPI docs.** A `/v1` API with API keys, scopes, webhooks, rate limits, generated SDKs and a CLI, added next to the existing internal routes, which are not renamed. See [section 3.17](#317-public-api-and-enterprise-integrations).
+16. **Settle the market wedge and the unit economics before scaling the build.** Web scanning is a commodity. The plan needs a defined wedge, a cost-per-unit model that sets plan quotas, and the legal, security and ownership items that enterprise buyers ask for. See [section 3.18](#318-positioning-unit-economics-and-trust).
 
 ---
 
@@ -223,6 +226,7 @@ Different workers need very different runtimes, so build **separate images and C
 | `notify` | Lightweight Python | Email and in-app notifications; isolated so a mail-provider outage cannot block scans (3.14) |
 | `billing` | Lightweight Python | Razorpay webhooks, reconciliation, invoice generation (3.16) |
 | `ops` | Lightweight Python | Ops Agent and runbook executor, with its own least-privilege credentials (3.15) |
+| `integrations` | Lightweight Python | Outbound webhooks and Jira, GitHub and Slack sync, aware of each provider's rate limits (3.17) |
 
 Celery on Redis: use `acks_late`, idempotent task IDs, and set `visibility_timeout` above the longest job (video), or move long media jobs to RabbitMQ.
 
@@ -301,7 +305,7 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **Email and notifications** | Provider (SMTP / SES / other), sender identity, templates, and which event sends what to whom and when (3.14) | 1 |
 | **Feature flags** | Global, per plan, per tenant, percentage rollout, kill switches | 1 |
 | **Payment gateway and tax** | Razorpay account (mode, keys, webhook secret), plan sync, GST settings, invoice series, dunning and grace periods (3.16) | 1 (payment links), 2 (subscriptions) |
-| **Auth and security policy** | SSO providers per tenant, MFA enforcement, session length, password policy, IP allow-lists | 2 |
+| **Auth and security policy** | SSO providers per tenant, MFA enforcement, session length, password policy, IP allow-lists | 1 (admin MFA), 2 (the rest) |
 | **White-label defaults** | Allowed customisations per plan, report branding | 2 |
 | **Data retention** | Retention period per plan and asset type, deletion schedules | 2 |
 | **HITL** | SME teams, skills, routing rules, SLAs, escalation | 3 |
@@ -311,6 +315,7 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **Report templates and rule content** | Report layouts, rule explanations and fix examples, with review workflow and versioning (3.14) | 1 |
 | **AI tiers and validation** | Tier per model, tier ladder per task, validation mode and sample rate, escalation limits (3.13) | 1 |
 | **Ops Agent** | Autonomy level per action, runbooks, canaries, escalation contacts, token budgets (3.15) | 2 |
+| **Public API and integrations** | API access and rate limits per plan, key lifetime, webhook limits, docs visibility, enabled integrations and their OAuth app credentials (3.17) | 1 |
 
 ### 3.12 Proposed repository layout
 
@@ -337,7 +342,9 @@ templates/             Default report and notification templates, shared accessi
 runbooks/              Self-healing runbooks (YAML) and their fault-injection tests (3.15)
 fixtures/              Known-bad test sites/files for scanner benchmarks
 infra/                 docker-compose, Dockerfiles, deployment
-docs/                  Architecture, plan, ADRs, accessibility statement
+cli/                   `a11y` command-line tool and CI wrappers (GitHub Action, GitLab CI) (3.17)
+sdks/                  Generated API client libraries (3.17)
+docs/                  Architecture, plan, ADRs, accessibility statement; api/ holds the published OpenAPI spec and changelog
 ```
 
 ### 3.13 Model tiering and the validation layer
@@ -421,7 +428,7 @@ docs/                  Architecture, plan, ADRs, accessibility statement
 - **Billing:** payment link, payment succeeded with invoice, payment failed with retry date, final notice, subscription cancelled, renewal reminder, refund processed.
 - **Operations (to admins):** provider outage and fallback active, incident opened and resolved, budget threshold reached, agent action awaiting approval.
 
-Channels: email and an in-app notification centre in Phase 1; outbound webhooks (Enterprise) and Slack or Teams alerts for admins in Phase 2.
+Channels: email and an in-app notification centre in Phase 1; outbound webhooks (3.17) in Phase 1b; Slack or Teams alerts in Phase 2.
 
 **How the template system works**
 
@@ -568,6 +575,121 @@ Autonomy levels, set per action and per environment: **Observe → Suggest → A
 10. GST invoicing duties and e-invoicing applicability, with a chartered accountant.
 11. Account activation and KYC lead time: start early, it can take days to weeks.
 
+### 3.17 Public API and enterprise integrations
+
+**Principle:** anything a customer can do in the UI can also be done through a documented, versioned API, and the product pushes events out to the tools enterprises already use. The Swagger/OpenAPI document is generated from the code, so it cannot drift from the product.
+
+**Two API surfaces (nothing already built is renamed)**
+
+| Surface | Paths | For | Contract |
+|---|---|---|---|
+| Internal app API (exists today) | `/auth`, `/org`, `/admin/...` | Our own web app | None. It may change at any time and stays out of the public docs. Interactive docs for it are switched off in production |
+| Public API (new) | `/v1/...` | Customers, integrators, our CLI and SDKs, and the web app for new features | Versioned and stable. Its own OpenAPI document, with Swagger UI at `/v1/docs`, ReDoc at `/v1/redoc` and the schema at `/v1/openapi.json` |
+
+**How it fits the current code.** The public API is a separate FastAPI sub-application mounted at `/v1`, so it has its own OpenAPI document and no internal route needs renaming. New capabilities (scans, findings, reports) are written **once**, as service-layer functions exposed under `/v1`, and the web app calls them with the user's session. Existing organisation, user and subscription functions get thin `/v1` wrappers only where enterprises need them. Both surfaces pass through the same tenant isolation (RLS), seat guard, trial lock and quota reservation, so an API call can never bypass a limit.
+
+**Authentication and authorisation**
+- **API keys (Phase 1a):** created by a Company Admin, shown once, stored only as a hash. Format `a11y_live_<random>_<checksum>`: the prefix and checksum let secret scanners (including GitHub's) recognise leaked keys. Each key has a name, scopes, an optional expiry and IP allow-list, a last-used time, and can be rotated with an overlap period or revoked.
+- **OAuth 2.0 client credentials (Phase 2)** for server-to-server integrations; the authorisation-code flow later for marketplace apps.
+- **Session tokens:** `/v1` also accepts the web app's normal access token, so the UI and integrations share one code path.
+- **Scopes** follow least privilege (`scans:read`, `scans:write`, `reports:read`, and so on). A key can never perform Super Admin actions and cannot manage other keys.
+- **Service accounts:** a key acts as an `API_CLIENT` principal inside its organisation. It does not use a user seat (admin setting).
+
+**API catalogue**
+
+| Area | Operations (all under `/v1`) | Scope | Phase |
+|---|---|---|---|
+| Scans | `POST /scans` (URL, standards, crawl limits, auth-state id), `GET /scans`, `GET /scans/{id}`, `POST /scans/{id}/cancel`, `POST /scans/{id}/rescan`, `GET /scans/{id}/events` (server-sent events) | `scans:read`, `scans:write` | 1a |
+| Findings | `GET /scans/{id}/findings` (filter by standard, severity, rule, status), `GET /findings/{id}`, `PATCH /findings/{id}` (status, assignee, comment), `GET /scans/{id}/diff/{other_id}` | `findings:read`, `findings:write` | 1a (read), 2 (triage, diff) |
+| Standards and rules | `GET /standards`, `GET /rules`, `GET /rules/{id}` (explanation, fix examples, clause citations) | `catalog:read` | 1a |
+| Reports | `POST /reports` (scan, standard, type, format), `GET /reports/{id}`, `GET /reports/{id}/download`, `POST /reports/{id}/sign-off` | `reports:read`, `reports:write` | 1a |
+| Uploads | `POST /uploads` (returns a pre-signed URL), `POST /uploads/{id}/complete`; used for `storageState` files, documents, media and APKs | `uploads:write` | 1a (auth state), 3 to 5 |
+| Organisation | `GET /org`, `GET /org/usage`, `GET /org/subscription`, `GET /org/invoices`, `GET /org/users`, `POST /org/invites` and `DELETE /org/users/{id}` (the seat guard applies and returns the upgrade prompt on a full plan) | `org:read`, `users:write` | 1a (read), 1b (write) |
+| API keys | `GET/POST /org/api-keys`, `POST /org/api-keys/{id}/rotate`, `DELETE /org/api-keys/{id}` | Company Admin session only | 1a |
+| Webhooks | `GET/POST/PATCH/DELETE /webhooks`, `GET /webhooks/{id}/deliveries`, `POST /webhooks/{id}/test`, `POST /deliveries/{id}/redeliver` | `webhooks:manage` | 1b |
+| Audit log | `GET /audit-events` (pulled by a SIEM) | `audit:read` | 1b |
+| Monitors | `POST /monitors` (scheduled recurring scans), `GET /monitors`, `PATCH /monitors/{id}`, `DELETE /monitors/{id}` | `monitors:write` | 2 |
+| Integrations | `GET/POST/DELETE /integrations` (Jira, GitHub, Slack), `POST /findings/{id}/export` (create an issue) | `integrations:manage` | 2 |
+| Identity | SCIM 2.0 at `/scim/v2` (Users, Groups) | SCIM token | 2 |
+| Documents | `POST /documents`, `GET /documents/{id}`, `GET /documents/{id}/download`, `GET /documents/{id}/review` | `documents:read`, `documents:write` | 3 |
+| Media | `POST /media`, `GET /media/{id}`, `GET /media/{id}/captions` (`.vtt`, `.srt`), `/transcript`, `/audio-description` | `media:read`, `media:write` | 4 |
+| Mobile | `POST /mobile/scans`, `GET /mobile/scans/{id}` | `mobile:read`, `mobile:write` | 5 |
+
+**Conventions (all endpoints)**
+- Resource-oriented JSON, RFC 3339 UTC timestamps, UUID ids, cursor pagination (`limit`, `cursor`), and documented filter and sort parameters.
+- Work that takes time returns `202 Accepted` with a job resource and a `Location` header. Clients poll, stream events (SSE) or receive a webhook.
+- An `Idempotency-Key` header on every `POST` that creates work or spends quota. It maps onto the existing idempotent reservation by job id, so a retried request never charges twice.
+- Errors use RFC 9457 `application/problem+json` with a stable `type`, a machine-readable `code` and, where relevant, the structured upgrade prompt (seat limit, quota, locked trial) that the app already returns.
+- Rate limits per key and per organisation (token bucket in Redis), with `429`, `Retry-After` and rate-limit headers. Limits come from plan entitlements and can be overridden per organisation in admin.
+- `X-Request-Id` on every response and in the audit log; optimistic concurrency with `ETag` and `If-Match` on `PATCH`.
+- **Versioning:** `/v1` accepts additive changes only (new fields, endpoints and optional parameters). A breaking change means `/v2`. Endpoints marked `beta` may change. A deprecated endpoint gets `Deprecation` and `Sunset` headers and stays for at least 12 months.
+
+**Swagger / OpenAPI and the developer portal**
+- FastAPI generates OpenAPI 3.1 from the code. Every operation must have an `operationId`, a tag, a summary and description, the required scopes, request and response examples, and every error response modelled. CI fails when any are missing.
+- **CI quality gates:** Spectral (lint rules), oasdiff (breaking-change detection against the last release), Schemathesis (contract and fuzz tests against a running API) and a check that the generated SDKs still compile.
+- CI commits the published spec to `docs/api/openapi-v1.json`, with a changelog, so every API change is visible in review.
+- **Accessible reference:** Swagger UI and ReDoc are third-party tools with known accessibility gaps (we verify with our own scanner and a screen reader). We keep them for their "try it" convenience **and** publish our own semantic-HTML API reference generated from the same OpenAPI file. The Accessibility Statement lists the status of each.
+- **Developer portal at `/developers`:** getting started, authentication, quickstarts (curl, Python, JavaScript), webhook guide, error and rate-limit reference, changelog, Postman collection export, and a sandbox target site so integrators can test without scanning real sites. Docs visibility (public or signed-in) is an admin setting.
+- **SDKs and CLI:** Python and TypeScript SDKs generated with openapi-generator (Phase 2), other languages on demand. The `a11y` CLI wraps the SDK, for example `a11y scan <url> --fail-on serious --baseline file`, and works from any CI system.
+
+**Outbound webhooks (Phase 1b)**
+- Events: `scan.completed`, `scan.failed`, `report.ready`, `regression.detected`, `document.remediated`, `review.completed`, `quota.threshold_reached`, `subscription.changed`, `user.invited`. Payloads are thin (ids and a summary), and the receiver fetches details through the API.
+- Each delivery carries a signed header (HMAC-SHA256 over timestamp and body, with a replay window), an event id for de-duplication and the API version. Retries use exponential back-off over 24 hours. An endpoint auto-disables after repeated failures, with a notification. Admins see a delivery log with manual redelivery and secret rotation.
+- Webhook URLs go through the same SSRF checks as scan targets (3.6). Delivery runs on the `integrations` queue.
+
+**Enterprise integrations**
+
+| Need | What we build | Phase |
+|---|---|---|
+| Single sign-on and provisioning | SAML 2.0 and OIDC SSO; SCIM 2.0 user and group provisioning; MFA enforcement | 2 |
+| Issue tracking | Jira Cloud and Data Center, and GitHub Issues: create an issue from a finding and sync its status. Issue title and body come from admin-editable templates (3.14). GitLab and Azure DevOps on demand | 2 |
+| CI/CD gates | `a11y` CLI, GitHub Action, GitLab CI template, Azure Pipelines and Jenkins through the CLI; fail the build on new violations against a baseline | 2 |
+| Team chat | Slack and Microsoft Teams: scan summaries and regression alerts | 2 |
+| Security and compliance tooling | Audit-log pull endpoint, then streaming to a SIEM (Splunk, Datadog, Elastic) over HTTPS | 1b (pull), 3 (streaming) |
+| IT service management | ServiceNow and similar through webhooks and the API; a native app on demand | 3 or later |
+| No-code automation | Zapier, Make and Power Automate connectors built on webhooks and the API | 3 or later, on demand |
+| Data export | Scheduled CSV or JSON export to the customer's own S3 or Azure Blob storage | 3 |
+
+**Integration framework.** Each connection is an `Integration(org_id, type, config, secret_ref, scopes, status)`. Platform-level OAuth app credentials (for Jira, GitHub and Slack) are write-only admin settings (3.11.1). Per-organisation tokens are encrypted and refreshed automatically. Outbound calls respect each provider's rate limits and run on the `integrations` queue. Connection health feeds the incident system (3.15), so an expired Jira token raises a notification instead of failing silently.
+
+**Admin configuration (3.11).** Per plan and per organisation: API access on or off, requests per minute and per month, maximum keys, maximum webhooks, key lifetime, allowed integrations, docs visibility, and a CORS origin allow-list (off by default, because the public API is server-to-server).
+
+**Security.** Keys are hashed at rest and never logged. Every API call is written to the audit log with organisation, key and action. Burst and anomaly alerts feed `/admin/ops`. Request size limits apply, uploads go only through pre-signed URLs with malware scanning (3.6), IP allow-lists are supported, and each organisation has a kill switch for API access. mTLS for Enterprise is an option for later.
+
+**Exit criteria (Phase 1a):** the OpenAPI document is published and passes the lint and breaking-change gates; API-key authentication and scopes are enforced and tested; a sample integration script runs scan, findings and report using only the API in CI; rate-limit, idempotency and tenant-isolation tests pass for `/v1`.
+
+### 3.18 Positioning, unit economics and trust
+
+**Market wedge.** Web scanning alone is a commodity: the best engines (axe-core, IBM Equal Access) are free, and established vendors (for example Deque, Level Access, Siteimprove and Pope Tech) already sell monitoring. The places where we can be different are already in this plan: remediation instead of detection only, document and PDF remediation, multi-law reporting with a drafted VPAT, Indian-market fit (INR pricing, GIGW, regional languages) and trained human review. Actions:
+- Keep a short competitor comparison in `docs/market/` (features, price, weaknesses).
+- Interview 5 to 10 target customers before 1a closes, and write down the primary customer type and the one problem we solve first.
+- **Order check:** after design-partner feedback on 1a, decide whether Phase 3 (documents) should run before parts of Phase 2. The phases are independent enough to swap.
+
+**Unit economics.** Plan quotas count different things (URLs, document pages, video minutes), and each costs something different. Before final pricing:
+- Build a cost model per unit: URL scan (pages, CPU seconds, storage, tokens by tier), document page, alt text, video minute (GPU transcription, audio-description tokens, speech synthesis, storage), mobile scan (emulator host time) and human-review minute. Add payment fees, email and support.
+- Meter the inputs: extend `UsageLedger` and `AIUsage` with worker-seconds, GPU-seconds and storage, so FinOps can show **margin per tenant** and not only AI cost.
+- Set quotas and prices from the model, with a target gross margin per plan, and review them quarterly. **The plan limits seeded in migration 0003 are launch placeholders** and should be replaced once the model exists.
+- Human review is a paid add-on, priced per page or minute with turnaround tiers, and backed by a capacity plan for the SME teams.
+
+**Legal and trust**
+- Terms of service with liability limits and plain wording that automated results are not legal advice or a guarantee of compliance; a privacy policy; a data processing agreement with a sub-processor list (AI providers, Razorpay, email, hosting); DPDP Act and GDPR handling.
+- **Hosting region:** a single region (India) at launch, stated in the DPA. Regional deployments come only when a customer needs them.
+- **Security assurance:** an independent penetration test before the first paying customer; a vulnerability disclosure policy (`security.txt`); backup and recovery targets (RPO and RTO) that are written down and tested; a SOC 2 or ISO 27001 roadmap started when the enterprise pipeline asks for it.
+- Consider professional-liability (errors and omissions) insurance before enterprise contracts.
+
+**Brand.** "a11y" is a common shorthand for accessibility, so it is hard to trademark, to search for and to get a domain for. Keep `a11y` as the code and repository name, and choose a distinctive product name and domain, with a trademark check, before the public launch.
+
+**Named owners.** The plan assumes people in these roles. Each needs a name before the phase that depends on it.
+
+| Role | Responsible for | Needed by |
+|---|---|---|
+| Accessibility lead (IAAP-certified) | Sign-off on our own ACR, VPAT approvals, release screen-reader checks | 1a |
+| Rule-mapping SME | Standards mappings and the rule content library | 1a |
+| Security owner | Penetration test, key management, admin MFA policy, incident response | 1a |
+| Chartered accountant | GST rate, SAC code, e-invoicing, invoice retention | Before the first invoice |
+| Privacy contact | DPA, data requests, retention | Before the first customer |
+| Ops owner and on-call | Approvals for Ops Agent actions, incident response | 1b |
+
 ---
 
 ## 4. Phased build plan
@@ -597,6 +719,39 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Every auth email renders from a published template and passes the template accessibility check.
 
 ### Phase 1: MVP, sellable web accessibility audits
+
+**Staging (added 2026-11-27).** Phase 1 is already in development, so this staging does not change anything that is built. It only assigns the remaining work to two stages, so design partners can start sooner. The scope and exit criteria below remain the full list; this table says in which stage each item lands. Status comes from the repository on 2026-11-27 and should be updated as work lands.
+
+- **1a, sellable to design partners:** scan a site, understand the findings, export a report, be billed.
+- **1b, breadth and hardening:** what makes it cheaper to run and easier to operate, but is not needed on day one.
+
+| Item | Stage | Status |
+|---|---|---|
+| Settings framework, `/admin/settings`, schema-generated admin forms (3.11.1) | 1a | Built |
+| SaaS core: plans and entitlements, trial, seat guard, quota reservations, coupons; admin screens for organisations, plans and coupons | 1a | Built |
+| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built with the fake adapter only; two real adapters not started |
+| Rule registry and switching standards | 1a | Not started |
+| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Not started |
+| SSRF protection, domain verification, rate limits | 1a | Not started |
+| Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Not started |
+| Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Not started |
+| Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Not started |
+| Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
+| Admin MFA for every admin role, and session refresh | 1a | Not started |
+| Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
+| Workspace screens: new scan, findings list, Fix Workbench | 1a | Not started |
+| Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |
+| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Not started |
+| Remaining notification events, in-app notification centre | 1b | Not started |
+| Content library for all rules | 1b | Not started |
+| Outbound webhooks and the audit-log endpoint (3.17) | 1b | Not started |
+| Accessible API reference page and the full API quality gates (3.17) | 1b | Not started |
+| Canaries, first runbooks, read-only `/admin/ops` | 1b | Not started |
+| Sampled premium validation (V2) and shadow-mode promotion (3.13) | 1b | Not started |
+| Remaining admin settings (email provider, legal pages, scan engines, feature flags), granular admin roles, two-person approval | 1b | Not started |
+| Our own ACR from a human audit, Accessibility Statement, manual NVDA and VoiceOver pass | 1b | Not started |
+
+**Stage gates.** Design partners onboard when **1a** exits: the scanner benchmark is recorded; the quota and coupon concurrency tests pass; exported PDFs pass veraPDF; switching the code-fix provider needs no redeploy and falls back automatically (two real adapters); a worker killed mid-scan resumes or fails with a reason and leaves no credits reserved; a Razorpay Payment Link activates a plan through the webhook, including the duplicate, out-of-order and forged-signature tests; admin MFA is enforced for every admin role; the `/v1` exit criteria in 3.17 pass; and no Critical or Serious accessibility issue is open on any screen shipped so far. **1b** closes when the remaining exit criteria below pass, 3 to 5 design partners are actively scanning, and our own ACR is done before the first paid customer.
 
 **Scope**
 - **SaaS core:** Plans, Organizations, Users and roles, Seat Limit Guard with upgrade prompt, Trial engine (14 days → `LOCKED_READ_ONLY`), Coupons + Redemptions, Usage Ledger + Reservations, audit logs.
@@ -636,13 +791,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Vision-LLM auditor: text in images, contrast over gradients and images, alt text quality, missing focus indicators.
 - Scheduled monitoring, scan-to-scan regression diff, email digests (accessible HTML emails).
 - **Razorpay self-serve billing (3.16):** subscriptions for monthly plans, orders or yearly subscriptions for annual plans as decided in the spike, plan changes, coupons mapped to final amounts, dunning, refunds and credit notes, nightly reconciliation, `PAST_DUE` and lock handling, and an upgrade checkout that meets SC 3.3.7 with accessible fallback payment paths.
-- **Ops Agent (3.15):** Suggest and Approve-to-run modes, action catalogue with policy engine, approvals in `/admin/ops`, billing-reconciliation incidents, public status page; proven runbooks promoted to Auto.
+- **Ops Agent (3.15):** start it once real production incidents exist, because runbooks are written from real failures (layers 0 to 2 ship earlier, in Phase 1). Suggest and Approve-to-run modes, action catalogue with policy engine, approvals in `/admin/ops`, billing-reconciliation incidents, public status page; proven runbooks promoted to Auto.
 - **AI tiering, round 2 (3.13):** sampled premium validation, shadow-mode promotion of cheaper models, cost-versus-quality dashboard.
-- **Notifications, round 2 (3.14):** outbound webhooks for Enterprise, Slack or Teams admin alerts, per-user preferences and digests, Indian-language template variants (for example Tamil and Hindi).
+- **Notifications, round 2 (3.14):** Slack or Teams alerts, per-user preferences and digests, Indian-language template variants (for example Tamil and Hindi). Outbound webhooks arrive earlier, in 1b (3.17).
 - Super Admin: MRR/ARR, trial conversion, AI FinOps (token cost per tenant), budget caps.
 - Configuration, round 2: payment gateway registry, tax settings, bring-your-own AI key for Enterprise, per-org data policy (regions, zero retention), prompt versioning with evaluation-gated activation, staged rollouts, two-person approval for high-risk changes.
 - White-label: contrast-validated brand colours, custom report branding.
-- Enterprise SSO (SAML/OIDC); optional here, required before large enterprise deals.
+- **Enterprise integrations (3.17):** OAuth 2.0 client credentials, Python and TypeScript SDKs, the `a11y` CLI with a GitHub Action and a GitLab CI template, Jira and GitHub issue sync, Slack and Teams, SSO (SAML/OIDC) with SCIM 2.0 provisioning, and the finding-lifecycle and monitor endpoints. SSO and SCIM are required before large enterprise deals.
 
 **Exit criteria**
 - Self-serve trial → paid conversion works end to end without staff involvement.
@@ -650,8 +805,11 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Release screen-reader matrix (section 2.6) passed.
 - A self-serve payment through Razorpay works end to end in live mode, and the nightly reconciliation shows no unexplained differences over a full billing cycle.
 - In Suggest mode the Ops Agent makes correct proposals for injected faults (provider outage, stuck queue, orphaned reservations), and every action and proposal is in the audit log.
+- A sample customer pipeline fails a build on a new violation through the CLI or GitHub Action, and a finding can be sent to Jira from the UI and through the API.
 
 ### Phase 3: Documents and eBooks
+
+*Order check (3.18): after design-partner feedback on Phase 1a, decide whether this phase should run before parts of Phase 2.*
 
 **Scope** (in order of customer demand)
 1. **PDF:** veraPDF audit → layout analysis (Vision-LLM + `pypdfium2`/`pdfplumber`) → tag tree, title, language, alt text via `pikepdf` → re-validate. A large share of Matterhorn Protocol checkpoints need human judgment, so complex files are routed to HITL.
@@ -661,6 +819,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - **HITL SME console:** queue, assignment, side-by-side review, approve/edit/reject, SLA tracking. Fully keyboard-operable, with no drag-only actions (SC 2.5.7).
 - Document workbench: side-by-side preview, editable alt text, **reading-order editor with move up/down buttons** (not drag-only), "Download Remediated File".
 - Document validators (veraPDF, EPUBCheck, Ace) are V1 checks in the validation layer (3.13). Add document runbooks (3.15) and the remediation report template (3.14).
+- Public API: the `/v1/documents` endpoints and the document pages of the uploads flow (3.17).
 
 **Exit criteria**
 - Remediated files pass their validators, and SME review confirms reading order on a sample set.
@@ -674,6 +833,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Audio Description: keyframes during pauses → LLM-drafted AD script → human approval → TTS (Kokoro/Piper) → mux AD track + captions into an accessible MP4. Extended AD when pauses are too short.
 - Indian-language captions (Whisper multilingual): a differentiator for the domestic market.
 - Light-tier caption clean-up; premium validation of audio-description scripts (3.13). Add media runbooks (chunk and resume) and the media report template (3.14, 3.15).
+- Public API: the `/v1/media` endpoints, including caption and transcript downloads (3.17).
 
 **Exit criteria**
 - Caption accuracy (WER) measured on a reference set for each supported language.
@@ -685,6 +845,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Android: APK upload → sandboxed emulator (KVM host) → Appium UiAutomator2 + Google ATF → TalkBack-order traversal, node info, screenshots → Kotlin / Jetpack Compose / React Native fixes.
 - iOS (XCUITest + VoiceOver on on-demand macOS hosts) and real NVDA/VoiceOver capture for web: backlog, prioritised by customer demand.
 - Mobile runbooks (emulator recycle, host failover) and the mobile report template (3.15, 3.14).
+- Public API: the `/v1/mobile` endpoints (3.17).
 
 **Exit criteria**
 - Benchmark against a known-bad sample APK set; sandbox escape and network-isolation tests pass.
@@ -708,6 +869,11 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | 11 | Ops Agent autonomy and ownership | Every action starts at Suggest and is promoted only with a supervised track record. Name a human owner for approvals and on-call |
 | 12 | GST and e-invoicing | A chartered accountant confirms rate, SAC code, e-invoicing applicability and invoice retention before the first invoice |
 | 13 | Template editor | Source editor with live preview; no WYSIWYG widget unless it passes our own audit |
+| 14 | Market wedge and first customer type | Lead with remediation, documents, multi-law reports and Indian-market fit, not scanning alone. Interview 5 to 10 prospects before 1a closes (3.18) |
+| 15 | Public API contract | `/v1` as a sub-application next to the internal routes; API keys first, OAuth client credentials in Phase 2; additive-only changes within a version; 12-month deprecation window (3.17) |
+| 16 | Hosting region and security assurance | India region at launch; penetration test before the first paying customer; SOC 2 or ISO 27001 when the pipeline requires it (3.18) |
+| 17 | Product brand | A distinctive name and domain with a trademark check before public launch; keep `a11y` as the code and repository name |
+| 18 | Named owners | Accessibility lead, rule-mapping SME, security owner, chartered accountant, privacy contact, ops owner (3.18) |
 
 ## 6. Top risks
 
@@ -715,7 +881,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|
 | Overclaiming compliance (legal/regulatory exposure) | "Automated coverage X/Y" scoring, "Not Evaluated" defaults, human-signed VPATs, careful marketing copy |
 | Our own UI has accessibility defects | CI gates from Phase 0, release AT matrix, disabled-user testing, public statement and feedback loop |
-| Scope too broad, delaying revenue | Phase 1 kept to the web audit MVP; later phases driven by design-partner demand |
+| Scope too broad, delaying revenue | Phase 1 kept to the web audit MVP and split into 1a and 1b; later phases driven by design-partner demand |
 | LLM cost grows with crawl size | Template clustering, response cache, per-tenant budgets, deterministic checks before AI, model tiering and the resolution ladder (3.13), rule content library (3.14) |
 | Hostile inputs (SSRF, malicious files, APKs) | Sandboxed workers, egress controls, domain verification, malware scanning |
 | Admin misconfiguration breaks production (bad key, wrong price, disabled model) | Typed validation, test connection, draft/publish, evaluation gates, two-person approval, versioned rollback, audit log |
@@ -725,4 +891,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | GST or e-invoicing mistakes | Chartered accountant sign-off, admin-configurable tax settings, gap-free invoice series, credit notes |
 | Razorpay Checkout is not fully accessible (we do not control it) | Test it in the spike, publish the result, offer accessible fallback payment paths |
 | Template edits break emails or reports | Save-time render and accessibility checks, two-person approval for billing and legal templates, last known-good fallback, version rollback |
+| An undifferentiated product (commodity scanning) | Defined wedge, competitor comparison, customer interviews, order check after 1a (3.18) |
+| Plan prices lose money on heavy plans (video, AI, human review) | Unit-cost model, per-unit metering, quotas set from the model, margin-per-tenant view, human review sold as an add-on |
+| Admin account takeover | Admin MFA in 1a, two-person approval for high-risk changes, audit log, short sessions |
+| Public API breaks integrators | `/v1` versioning, breaking-change gate in CI, `Deprecation` and `Sunset` headers, SDK contract tests |
+| API key leaks | Hashed storage, recognisable key format for secret scanners, scopes, IP allow-lists, rotation, anomaly alerts |
+| Liability from customers relying on our reports | Terms with liability limits, "not a guarantee" wording, human-signed VPATs, insurance review |
 | Engine and rule drift over time | Pinned engine versions per scan, versioned rule registry, benchmark suite in CI |
