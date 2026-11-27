@@ -23,10 +23,12 @@ from .routers import (
     mfa,
     org,
     org_ai,
+    org_api_keys,
     reports,
     rule_guidance,
     scans,
     standards,
+    v1,
 )
 
 
@@ -98,6 +100,8 @@ app.include_router(org_ai.router)
 app.include_router(standards.router)
 app.include_router(rule_guidance.router)
 app.include_router(fixes.router)
+app.include_router(org_api_keys.router)
+app.include_router(v1.router)
 app.include_router(scans.router)
 app.include_router(domains.router)
 app.include_router(reports.router)

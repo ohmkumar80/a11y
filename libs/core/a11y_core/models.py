@@ -681,3 +681,25 @@ class NotificationLog(Base):
     config_ref: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ApiKey(Base):
+    """A key for the public API. Only a hash is stored; identity, hash and scopes are immutable (the table grants UPDATE
+    only on ``last_used_at`` and ``revoked_at``), so changing what a key can do means issuing a new one."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = (CheckConstraint("cardinality(scopes) > 0", name="ck_api_key_scopes"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    key_hint: Mapped[str] = mapped_column(String(4))
+    scopes: Mapped[list[str]] = mapped_column(ARRAY(String(40)))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,5 +1,7 @@
 import { test as base, type Page } from "@playwright/test";
 import { BYOK, SUBSCRIPTION, mockAdminApi } from "./admin-mocks";
+import openapi from "./openapi-fixture.json" with { type: "json" };
+import { mockApiKeys } from "./apikey-mocks";
 import { mockReportApi } from "./report-mocks";
 import { mockScanApi } from "./scan-mocks";
 
@@ -30,6 +32,8 @@ export async function mockApi(page: Page, role: Role) {
   await page.route("**/api/auth/mfa/status", (r) => r.fulfill({ json: { enabled: false, mode: "optional", required: false, recovery_codes_left: 0, available: role === "COMPANY_ADMIN" || role === "SUPER_ADMIN" } }));
   await mockScanApi(page);
   await mockReportApi(page);
+  await mockApiKeys(page);
+  await page.route("**/api/v1/openapi.json", (r) => r.fulfill({ json: openapi }));
   await page.route("**/api/invites/**", (r) =>
     r.request().method() === "GET"
       ? r.fulfill({ json: { email: "invitee@example.com", organization_name: "Example Org" } })

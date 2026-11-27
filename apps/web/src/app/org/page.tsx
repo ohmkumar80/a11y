@@ -81,6 +81,10 @@ function OrgContent({ name }: { name: string }) {
         <h2 id="ai" className="text-xl font-bold">AI provider</h2>
         <p>On the Enterprise plan you can use your own OpenAI, Azure OpenAI or DeepSeek keys. <NextLink href="/org/ai" className="underline">Manage AI provider settings</NextLink>.</p>
       </section>
+      <section aria-labelledby="api" className="flex flex-col gap-2">
+        <h2 id="api" className="text-xl font-bold">API access</h2>
+        <p>Let your own systems start scans and read results. <NextLink href="/org/api" className="underline">Manage API keys</NextLink>.</p>
+      </section>
       <section aria-labelledby="security" className="flex flex-col gap-2">
         <h2 id="security" className="text-xl font-bold">Your security</h2>
         <SecurityPanel />

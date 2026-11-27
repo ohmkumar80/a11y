@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 14
     cookie_secure: bool = False
     public_web_url: str = "http://localhost:3000"
+    public_api_url: str = (
+        ""  # shown as the server in the published API description; empty = relative
+    )
     cors_origins: str = "http://localhost:3000"
 
     # Starting value of the platform-administrator MFA policy (admins can change it in /admin -> Settings -> auth.mfa).

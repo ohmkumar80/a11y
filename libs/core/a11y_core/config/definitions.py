@@ -350,6 +350,28 @@ register(
 )
 
 
+class ApiLimits(BaseModel):
+    requests_per_minute: int = Field(
+        120, ge=1, le=6000, description="Requests per API key per minute"
+    )
+    max_keys_per_org: int = Field(10, ge=1, le=200, description="Active API keys per organisation")
+    max_key_lifetime_days: int | None = Field(
+        None, ge=1, le=3650, description="Longest a key may live; empty = keys can be non-expiring"
+    )
+
+
+register(
+    SettingDef(
+        key="api.limits",
+        model=ApiLimits,
+        default=ApiLimits(),
+        description="Public API: request rate per key, keys per organisation, and key lifetime.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("api",),
+    )
+)
+
+
 # --- Two-step verification policy ------------------------------------------------------------------------
 
 

@@ -62,6 +62,7 @@ export const post = <T = void>(path: string, json?: unknown) => raw<T>(path, { m
 export const get = <T>(path: string) => raw<T>(path, { method: "GET" });
 export const put = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PUT", json });
 export const patch = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PATCH", json });
+export const del = <T = void>(path: string) => raw<T>(path, { method: "DELETE" });
 
 /**
  * Refresh is single-flight within the tab AND across tabs (Web Locks). Refresh tokens rotate and

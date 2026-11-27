@@ -1,0 +1,2063 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "a11y API",
+  "description": "The a11y API lets you start accessibility scans, read their findings and download accessible reports from your own systems.\n\n**Authentication.** Create a key in the app under *Organisation \u2192 API keys*, then send it as\n`Authorization: Bearer a11y_...`. A key has *scopes* (shown on each endpoint) and works only for your organisation.\nThe key is shown once. Keep it secret; revoke it in the app if it leaks.\n\n**Errors.** Every error has the shape `{\"detail\": \"...\", \"code\": \"...\", \"field\": \"...\"}`. `detail` is written for people;\n`code` is stable for programs.\n\n**Limits.** Each key has a rate limit (see `X-RateLimit-*` headers and `GET /v1/me`). Starting a scan uses one scan credit.\n\n**Retries.** Send an `Idempotency-Key` header on `POST` requests; repeating it returns the original answer instead of\nstarting a second scan.\n\n**What a scan result means.** Automated tests cover only part of WCAG. Results are never a statement of conformance.",
+  "version": "1.0.0"
+ },
+ "paths": {
+  "/v1/me": {
+   "get": {
+    "tags": [
+     "Account"
+    ],
+    "summary": "Who this key is",
+    "description": "Returns the organisation, the key's scopes, the rate limit and this month's scan usage.\n\nAny valid API key.",
+    "operationId": "me_v1_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Me"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/standards": {
+   "get": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "List the standards a scan can be evaluated against",
+    "description": "Each has a legal status and, until an accessibility expert signs the mapping off, `review.status` is `draft`.\n\n**Required scope:** `scans:read`.",
+    "operationId": "standards_v1_standards_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/scans": {
+   "get": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "List scans",
+    "description": "Newest first.\n\n**Required scope:** `scans:read`.",
+    "operationId": "list_scans_v1_scans_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "description": "Page size",
+       "default": 25,
+       "title": "Limit"
+      },
+      "description": "Page size"
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScanList"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "Start a scan",
+    "description": "Starts a scan of one page or a bounded crawl. It uses one scan credit and is checked like a scan started in the app: the address must be public, crawls above the unverified limit need a verified site, and your plan's quota and rate limits apply. Poll `GET /v1/scans/{id}` until `status` is `SUCCEEDED` or `FAILED`.\n\n**Required scope:** `scans:write`.",
+    "operationId": "create_scan_v1_scans_post",
+    "parameters": [
+     {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry.",
+       "title": "Idempotency-Key"
+      },
+      "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry."
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScanIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScanCreated"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:write",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/scans/{scan_id}": {
+   "get": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "Get a scan",
+    "description": "Status, pages scanned, counts by kind and severity, and the automated coverage summary.\n\n**Required scope:** `scans:read`.",
+    "operationId": "get_scan_v1_scans__scan_id__get",
+    "parameters": [
+     {
+      "name": "scan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scan Id"
+      }
+     },
+     {
+      "name": "standard",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Re-evaluate the summary against another standard, with no rescan",
+       "title": "Standard"
+      },
+      "description": "Re-evaluate the summary against another standard, with no rescan"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScanDetail"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/scans/{scan_id}/findings": {
+   "get": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "List a scan's findings",
+    "description": "Filter by kind, severity, rule, confidence or page. `group=cluster` groups identical problems found on many pages into one root cause.\n\n**Required scope:** `scans:read`.",
+    "operationId": "list_findings_v1_scans__scan_id__findings_get",
+    "parameters": [
+     {
+      "name": "scan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scan Id"
+      }
+     },
+     {
+      "name": "standard",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Standard"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(violation|needs_review|best_practice)$",
+       "default": "violation",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "severity",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(critical|serious|moderate|minor)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Severity"
+      }
+     },
+     {
+      "name": "rule",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 120
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Rule"
+      }
+     },
+     {
+      "name": "page_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Page Id"
+      }
+     },
+     {
+      "name": "confidence",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(high|medium|low|review)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Confidence"
+      }
+     },
+     {
+      "name": "group",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(none|cluster)$",
+       "default": "none",
+       "title": "Group"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FindingList"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/scans/{scan_id}/summary": {
+   "get": {
+    "tags": [
+     "Scans"
+    ],
+    "summary": "Automated coverage summary",
+    "description": "Which criteria failed, need review, found no issue, or cannot be tested automatically. It is never a pass/fail or a score.\n\n**Required scope:** `scans:read`.",
+    "operationId": "scan_summary_v1_scans__scan_id__summary_get",
+    "parameters": [
+     {
+      "name": "scan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scan Id"
+      }
+     },
+     {
+      "name": "standard",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "WCAG_2_2_AA",
+       "title": "Standard"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "scans:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/scans/{scan_id}/reports": {
+   "post": {
+    "tags": [
+     "Reports"
+    ],
+    "summary": "Create a report",
+    "description": "Renders an accessible PDF (checked against PDF/UA), a Word file (structure-checked) or a CSV. A file that fails its accessibility check is never offered. Poll `GET /v1/reports/{id}` until `READY`.\n\n**Required scope:** `reports:write`.",
+    "operationId": "create_report_v1_scans__scan_id__reports_post",
+    "parameters": [
+     {
+      "name": "scan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scan Id"
+      }
+     },
+     {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry.",
+       "title": "Idempotency-Key"
+      },
+      "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry."
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReportIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportCreated"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "reports:write",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   },
+   "get": {
+    "tags": [
+     "Reports"
+    ],
+    "summary": "List a scan's reports",
+    "description": "**Required scope:** `reports:read`.",
+    "operationId": "list_reports_v1_scans__scan_id__reports_get",
+    "parameters": [
+     {
+      "name": "scan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scan Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ReportOut"
+         },
+         "title": "Response List Reports V1 Scans  Scan Id  Reports Get"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "reports:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/reports/{report_id}": {
+   "get": {
+    "tags": [
+     "Reports"
+    ],
+    "summary": "Get a report's status",
+    "description": "**Required scope:** `reports:read`.",
+    "operationId": "get_report_v1_reports__report_id__get",
+    "parameters": [
+     {
+      "name": "report_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Report Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReportOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "reports:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/reports/{report_id}/download": {
+   "get": {
+    "tags": [
+     "Reports"
+    ],
+    "summary": "Download a finished report",
+    "description": "Only a report with status `READY` can be downloaded.\n\n**Required scope:** `reports:read`.",
+    "operationId": "download_report_v1_reports__report_id__download_get",
+    "parameters": [
+     {
+      "name": "report_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Report Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The file",
+      "content": {
+       "application/pdf": {},
+       "text/csv": {},
+       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "reports:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/audit-log": {
+   "get": {
+    "tags": [
+     "Account"
+    ],
+    "summary": "Read the organisation's audit log",
+    "description": "Security-relevant events, newest first: key and member changes, sign-offs, settings. Page backwards with `before`.\n\n**Required scope:** `audit:read`.",
+    "operationId": "audit_log_v1_audit_log_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only events older than this timestamp",
+       "title": "Before"
+      },
+      "description": "Only events older than this timestamp"
+     },
+     {
+      "name": "action",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 100
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only this kind of event, for example `api_key.create`",
+       "title": "Action"
+      },
+      "description": "Only this kind of event, for example `api_key.create`"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AuditList"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "audit:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AuditEvent": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "actor_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor User Id"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Detail"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "action",
+     "actor_user_id",
+     "detail",
+     "created_at"
+    ],
+    "title": "AuditEvent"
+   },
+   "AuditList": {
+    "properties": {
+     "events": {
+      "items": {
+       "$ref": "#/components/schemas/AuditEvent"
+      },
+      "type": "array",
+      "title": "Events"
+     },
+     "next_before": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Before",
+      "description": "Pass as `before` to get the next page; null at the end"
+     }
+    },
+    "type": "object",
+    "required": [
+     "events",
+     "next_before"
+    ],
+    "title": "AuditList"
+   },
+   "Finding": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "rule": {
+      "type": "string",
+      "title": "Rule",
+      "description": "Our canonical rule id, stable across engines"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "description": "`violation`, `needs_review` or `best_practice`"
+     },
+     "severity": {
+      "type": "string",
+      "title": "Severity",
+      "description": "`critical`, `serious`, `moderate` or `minor`"
+     },
+     "confidence": {
+      "type": "string",
+      "title": "Confidence",
+      "description": "`high`, `medium`, `low` or `review`"
+     },
+     "criteria": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Criteria"
+     },
+     "engines": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Engines"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     },
+     "element": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Element",
+      "description": "xpath, css, tag, html (the opening tag) and rect in page pixels"
+     },
+     "page": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Page"
+     },
+     "help_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Help Url"
+     },
+     "cluster_key": {
+      "type": "string",
+      "title": "Cluster Key"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "rule",
+     "title",
+     "kind",
+     "severity",
+     "confidence",
+     "criteria",
+     "engines",
+     "message",
+     "element",
+     "page",
+     "cluster_key"
+    ],
+    "title": "Finding"
+   },
+   "FindingList": {
+    "properties": {
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "findings": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/Finding"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Findings"
+     },
+     "clusters": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clusters",
+      "description": "Present when `group=cluster`"
+     }
+    },
+    "type": "object",
+    "required": [
+     "total"
+    ],
+    "title": "FindingList"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "Me": {
+    "properties": {
+     "organization": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Organization"
+     },
+     "key": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Key"
+     },
+     "plan": {
+      "type": "string",
+      "title": "Plan"
+     },
+     "rate_limit_per_minute": {
+      "type": "integer",
+      "title": "Rate Limit Per Minute"
+     },
+     "scans_used_this_month": {
+      "type": "integer",
+      "title": "Scans Used This Month"
+     },
+     "scans_allowed_this_month": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scans Allowed This Month",
+      "description": "Null = unlimited"
+     }
+    },
+    "type": "object",
+    "required": [
+     "organization",
+     "key",
+     "plan",
+     "rate_limit_per_minute",
+     "scans_used_this_month",
+     "scans_allowed_this_month"
+    ],
+    "title": "Me"
+   },
+   "Problem": {
+    "properties": {
+     "detail": {
+      "type": "string",
+      "title": "Detail",
+      "description": "What went wrong, in words you can show to a person"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code",
+      "description": "A stable machine-readable code, for example `quota_exceeded`"
+     },
+     "field": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Field",
+      "description": "The request field the problem is about, when there is one"
+     }
+    },
+    "type": "object",
+    "required": [
+     "detail"
+    ],
+    "title": "Problem",
+    "description": "Every error has this shape.",
+    "example": {
+     "code": "quota_exceeded",
+     "detail": "You have used 10 of 10 this month. Upgrade your plan for more."
+    }
+   },
+   "ReportCreated": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "default": "QUEUED"
+     },
+     "reused": {
+      "type": "boolean",
+      "title": "Reused",
+      "description": "True when an identical, current report already existed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "reused"
+    ],
+    "title": "ReportCreated"
+   },
+   "ReportIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "pattern": "^(audit_pdf|audit_docx|audit_csv)$",
+      "title": "Kind"
+     },
+     "standard": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 40
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Standard"
+     },
+     "regenerate": {
+      "type": "boolean",
+      "title": "Regenerate",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "ReportIn",
+    "example": {
+     "kind": "audit_pdf",
+     "standard": "WCAG_2_2_AA"
+    }
+   },
+   "ReportOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "scan_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Scan Id"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "standard": {
+      "type": "string",
+      "title": "Standard"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`QUEUED`, `RUNNING`, `READY` or `FAILED`"
+     },
+     "error_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Detail"
+     },
+     "size_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Size Bytes"
+     },
+     "validation": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Validation",
+      "description": "The accessibility check the file passed before it was offered"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "scan_id",
+     "kind",
+     "standard",
+     "status",
+     "validation",
+     "created_at"
+    ],
+    "title": "ReportOut"
+   },
+   "ScanCreated": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "default": "QUEUED"
+     },
+     "max_pages": {
+      "type": "integer",
+      "title": "Max Pages"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "max_pages"
+    ],
+    "title": "ScanCreated"
+   },
+   "ScanDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "`single` or `crawl`"
+     },
+     "max_pages": {
+      "type": "integer",
+      "title": "Max Pages"
+     },
+     "standards": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Standards"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` or `CANCELLED`"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Detail"
+     },
+     "pages_scanned": {
+      "type": "integer",
+      "title": "Pages Scanned"
+     },
+     "findings_count": {
+      "type": "integer",
+      "title": "Findings Count"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "engine_versions": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Engine Versions"
+     },
+     "rules_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rules Version"
+     },
+     "pages": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Pages",
+      "description": "Each page scanned, with its result"
+     },
+     "by_kind": {
+      "additionalProperties": {
+       "additionalProperties": {
+        "type": "integer"
+       },
+       "type": "object"
+      },
+      "type": "object",
+      "title": "By Kind",
+      "description": "Counts by kind (violation, needs_review, best_practice) and severity"
+     },
+     "summary": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Summary",
+      "description": "Automated coverage of the chosen standard. Never a statement of conformance."
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "url",
+     "mode",
+     "max_pages",
+     "standards",
+     "status",
+     "pages_scanned",
+     "findings_count",
+     "created_at",
+     "pages",
+     "by_kind",
+     "summary"
+    ],
+    "title": "ScanDetail"
+   },
+   "ScanIn": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "maxLength": 2048,
+      "title": "Url"
+     },
+     "standards": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Standards"
+     },
+     "mode": {
+      "type": "string",
+      "pattern": "^(single|crawl)$",
+      "title": "Mode",
+      "default": "single"
+     },
+     "max_pages": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 2000.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Pages"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url"
+    ],
+    "title": "ScanIn",
+    "example": {
+     "mode": "single",
+     "standards": [
+      "WCAG_2_2_AA"
+     ],
+     "url": "https://www.example.com/"
+    }
+   },
+   "ScanList": {
+    "properties": {
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "scans": {
+      "items": {
+       "$ref": "#/components/schemas/ScanOut"
+      },
+      "type": "array",
+      "title": "Scans"
+     }
+    },
+    "type": "object",
+    "required": [
+     "total",
+     "scans"
+    ],
+    "title": "ScanList"
+   },
+   "ScanOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "`single` or `crawl`"
+     },
+     "max_pages": {
+      "type": "integer",
+      "title": "Max Pages"
+     },
+     "standards": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Standards"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` or `CANCELLED`"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Detail"
+     },
+     "pages_scanned": {
+      "type": "integer",
+      "title": "Pages Scanned"
+     },
+     "findings_count": {
+      "type": "integer",
+      "title": "Findings Count"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "url",
+     "mode",
+     "max_pages",
+     "standards",
+     "status",
+     "pages_scanned",
+     "findings_count",
+     "created_at"
+    ],
+    "title": "ScanOut"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  },
+  "securitySchemes": {
+   "apiKey": {
+    "type": "http",
+    "scheme": "bearer",
+    "bearerFormat": "a11y API key"
+   }
+  }
+ },
+ "tags": [
+  {
+   "name": "Account"
+  },
+  {
+   "name": "Scans"
+  },
+  {
+   "name": "Reports"
+  }
+ ],
+ "security": [
+  {
+   "apiKey": []
+  }
+ ],
+ "servers": [
+  {
+   "url": "/",
+   "description": "This environment"
+  }
+ ]
+}
