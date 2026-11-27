@@ -1,5 +1,5 @@
 import { test as base, type Page } from "@playwright/test";
-import { SUBSCRIPTION, mockAdminApi } from "./admin-mocks";
+import { BYOK, SUBSCRIPTION, mockAdminApi } from "./admin-mocks";
 
 export type Role = "ANON" | "COMPANY_ADMIN" | "STANDARD_USER" | "SUPER_ADMIN";
 
@@ -22,6 +22,8 @@ export async function mockApi(page: Page, role: Role) {
     r.fulfill({ json: [user("COMPANY_ADMIN"), { ...user("STANDARD_USER"), id: "33333333-3333-4333-8333-333333333333", email: "member@example.com" }] }),
   );
   await page.route("**/api/org/subscription", (r) => r.fulfill({ json: SUBSCRIPTION }));
+  await page.route("**/api/org/ai", (r) => r.fulfill({ json: BYOK }));
+  await page.route("**/api/org/ai/test", (r) => r.fulfill({ json: { ok: false, detail: "authentication failed (check the API key)" } }));
   await mockAdminApi(page);
   await page.route("**/api/invites/**", (r) =>
     r.request().method() === "GET"

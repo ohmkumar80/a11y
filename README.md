@@ -58,7 +58,10 @@ make up        # builds and starts everything; migrations and demo seed data run
 | Mailpit (all outgoing email) | http://localhost:8025 |
 | S3-compatible storage | http://localhost:9000 (console :9001) |
 
-Demo login: `admin@demo.example.com` / `demo-passphrase-123` (administrator) or `member@demo.example.com` (standard user). Demo coupon: `DEMO20`. `make reset` wipes all data volumes. Ports can be changed in `.env` (`WEB_PORT`, `API_PORT`, and so on).
+Demo login: `admin@demo.example.com` / `demo-passphrase-123` (administrator) or `member@demo.example.com` (standard user). Demo coupon: `DEMO20`.
+
+**AI providers:** in `/admin` → AI, use *Quick add* for DeepSeek, Azure OpenAI or OpenAI (key is write-only, then *Test connection*).
+Enterprise organisation admins can use their own keys at `/org/ai`. `make reset` wipes all data volumes. Ports can be changed in `.env` (`WEB_PORT`, `API_PORT`, and so on).
 
 ```sh
 docker compose up -d postgres redis mailpit   # infrastructure only

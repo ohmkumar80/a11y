@@ -4,6 +4,10 @@ Nothing else in the codebase imports a provider SDK. Which provider/model serves
 fallback chain, parameters and budgets are admin-configured settings (``ai.providers``,
 ``ai.models``, ``ai.route.<task>``), read through the live-reloading config service - so
 switching a provider in /admin takes effect on the next call with no redeploy.
+
+Enterprise organisations may bring their own accounts (``ai.byok``, org-scoped). Their models are
+tried first; the platform chain is used only if they allow it (``fallback_to_platform``). BYOK
+calls are metered (``byok=true``) but never count against platform budgets.
 """
 
 from __future__ import annotations
@@ -11,9 +15,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 
 from sqlalchemy import text
 
+from ..billing import entitlement, load_subscription
 from ..config import ConfigService, get_config
 from ..config import definitions as _definitions  # noqa: F401
 from ..config.definitions import AI_TASKS, AIModel, AIProvider
@@ -30,6 +36,8 @@ from .types import (
 )
 
 log = logging.getLogger(__name__)
+BYOK_FEATURE = "byok_ai"
+Link = tuple[AIProvider, AIModel, bool]  # (provider, model, is_byok)
 
 
 class LLMGateway:
@@ -46,17 +54,25 @@ class LLMGateway:
         return self._config or get_config()
 
     async def _month_spend(self, org_id) -> float:
+        """Platform-paid spend only: BYOK usage is the customer's own money."""
         async with tenant_session(org_id) as db:
             return float(
                 (
                     await db.execute(
                         text(
                             "SELECT coalesce(sum(cost_usd), 0) FROM ai_usage "
-                            "WHERE created_at >= date_trunc('month', now())"
+                            "WHERE NOT byok AND created_at >= date_trunc('month', now())"
                         )
                     )
                 ).scalar_one()
             )
+
+    async def byok_entitled(self, org_id: uuid.UUID) -> bool:
+        """Checked on every call (not just at save time) so a downgrade stops BYOK immediately."""
+        async with tenant_session(org_id) as db:
+            sub = await load_subscription(db)
+            ent = await entitlement(db, sub.plan_id, BYOK_FEATURE)
+        return ent.enabled
 
     async def _record(
         self,
@@ -71,7 +87,10 @@ class LLMGateway:
         cost: float,
         ms: int,
         refs: list[str],
+        byok: bool,
     ) -> None:
+        if req.org_id is None:
+            return
         try:
             async with tenant_session(req.org_id) as db:
                 db.add(
@@ -82,6 +101,7 @@ class LLMGateway:
                         provider_id=prov,
                         model_id=model,
                         status="ok" if ok else "error",
+                        byok=byok,
                         error_class=err,
                         tokens_in=tin,
                         tokens_out=tout,
@@ -93,6 +113,31 @@ class LLMGateway:
         except Exception:  # noqa: BLE001 - metering must never turn a good answer into a failure
             log.exception("failed to record AI usage")
 
+    @staticmethod
+    def _links(
+        model_ids: list[str],
+        models: dict[str, AIModel],
+        providers: dict[str, AIProvider],
+        need: set[str],
+        supported: set[str],
+        byok: bool,
+    ) -> list[Link]:
+        out: list[Link] = []
+        for mid in model_ids:
+            m = models.get(mid)
+            p = providers.get(m.provider_id) if m else None
+            # Skip (never fail on) anything misconfigured, disabled or incapable.
+            if (
+                m
+                and p
+                and m.is_enabled
+                and p.is_enabled
+                and need <= set(m.capabilities)
+                and p.type in supported
+            ):
+                out.append((p, m, byok))
+        return out
+
     async def complete(self, req: LLMRequest) -> LLMResponse:
         if req.task not in AI_TASKS:
             raise ValueError(f"unknown AI task {req.task!r}")
@@ -101,42 +146,63 @@ class LLMGateway:
         route = await cfg.effective(f"ai.route.{req.task}", **kw)
         providers = await cfg.effective("ai.providers")
         models = await cfg.effective("ai.models")
-        refs = [route.ref, providers.ref, models.ref]
+        byok = await cfg.effective("ai.byok", org_id=req.org_id)
+        refs = [route.ref, providers.ref, models.ref, byok.ref]
         r = route.value
-
-        if not r.primary_model_id:
-            raise AIUnavailable(f"No model is configured for {req.task}.", reason="not_configured")
-        if (
-            r.monthly_budget_usd is not None
-            and await self._month_spend(req.org_id) >= r.monthly_budget_usd
-        ):
-            raise AIUnavailable(
-                "This organisation's AI budget for the month is used up.", reason="budget_exceeded"
-            )
-
-        by_provider: dict[str, AIProvider] = {p.id: p for p in providers.value.items}
-        by_model: dict[str, AIModel] = {m.id: m for m in models.value.items}
         need = set(AI_TASKS[req.task])
+        supported = set(self._adapters)
         params = CallParams(r.temperature, r.max_tokens, r.timeout_seconds)
 
-        chain: list[tuple[AIProvider, AIModel]] = []
-        for mid in [r.primary_model_id, *r.fallback_model_ids]:
-            m = by_model.get(mid)
-            p = by_provider.get(m.provider_id) if m else None
-            # Skip (never fail on) anything misconfigured, disabled or incapable.
-            if (
-                m
-                and p
-                and m.is_enabled
-                and p.is_enabled
-                and need <= set(m.capabilities)
-                and p.type in self._adapters
-            ):
-                chain.append((p, m))
+        # 1. The organisation's own accounts (Enterprise), when enabled, entitled and applicable.
+        own: list[Link] = []
+        b = byok.value
+        byok_active = (
+            b.enabled
+            and (not b.only_tasks or req.task in b.only_tasks)
+            and await self.byok_entitled(req.org_id)
+        )
+        if byok_active:
+            own = self._links(
+                b.model_order,
+                {m.id: m for m in b.models},
+                {p.id: p for p in b.providers},
+                need,
+                supported,
+                True,
+            )
+
+        # 2. The platform chain: unless BYOK is active without permission to fall back.
+        platform: list[Link] = []
+        if not own or b.fallback_to_platform:
+            if r.primary_model_id:
+                over_budget = (
+                    r.monthly_budget_usd is not None
+                    and await self._month_spend(req.org_id) >= r.monthly_budget_usd
+                )
+                if over_budget:
+                    if not own:
+                        raise AIUnavailable(
+                            "This organisation's AI budget for the month is used up.",
+                            reason="budget_exceeded",
+                        )
+                else:
+                    platform = self._links(
+                        [r.primary_model_id, *r.fallback_model_ids],
+                        {m.id: m for m in models.value.items},
+                        {p.id: p for p in providers.value.items},
+                        need,
+                        supported,
+                        False,
+                    )
+        if not own and not r.primary_model_id:
+            raise AIUnavailable(f"No model is configured for {req.task}.", reason="not_configured")
+        chain = own + platform
         if not chain:
             raise AIUnavailable(f"No eligible model for {req.task}.", reason="no_eligible_model")
 
-        for p, m in chain:
+        # "Fell back" = something other than the model the config intended to serve it.
+        intended = b.model_order[0] if byok_active else r.primary_model_id
+        for p, m, is_byok in chain:
             t0 = time.perf_counter()
             try:
                 raw = await asyncio.wait_for(
@@ -156,13 +222,15 @@ class LLMGateway:
                     cost=0.0,
                     ms=ms,
                     refs=refs,
+                    byok=is_byok,
                 )
                 log.warning(
-                    "AI call failed task=%s provider=%s model=%s: %s",
+                    "AI call failed task=%s provider=%s model=%s byok=%s: %s",
                     req.task,
                     p.id,
                     m.id,
-                    type(e).__name__,
+                    is_byok,
+                    e,
                 )
                 continue
             ms = int((time.perf_counter() - t0) * 1000)
@@ -181,6 +249,7 @@ class LLMGateway:
                 cost=cost,
                 ms=ms,
                 refs=refs,
+                byok=is_byok,
             )
             return LLMResponse(
                 raw.text,
@@ -190,10 +259,38 @@ class LLMGateway:
                 raw.tokens_out,
                 cost,
                 ms,
-                fell_back=m.id != r.primary_model_id,
+                fell_back=m.id != intended,
                 config_refs=refs,
+                byok=is_byok,
             )
         raise AIUnavailable(f"Every model for {req.task} failed.", reason="all_failed")
+
+    async def test_provider(
+        self, provider: AIProvider, models: list[AIModel], *, model_id: str | None = None
+    ) -> dict:
+        """Tiny live call to prove credentials, address and model/deployment name work. Used by
+        the admin and org-admin 'Test connection' buttons. Returns a safe, user-facing result."""
+        adapter = self._adapters.get(provider.type)
+        if adapter is None:
+            return {"ok": False, "detail": f"No adapter for provider type {provider.type} yet."}
+        mine = [
+            m
+            for m in models
+            if m.provider_id == provider.id and (model_id is None or m.id == model_id)
+        ]
+        if not mine:
+            return {"ok": False, "detail": "Add a model for this provider first, then test."}
+        t0 = time.perf_counter()
+        try:
+            await asyncio.wait_for(adapter.test_connection(provider, mine[0]), timeout=30)
+        except (ProviderError, TimeoutError) as e:
+            return {"ok": False, "detail": str(e) or "timed out", "model_id": mine[0].id}
+        return {
+            "ok": True,
+            "detail": "Connected.",
+            "model_id": mine[0].id,
+            "latency_ms": int((time.perf_counter() - t0) * 1000),
+        }
 
 
 _gateway: LLMGateway | None = None

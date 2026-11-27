@@ -58,6 +58,10 @@ class QuotaExceeded(BillingError):
     status_code = 402
 
 
+class FeatureNotInPlan(QuotaExceeded):
+    code = "feature_not_in_plan"
+
+
 class SeatLimitReached(QuotaExceeded):
     code = "seat_limit_reached"
 

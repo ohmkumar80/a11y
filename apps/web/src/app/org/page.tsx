@@ -5,6 +5,7 @@ import { Button, ErrorSummary, Form, Select, Table, TextField, notify } from "@a
 import { Page } from "@/components/Page";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useForm } from "@/components/useForm";
+import NextLink from "next/link";
 import { PlanPanel } from "@/components/PlanPanel";
 import { get, post, type User } from "@/lib/api";
 import type { Subscription } from "@/lib/billing";
@@ -75,6 +76,10 @@ function OrgContent({ name }: { name: string }) {
   return (
     <Page title="Organisation" intro={name}>
       {sub ? <PlanPanel sub={sub} onChanged={() => void load()} /> : <p role="status">{failed ? "We could not load your plan. Refresh the page to try again." : "Loading your plan."}</p>}
+      <section aria-labelledby="ai" className="flex flex-col gap-2">
+        <h2 id="ai" className="text-xl font-bold">AI provider</h2>
+        <p>On the Enterprise plan you can use your own OpenAI, Azure OpenAI or DeepSeek keys. <NextLink href="/org/ai" className="underline">Manage AI provider settings</NextLink>.</p>
+      </section>
       <Team onInvited={() => void load()} />
     </Page>
   );

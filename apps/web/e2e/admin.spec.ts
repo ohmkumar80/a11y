@@ -4,7 +4,10 @@ import { expect, mockApi, test } from "./fixtures";
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
 async function audit(page: import("@playwright/test").Page, what: string) {
-  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+  // React Aria's live announcer (visually hidden aria-live container) briefly holds role="img"
+  // nodes that axe flags (role-img-alt). They are not content; the announcement is what AT hears.
+  // Only that container is excluded: the rest of the page is audited in full.
+  const results = await new AxeBuilder({ page }).withTags(TAGS).exclude("[data-live-announcer]").analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => n.target.join(" ")).join(" | ")})`), what).toEqual([]);
 }
 
@@ -24,6 +27,12 @@ for (const scheme of ["light", "dark"] as const) {
     await page.getByRole("tab", { name: "Coupons" }).click();
     await expect(page.getByRole("row", { name: /WELCOME20/ })).toBeVisible();
     await audit(page, "coupons tab");
+
+    await page.getByRole("tab", { name: "AI" }).click();
+    await expect(page.getByRole("row", { name: /DeepSeek/ })).toBeVisible();
+    await page.getByRole("button", { name: "Test connection for DeepSeek" }).click();
+    await expect(page.getByText(/Connected in 120 ms/)).toBeVisible();
+    await audit(page, "ai tab");
 
     await page.getByRole("tab", { name: "Settings" }).click();
     for (const key of ["billing.trial", "ai.providers"]) {
@@ -73,4 +82,25 @@ test("a never-set setting shows its built-in defaults in the form (not empty val
   await expect(page.getByText("Current value comes from: default")).toBeVisible();
   await expect(page.getByLabel("Reminder days before")).toHaveValue("3, 1");
   await expect(page.getByLabel("Length days")).toHaveValue("14");
+});
+
+test("enterprise org admin can see and test their own AI accounts; the key is never shown", async ({ page }) => {
+  await mockApi(page, "COMPANY_ADMIN");
+  await page.goto("/org/ai");
+  await expect(page.getByRole("heading", { level: 1, name: "AI provider" })).toBeVisible();
+  await expect(page.getByText("This month: 3 AI calls")).toBeVisible();
+  await expect(page.getByText(/ends in WXYZ/)).toBeVisible();
+  await expect(page.getByLabel("Api key")).toHaveValue("");
+  await page.getByRole("button", { name: "Test connection for Our DeepSeek" }).click();
+  await expect(page.getByText(/Failed: authentication failed/)).toBeVisible();
+  await audit(page, "org ai page");
+});
+
+test("non-enterprise org sees an upgrade message instead of the form", async ({ page }) => {
+  await mockApi(page, "COMPANY_ADMIN");
+  await page.route("**/api/org/ai", (r) => r.fulfill({ json: { eligible: false, upgrade_url: "/org#plan", provider_types: [] } }));
+  await page.goto("/org/ai");
+  await expect(page.getByText(/part of the Enterprise plan/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save AI settings" })).toHaveCount(0);
+  await audit(page, "org ai upgrade state");
 });

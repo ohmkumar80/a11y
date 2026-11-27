@@ -16,7 +16,7 @@ class Message:
 class LLMRequest:
     task: str  # a key of config.definitions.AI_TASKS
     messages: list[Message]
-    org_id: object  # uuid.UUID; usage is metered and budgets enforced per organisation
+    org_id: object  # uuid.UUID | None (None only for connection tests); usage is metered and budgets enforced per organisation
     job_id: str | None = None
     plan_id: str | None = None  # lets plan-scoped routing overrides apply
     json_mode: bool = False
@@ -46,6 +46,7 @@ class LLMResponse:
     cost_usd: float
     latency_ms: int
     fell_back: bool  # True when a fallback served the request
+    byok: bool = False  # served by the organisation's own account
     config_refs: list[str] = field(default_factory=list)
 
 
@@ -72,5 +73,7 @@ class ProviderAdapter:
     ) -> RawResult:  # pragma: no cover - interface
         raise NotImplementedError
 
-    async def test_connection(self, provider: AIProvider) -> None:  # pragma: no cover
+    async def test_connection(
+        self, provider: AIProvider, model: AIModel | None = None
+    ) -> None:  # pragma: no cover
         raise NotImplementedError

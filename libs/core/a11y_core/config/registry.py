@@ -127,6 +127,15 @@ def redact(data: Any) -> Any:
 # --- definitions ----------------------------------------------------------------------------
 
 
+def public_schema(model: type[BaseModel]) -> dict:
+    """JSON Schema for clients. The stored-ciphertext internals of ``Secret`` are not advertised."""
+    schema = model.model_json_schema(by_alias=True)
+    props = schema.get("$defs", {}).get("Secret", {}).get("properties", {})
+    props.pop("ct", None)
+    props.pop("hint", None)
+    return schema
+
+
 @dataclass(frozen=True)
 class SettingDef:
     key: str
@@ -142,7 +151,7 @@ class SettingDef:
     tags: tuple[str, ...] = field(default_factory=tuple)
 
     def json_schema(self) -> dict:
-        return self.model.model_json_schema(by_alias=True)
+        return public_schema(self.model)
 
     def validate(self, raw: Any, prev_raw: Any = None, *, trusted: bool = False) -> dict:
         """Validate submitted JSON, run the guardrail, and return the JSON to STORE (sealed).

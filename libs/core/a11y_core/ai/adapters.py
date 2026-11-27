@@ -37,8 +37,22 @@ class FakeAdapter(ProviderAdapter):
         out = f"[{provider.id}/{model.model_name}] {req.task}: {prompt[:60]}"
         return RawResult(out, tokens_in=max(1, len(prompt) // 4), tokens_out=max(1, len(out) // 4))
 
-    async def test_connection(self, provider: AIProvider) -> None:
+    async def test_connection(self, provider: AIProvider, model: AIModel | None = None) -> None:
         return None
 
 
-ADAPTERS: dict[str, ProviderAdapter] = {"fake": FakeAdapter()}
+def _build() -> dict[str, ProviderAdapter]:
+    from .openai_chat import OpenAIChatAdapter
+
+    chat = OpenAIChatAdapter()
+    return {
+        "fake": FakeAdapter(),
+        # One wire format, five provider types (see openai_chat.py).
+        "deepseek": chat,
+        "openai": chat,
+        "azure_openai": chat,
+        "openai_compatible": chat,
+    }
+
+
+ADAPTERS: dict[str, ProviderAdapter] = _build()

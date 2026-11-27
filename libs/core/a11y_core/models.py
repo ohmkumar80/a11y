@@ -347,6 +347,8 @@ class AIUsage(Base):
     provider_id: Mapped[str] = mapped_column(String(40))
     model_id: Mapped[str] = mapped_column(String(60))
     status: Mapped[str] = mapped_column(String(8))
+    # True when the call used the organisation's own account (not billed to / budgeted by us).
+    byok: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     error_class: Mapped[str | None] = mapped_column(String(100))
     tokens_in: Mapped[int] = mapped_column(Integer, server_default="0")
     tokens_out: Mapped[int] = mapped_column(Integer, server_default="0")

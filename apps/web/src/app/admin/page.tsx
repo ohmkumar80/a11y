@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs } from "@a11y/ui";
+import { AiTab } from "@/components/admin/AiTab";
 import { CouponsTab } from "@/components/admin/CouponsTab";
 import { PlansTab } from "@/components/admin/PlansTab";
 import { SettingsTab } from "@/components/admin/SettingsTab";
@@ -19,6 +20,7 @@ export default function AdminPage() {
               { id: "tenants", label: "Organisations", content: <TenantsTab /> },
               { id: "plans", label: "Plans", content: <PlansTab /> },
               { id: "coupons", label: "Coupons", content: <CouponsTab /> },
+              { id: "ai", label: "AI", content: <AiTab /> },
               { id: "settings", label: "Settings", content: <SettingsTab /> },
             ]}
           />

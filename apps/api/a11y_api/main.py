@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy import text
 
-from .routers import admin_billing, admin_settings, auth, org
+from .routers import admin_ai, admin_billing, admin_settings, auth, org, org_ai
 
 
 @asynccontextmanager
@@ -73,6 +73,8 @@ app.include_router(auth.router)
 app.include_router(org.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_billing.router)
+app.include_router(admin_ai.router)
+app.include_router(org_ai.router)
 
 
 from fastapi.exceptions import RequestValidationError  # noqa: E402

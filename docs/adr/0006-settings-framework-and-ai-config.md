@@ -30,8 +30,9 @@
   enforces a per-org monthly budget, and raises `AIUnavailable` so callers degrade to deterministic output.
 
 ## Known gaps (tracked, not hidden)
-- Only the `fake` adapter exists. Real adapters (OpenAI, Anthropic, Bedrock, …) and the LiteLLM-vs-native decision are next;
-  the Phase 1 exit criterion needs at least two live ones.
+- Adapters: `fake`, and one OpenAI-chat-format adapter serving `deepseek`, `openai`, `azure_openai` and `openai_compatible`
+  (thin native code, no LiteLLM dependency for now). Still missing: Anthropic, Bedrock, Gemini adapters. Prices for new models
+  start at 0 and must be set in `ai.models` for cost reports to be meaningful.
 - Cross-setting integrity (a route naming a model that does not exist, disabling the last model for a task) is handled at
   call time by skipping, not rejected at publish time yet.
 - Draft → "test connection" → evaluation-gated publish, staged rollout and two-person approval (`high_risk` is declared
@@ -39,3 +40,16 @@
 - Feature flags need merge-by-name semantics across scopes, which the whole-value override model does not give; they will
   be their own table.
 - Super Admin sign-in is access-token-only (no refresh, no MFA). MFA is required before any production use.
+
+## Enterprise bring-your-own-key (BYOK)
+- `ai.byok` is an **org-scoped** setting edited by the organisation's own admin at `/org/ai`, gated by the `byok_ai` plan
+  entitlement (seeded on ENTERPRISE; admins can grant it to any plan). Entitlement is checked at save time AND on every AI
+  call, so a downgrade stops BYOK immediately.
+- A tenant is not trusted like a platform admin: the setting's guard allows only `openai`, `azure_openai` and `deepseek`;
+  OpenAI/DeepSeek use fixed addresses; Azure addresses must be `https://<resource>.openai.azure.com` (or
+  `.cognitiveservices.azure.com`) with no credentials/port/path; provider options are allow-listed. This prevents SSRF
+  through a customer-supplied base URL. `openai_compatible` (arbitrary URL) stays platform-admin only.
+- Routing: the org's `model_order` is tried first (per `only_tasks`), the platform chain only if `fallback_to_platform`.
+  BYOK calls are metered with `byok=true` and never count against platform budgets.
+- Keys are write-only and encrypted like every secret; the DeepSeek preset marks data as processed in China (`cn`) so
+  regulated tenants can exclude it.

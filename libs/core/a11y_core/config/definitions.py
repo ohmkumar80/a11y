@@ -4,6 +4,7 @@ here); the admin API and forms pick them up automatically."""
 from __future__ import annotations
 
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -179,3 +180,85 @@ for _task, _needs in AI_TASKS.items():
             tags=("ai", "routing"),
         )
     )
+
+
+# --- Enterprise bring-your-own-key (BYOK) -------------------------------------------------------
+# An Enterprise organisation admin may use their own AI accounts. Because a tenant is NOT trusted
+# the way a platform admin is, this setting is restricted: only provider types with a fixed or
+# allow-listed host (so a tenant cannot make our servers call arbitrary URLs: SSRF), only known
+# options, and a hard cap on size. The same guard applies whoever writes it.
+
+BYOK_TYPES = ("openai", "azure_openai", "deepseek")
+AZURE_HOSTS = (".openai.azure.com", ".cognitiveservices.azure.com")
+ADAPTER_OPTIONS = ("api_version", "token_param", "omit_temperature")
+
+
+class ByokConfig(BaseModel):
+    enabled: bool = Field(False, description="Use this organisation's own AI accounts.")
+    providers: list[AIProvider] = Field(default_factory=list, max_length=3)
+    models: list[AIModel] = Field(default_factory=list, max_length=10)
+    model_order: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="Model ids to try, in order. Models that cannot do a task are skipped for it.",
+    )
+    only_tasks: list[Literal[tuple(AI_TASKS)]] = Field(  # type: ignore[valid-type]
+        default_factory=list,
+        description="Use your own accounts only for these tasks. Empty = all tasks.",
+    )
+    fallback_to_platform: bool = Field(
+        False,
+        description="If your accounts fail, fall back to the platform's AI (counts toward platform usage).",
+    )
+
+    @model_validator(mode="after")
+    def _check(self):
+        pids = [p.id for p in self.providers]
+        mids = [m.id for m in self.models]
+        if len(pids) != len(set(pids)) or len(mids) != len(set(mids)):
+            raise ValueError("Provider and model ids must be unique.")
+        for p in self.providers:
+            if p.type not in BYOK_TYPES:
+                raise ValueError(
+                    f"Provider type {p.type} is not available for your own accounts. Use one of: {', '.join(BYOK_TYPES)}."
+                )
+            if p.type == "azure_openai":
+                u = urlparse(p.base_url or "")
+                host = (u.hostname or "").lower()
+                if (
+                    u.scheme != "https"
+                    or u.username
+                    or u.password
+                    or u.port not in (None, 443)
+                    or not host.endswith(AZURE_HOSTS)
+                    or u.path not in ("", "/")
+                ):
+                    raise ValueError(
+                        "Azure OpenAI needs your resource address, like https://your-resource.openai.azure.com"
+                    )
+            elif p.base_url:
+                raise ValueError(f"{p.type} uses a fixed address; leave the base URL empty.")
+            bad = set(p.options) - set(ADAPTER_OPTIONS)
+            if bad:
+                raise ValueError(f"Unknown option(s): {', '.join(sorted(bad))}.")
+        for m in self.models:
+            if m.provider_id not in pids:
+                raise ValueError(f"Model {m.id} refers to a provider that is not in your list.")
+        if any(x not in mids for x in self.model_order):
+            raise ValueError("model_order names a model that is not in your list.")
+        if self.enabled and not self.model_order:
+            raise ValueError("Choose at least one model in model_order before enabling.")
+        return self
+
+
+register(
+    SettingDef(
+        key="ai.byok",
+        model=ByokConfig,
+        default=ByokConfig(),
+        description="An organisation's own AI provider accounts (Enterprise). Keys are write-only.",
+        scopes=frozenset({Scope.ORG}),
+        owner_role="ORG_ADMIN",
+        tags=("ai", "byok"),
+    )
+)
