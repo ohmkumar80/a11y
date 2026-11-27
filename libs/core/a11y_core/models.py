@@ -479,3 +479,72 @@ class VerifiedDomain(Base):
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     method: Mapped[str | None] = mapped_column(String(8))  # file | meta
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# --- Reports ----------------------------------------------------------------------------------------
+
+
+class Report(Base):
+    """A generated file. Rendered by the docs worker, gated (veraPDF / DOCX check / CSV schema) BEFORE it can be
+    downloaded: a file that fails its gate is never offered. Content lives in Postgres for now (bytea, size-capped);
+    object storage replaces it when the cloud target is chosen (ADR 0002)."""
+
+    __tablename__ = "reports"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('audit_pdf', 'audit_docx', 'audit_csv', 'vpat_pdf', 'vpat_docx')",
+            name="ck_report_kind",
+        ),
+        CheckConstraint(
+            "status IN ('QUEUED', 'RUNNING', 'READY', 'FAILED')", name="ck_report_status"
+        ),
+        Index("ix_reports_scan", "scan_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    vpat_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    kind: Mapped[str] = mapped_column(String(16))
+    standard: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(8), server_default="QUEUED")
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    template_version: Mapped[str | None] = mapped_column(String(80))
+    validation: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    content: Mapped[bytes | None] = mapped_column(deferred=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VpatReport(Base):
+    """A VPAT/ACR draft. Conformance levels default to automated evidence or 'Not Evaluated'; a human edits them
+    and signs off before the document can be exported (PROJECT_PLAN 1.7)."""
+
+    __tablename__ = "vpat_reports"
+    __table_args__ = (
+        UniqueConstraint("scan_id", "standard", "edition", name="uq_vpat_scan_std_edition"),
+        CheckConstraint("status IN ('DRAFT', 'SIGNED_OFF')", name="ck_vpat_status"),
+        CheckConstraint("edition IN ('WCAG', '508', 'EU', 'INT')", name="ck_vpat_edition"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    standard: Mapped[str] = mapped_column(String(40))
+    edition: Mapped[str] = mapped_column(String(4))
+    status: Mapped[str] = mapped_column(String(10), server_default="DRAFT")
+    product: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    criteria: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    mapping_review: Mapped[str] = mapped_column(String(10), server_default="draft")
+    signoff: Mapped[dict | None] = mapped_column(JSONB)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

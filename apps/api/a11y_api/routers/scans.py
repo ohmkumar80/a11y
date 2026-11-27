@@ -338,7 +338,7 @@ async def findings(
             rows = (
                 await db.execute(
                     text(
-                        f"SELECT f.cluster_key, min(f.canonical_rule_id) AS rule, min(f.title) AS title, (array_agg(f.sc))[1] AS sc, count(*) AS occurrences, "
+                        f"SELECT f.cluster_key, min(f.canonical_rule_id) AS rule, min(f.title) AS title, min(array_to_string(f.sc, ',')) AS sc, count(*) AS occurrences, "
                         f"count(DISTINCT f.page_id) AS pages, min(CASE f.severity WHEN 'critical' THEN 0 WHEN 'serious' THEN 1 WHEN 'moderate' THEN 2 ELSE 3 END) AS sev, "
                         f"(array_agg(f.html))[1] AS sample_html, (array_agg(f.css))[1] AS sample_css, (array_agg(f.id))[1] AS sample_id "
                         f"FROM scan_findings f WHERE {w} GROUP BY f.cluster_key ORDER BY sev, occurrences DESC LIMIT :l OFFSET :o"

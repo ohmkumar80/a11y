@@ -101,7 +101,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-    command: celery -A a11y_core.celery_app worker -Q system,docs,media,ai --loglevel=INFO
+    command: celery -A a11y_core.celery_app worker -Q system,media,ai --loglevel=INFO
 
   # Browser worker: scans customer-supplied URLs. All browser traffic goes through an egress proxy that
   # refuses private/internal addresses (ADR 0007). In production this service must ALSO run in a
@@ -111,6 +111,14 @@ services:
     environment: *api-env
     init: true
     ipc: host
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  # Documents worker: renders reports and runs the PDF/UA (veraPDF) and DOCX accessibility gates.
+  docs-worker:
+    build: { context: ., dockerfile: infra/docs-worker.Dockerfile }
+    environment: *api-env
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

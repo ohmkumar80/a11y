@@ -1,0 +1,112 @@
+{% extends "_base.html.j2" %}
+{% block title %}Accessibility audit report: {{ d.site_host }}{% endblock %}
+{% block running_head %}Accessibility audit: {{ d.site_host }}{% endblock %}
+{% block body %}
+<header>
+  <h1>Accessibility audit report</h1>
+  <p>{{ d.site }}</p>
+  <dl class="facts">
+    <dt>Prepared for</dt><dd>{{ d.organization }}</dd>
+    <dt>Scanned on</dt><dd>{{ d.scanned_on }}</dd>
+    <dt>Report created</dt><dd>{{ d.generated_on }}</dd>
+    <dt>Checked against</dt><dd>{{ d.standard.label }}</dd>
+    <dt>Pages scanned</dt><dd>{{ d.pages_scanned }}</dd>
+  </dl>
+</header>
+<main>
+<section aria-labelledby="notice">
+  <h2 id="notice">Read this first</h2>
+  <div class="notice">
+    <p><strong>This report is the result of automated tests. It is not a statement of conformance.</strong>
+    Automated tests can check only part of the criteria in {{ d.standard.label }}. A page with no automated failures can still be inaccessible,
+    and every criterion marked "needs a person" below has to be evaluated by an accessibility specialist.</p>
+    <p>{{ d.standard.label }}: {{ d.standard.legal_label }}.{% if d.standard.citation %} {{ d.standard.citation }}{% endif %}</p>
+    {% if d.standard.mapping_review == "draft" %}<p>The mapping of this standard to individual criteria has not yet been signed off by an accessibility expert.</p>{% endif %}
+  </div>
+</section>
+
+<section aria-labelledby="summary">
+  <h2 id="summary">Summary</h2>
+  {% for line in d.narrative %}<p>{{ line }}</p>{% endfor %}
+  <figure>
+    {% set bar_max = ([d.severity_counts.values()|max, 1]|max) %}
+    <svg role="img" aria-labelledby="sev-t sev-d" width="360" height="{{ 4 * 22 + 8 }}" viewBox="0 0 360 {{ 4 * 22 + 8 }}" xmlns="http://www.w3.org/2000/svg">
+      <title id="sev-t">Failures by severity</title>
+      <desc id="sev-d">{% for s in ["critical","serious","moderate","minor"] %}{{ d.severity_counts.get(s, 0) }} {{ s }}{% if not loop.last %}, {% endif %}{% endfor %}.</desc>
+      {% for s in ["critical","serious","moderate","minor"] %}
+      <rect x="4" y="{{ 4 + loop.index0 * 22 }}" width="{{ (d.severity_counts.get(s, 0) / bar_max * 340)|round(0)|int }}" height="16" fill="#1a1a1a"/>
+      {% endfor %}
+    </svg>
+    <figcaption>Figure 1. Failures by severity (the same numbers are in the table below).</figcaption>
+  </figure>
+  <table>
+    <caption>Results at a glance</caption>
+    <thead><tr><th scope="col">Result</th><th scope="col">Count</th></tr></thead>
+    <tbody>
+      {% for s in ["critical","serious","moderate","minor"] %}<tr><th scope="row">{{ s|capitalize }} failures</th><td>{{ d.severity_counts.get(s, 0) }}</td></tr>{% endfor %}
+      <tr><th scope="row">Items that need a person to review</th><td>{{ d.needs_review }}</td></tr>
+      <tr><th scope="row">Best-practice suggestions</th><td>{{ d.best_practices }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section aria-labelledby="criteria">
+  <h2 id="criteria">Criteria in {{ d.standard.label }}</h2>
+  <p>Automated checks exist for {{ d.criteria.tested }} of {{ d.criteria.total }} criteria.</p>
+  <table>
+    <caption>Criteria by result</caption>
+    <thead><tr><th scope="col">Result</th><th scope="col">Number</th><th scope="col">Criteria</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Automated failure found</th><td>{{ d.criteria.failed|length }}</td><td>{% for c in d.criteria.failed %}{{ c.clause }}{% if not loop.last %}, {% endif %}{% else %}None{% endfor %}</td></tr>
+      <tr><th scope="row">Only items to review</th><td>{{ d.criteria.needs_review|length }}</td><td>{% for c in d.criteria.needs_review %}{{ c.clause }}{% if not loop.last %}, {% endif %}{% else %}None{% endfor %}</td></tr>
+      <tr><th scope="row">Automated tests found no issue (still needs a person)</th><td>{{ d.criteria.no_issues_found|length }}</td><td>{% for c in d.criteria.no_issues_found %}{{ c.clause }}{% if not loop.last %}, {% endif %}{% else %}None{% endfor %}</td></tr>
+      <tr><th scope="row">Cannot be tested by automation: needs a person</th><td>{{ d.criteria.not_tested|length }}</td><td>{% for c in d.criteria.not_tested %}{{ c.clause }}{% if not loop.last %}, {% endif %}{% else %}None{% endfor %}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section aria-labelledby="findings">
+  <h2 id="findings">Problems found</h2>
+  {% if not d.clusters %}<p>The automated tests found no failures in this standard.</p>{% endif %}
+  <p>Problems are grouped by root cause: the same problem repeated on several elements or pages is listed once.
+  {% if d.clusters_total > d.clusters|length %}This report shows the {{ d.clusters|length }} most severe of {{ d.clusters_total }}; the CSV export lists everything.{% endif %}</p>
+  {% for c in d.clusters %}
+  <section aria-labelledby="c{{ loop.index }}">
+    <h3 id="c{{ loop.index }}">{{ loop.index }}. {{ c.title }}</h3>
+    <table>
+      <caption>Details of problem {{ loop.index }}</caption>
+      <tbody>
+        <tr><th scope="row">Severity</th><td>{{ c.severity|capitalize }}</td></tr>
+        <tr><th scope="row">Criteria</th><td>{% for k in c.criteria %}{{ k.clause }} {{ k.name }} (level {{ k.level }}){% if not loop.last %}; {% endif %}{% else %}Not mapped to a criterion{% endfor %}</td></tr>
+        <tr><th scope="row">How often</th><td>{{ c.occurrences }} {{ "occurrence" if c.occurrences == 1 else "occurrences" }} on {{ c.pages }} {{ "page" if c.pages == 1 else "pages" }}</td></tr>
+        <tr><th scope="row">Confidence</th><td>{{ c.confidence }} ({{ c.agreement }} agree)</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Examples</strong></p>
+    {% for e in c.examples %}
+    <p>On {{ e.page }}{% if e.message %}: {{ e.message }}{% endif %}</p>
+    <pre><code>{{ e.html }}</code></pre>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</section>
+
+<section aria-labelledby="pages">
+  <h2 id="pages">Pages scanned</h2>
+  <table>
+    <caption>Pages scanned</caption>
+    <thead><tr><th scope="col">Address</th><th scope="col">Result</th></tr></thead>
+    <tbody>{% for p in d.pages %}<tr><td>{{ p.url }}</td><td>{{ p.result }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+
+<section aria-labelledby="method">
+  <h2 id="method">How this report was made</h2>
+  <p>Each page was opened in a real browser. Three open-source engines then tested the same page: {% for k, v in d.engine_versions.items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.
+  Where several engines reported the same problem on the same element it is listed once, and the confidence shows how many agreed.
+  Rule mappings version {{ d.rules_version }}.</p>
+  <p>This report was generated from the stored scan results without any AI-written text.</p>
+</section>
+</main>
+<footer><p>Generated by a11y.</p></footer>
+{% endblock %}

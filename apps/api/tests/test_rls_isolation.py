@@ -28,6 +28,8 @@ TENANT_TABLES = [
     "scan_pages",
     "scan_findings",
     "verified_domains",
+    "reports",
+    "vpat_reports",
 ]
 # Tables that carry organization_id but intentionally also hold platform-wide rows (see policy).
 PLATFORM_AND_TENANT_TABLES = ["setting_versions"]

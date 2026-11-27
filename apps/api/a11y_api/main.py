@@ -18,6 +18,7 @@ from .routers import (
     domains,
     org,
     org_ai,
+    reports,
     scans,
     standards,
 )
@@ -35,7 +36,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in s.cors_origins.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["authorization", "content-type"],
 )
 
@@ -88,6 +89,7 @@ app.include_router(org_ai.router)
 app.include_router(standards.router)
 app.include_router(scans.router)
 app.include_router(domains.router)
+app.include_router(reports.router)
 
 
 from fastapi.exceptions import RequestValidationError  # noqa: E402

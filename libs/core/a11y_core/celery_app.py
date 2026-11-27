@@ -18,6 +18,8 @@ QUEUES = ("system", "web", "docs", "media", "mobile", "ai")
 _include = ["a11y_core.billing_jobs", "a11y_core.scan_jobs"]
 if importlib.util.find_spec("a11y_web_audit"):
     _include.append("a11y_web_audit.tasks")
+if importlib.util.find_spec("a11y_documents"):
+    _include.append("a11y_documents.tasks")
 
 celery_app = Celery("a11y", broker=get_settings().redis_url, include=_include)
 celery_app.conf.update(
