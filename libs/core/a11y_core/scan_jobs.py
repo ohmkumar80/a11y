@@ -144,6 +144,29 @@ async def sweep_orphaned_reservations() -> dict[str, int]:
                 ok = await billing.release_usage(db, USAGE_FEATURE, r.job_id)
         if ok:
             out["committed" if keep else "released"] += 1
+    # AI code-fix credits: a job that died after reserving. Charged only if a model-written fix was delivered.
+    async with admin_session(
+        actor_user_id=None, reason="orphaned fix credit sweep", action="system.sweep_reservations"
+    ) as db:
+        fixes = (
+            await db.execute(
+                text(
+                    "SELECT r.organization_id, r.job_id, f.status AS fix_status, f.rung FROM usage_reservations r "
+                    "LEFT JOIN fix_suggestions f ON f.id::text = split_part(r.job_id, ':', 1) "
+                    "WHERE r.status='RESERVED' AND r.feature_key = :f AND r.created_at < now() - CAST(:age AS interval) "
+                    "AND (f.id IS NULL OR f.status IN ('READY','NEEDS_REVIEW','FAILED'))"
+                ),
+                {"f": billing.FIX_FEATURE, "age": ORPHAN_AFTER},
+            )
+        ).all()
+    for r in fixes:
+        keep = r.fix_status == "READY" and r.rung in ("light", "standard")
+        async with tenant_session(r.organization_id) as db:
+            ok = await (billing.commit_usage if keep else billing.release_usage)(
+                db, billing.FIX_FEATURE, r.job_id
+            )
+        if ok:
+            out["committed" if keep else "released"] += 1
     if any(out.values()):
         log.warning("settled orphaned reservations: %s", out)
     return out

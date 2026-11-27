@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from a11y_core import billing
 from a11y_core.db import login_lookup_session, tenant_session
-from a11y_core.models import AuthToken, Organization, PlanEntitlement, TokenKind, User
+from a11y_core.models import AuthToken, Organization, TokenKind, User
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
@@ -55,27 +55,32 @@ async def subscription(p: Principal = Depends(current_principal)):
             await db.execute(text("SELECT name FROM plans WHERE id=:i"), {"i": sub.plan_id})
         ).scalar_one()
         used, limit = await billing.seat_usage(db, sub.plan_id)
-        ents = (
-            (
+        # The plan's features plus any feature a platform administrator opened up for this organisation only.
+        keys = {
+            r[0]
+            for r in (
                 await db.execute(
-                    select(PlanEntitlement)
-                    .where(PlanEntitlement.plan_id == sub.plan_id)
-                    .order_by(PlanEntitlement.feature_key)
+                    text(
+                        "SELECT feature_key FROM plan_entitlements WHERE plan_id=:p "
+                        "UNION SELECT feature_key FROM entitlement_overrides WHERE organization_id = app_org_id() "
+                        "AND (expires_at IS NULL OR expires_at > now())"
+                    ),
+                    {"p": sub.plan_id},
                 )
             )
-            .scalars()
-            .all()
-        )
+        }
         meters = []
-        for e in ents:
-            if e.feature_key == billing.SEATS or e.feature_key.startswith("pages_per"):
+        for key in sorted(keys):
+            if key == billing.SEATS or key.startswith("pages_per") or key in billing.NON_METERS:
                 continue  # not a monthly meter
+            e = await billing.entitlement(db, sub.plan_id, key)
             meters.append(
                 {
-                    "feature": e.feature_key,
+                    "feature": key,
                     "enabled": e.enabled,
-                    "used": await billing.usage_used(db, e.feature_key),
-                    "limit": e.limit_value,
+                    "used": await billing.usage_used(db, key),
+                    "limit": e.limit,
+                    "custom": e.custom,
                 }
             )
         coupon = None

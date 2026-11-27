@@ -33,6 +33,10 @@ REASONS = {
         "(for example colours or labels elsewhere), so we cannot check a fix automatically."
     ),
     "ai_unavailable": "No AI model is available for this right now, and there is no ready-made fix for this rule.",
+    "ai_quota_reached": (
+        "You have used all your AI code fixes for this month, and there is no ready-made fix for this rule. "
+        "Fixes found without AI, and fixes you already have, are not affected."
+    ),
     "validator_unavailable": (
         "Your settings require an independent review of every fix, and it could not be run, "
         "so we are not showing a fix we could not double-check."

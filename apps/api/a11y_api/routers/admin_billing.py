@@ -1,6 +1,7 @@
 """Super Admin: plans & entitlements, coupons, tenant directory, manual plan assignment, trial
 funnel. Every call goes through ``admin_session`` (cross-tenant, audit-logged with a reason)."""
 
+import secrets
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -15,7 +16,7 @@ from a11y_core.models import (
     PlanPrice,
     Subscription,
 )
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
@@ -235,16 +236,137 @@ def _coupon_json(c: Coupon) -> dict:
         "current_redemptions": c.current_redemptions,
         "applicable_plan_ids": c.applicable_plan_ids,
         "is_active": c.is_active,
+        "campaign": c.campaign,
     }
 
 
 @router.get("/coupons")
-async def list_coupons(p: Principal = Depends(require_super_admin)):
+async def list_coupons(campaign: str | None = None, p: Principal = Depends(require_super_admin)):
     async with admin_session(
         actor_user_id=p.user_id, reason="list coupons", action="admin.read"
     ) as db:
-        rows = (await db.execute(select(Coupon).order_by(Coupon.created_at.desc()))).scalars().all()
+        q = select(Coupon).order_by(Coupon.created_at.desc())
+        if campaign:
+            q = q.where(Coupon.campaign == campaign)
+        rows = (await db.execute(q.limit(1000))).scalars().all()
         return [_coupon_json(c) for c in rows]
+
+
+CODE_ALPHABET = (
+    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I: a printed code is easy to read out
+)
+
+
+class BulkIn(BaseModel):
+    campaign: str = Field(min_length=3, max_length=60, pattern=r"^[A-Za-z0-9 _-]+$")
+    count: int = Field(ge=1, le=500)
+    prefix: str = Field(min_length=2, max_length=12, pattern=r"^[A-Z0-9]+$")
+    discount_type: Literal["PERCENTAGE", "FIXED_INR"]
+    discount_value: int = Field(gt=0)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    max_redemptions: int = Field(
+        1, ge=1, description="Uses allowed per code; 1 = a single-use code"
+    )
+    applicable_plan_ids: list[str] = []
+
+
+@router.post("/coupons/bulk", status_code=status.HTTP_201_CREATED)
+async def create_coupon_batch(body: BulkIn, p: Principal = Depends(require_super_admin)):
+    """Make many single-purpose codes at once (a campaign): each is random, unguessable and unique."""
+    if body.discount_type == "PERCENTAGE" and body.discount_value > 100:
+        raise _err(422, "A percentage discount cannot exceed 100.", "discount_value")
+    if body.valid_from and body.valid_until and body.valid_until <= body.valid_from:
+        raise _err(422, "The end date must be after the start date.", "valid_until")
+    made: list[str] = []
+    async with admin_session(
+        actor_user_id=p.user_id,
+        reason=f"bulk coupons {body.campaign} x{body.count}",
+        action="coupon.bulk_created",
+    ) as db:
+        if (
+            await db.execute(select(Coupon.id).where(Coupon.campaign == body.campaign).limit(1))
+        ).first():
+            raise _err(
+                409, "A campaign with that name already exists. Choose another name.", "campaign"
+            )
+        for _ in range(6):  # a collision is astronomically unlikely, but handle it rather than hope
+            need = body.count - len(made)
+            if need <= 0:
+                break
+            batch = {
+                f"{body.prefix}-" + "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
+                for _ in range(need)
+            }
+            rows = (
+                await db.execute(
+                    text(
+                        "INSERT INTO coupons (id, code, discount_type, discount_value, valid_from, valid_until, max_redemptions, applicable_plan_ids, campaign) "
+                        "SELECT gen_random_uuid(), c, :t, :v, :vf, :vu, :m, CAST(:plans AS text[]), :camp FROM unnest(CAST(:codes AS text[])) AS c "
+                        "ON CONFLICT (code) DO NOTHING RETURNING code"
+                    ),
+                    {
+                        "t": body.discount_type,
+                        "v": body.discount_value,
+                        "vf": body.valid_from,
+                        "vu": body.valid_until,
+                        "m": body.max_redemptions,
+                        "plans": body.applicable_plan_ids,
+                        "camp": body.campaign,
+                        "codes": sorted(batch),
+                    },
+                )
+            ).all()
+            made += [r.code for r in rows]
+        if len(made) < body.count:
+            raise _err(500, "We could not make enough unique codes. Try again.")
+    return {"campaign": body.campaign, "count": len(made), "codes": sorted(made)}
+
+
+@router.get("/coupons-campaigns")
+async def coupon_campaigns(p: Principal = Depends(require_super_admin)):
+    async with admin_session(
+        actor_user_id=p.user_id, reason="list campaigns", action="admin.read"
+    ) as db:
+        rows = (
+            await db.execute(
+                text(
+                    "SELECT campaign, count(*) AS codes, coalesce(sum(current_redemptions),0) AS redeemed, "
+                    "count(*) FILTER (WHERE is_active) AS active, min(created_at) AS created_at, min(valid_until) AS valid_until "
+                    "FROM coupons WHERE campaign IS NOT NULL GROUP BY campaign ORDER BY min(created_at) DESC"
+                )
+            )
+        ).all()
+    return [
+        {
+            "campaign": r.campaign,
+            "codes": r.codes,
+            "redeemed": int(r.redeemed),
+            "active": r.active,
+            "created_at": r.created_at,
+            "valid_until": r.valid_until,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/coupons-campaigns/{campaign}/deactivate")
+async def deactivate_campaign(campaign: str, p: Principal = Depends(require_super_admin)):
+    """Stop every code of a campaign that has not been used up (for example when codes leaked)."""
+    async with admin_session(
+        actor_user_id=p.user_id,
+        reason=f"deactivate campaign {campaign}",
+        action="coupon.campaign_deactivated",
+    ) as db:
+        n = (
+            await db.execute(
+                text("UPDATE coupons SET is_active=false WHERE campaign=:c AND is_active"),
+                {"c": campaign},
+            )
+        ).rowcount
+    if not n:
+        raise _err(404, "No active codes in that campaign.")
+    return {"deactivated": n}
 
 
 @router.post("/coupons", status_code=status.HTTP_201_CREATED)
@@ -410,3 +532,131 @@ async def trial_funnel(p: Principal = Depends(require_super_admin)):
         "signups_last_30_days": signups_30d,
         "trials_ending_within_7_days": trialing_ending_7d,
     }
+
+
+# --- per-organisation entitlement overrides ----------------------------------------------------------------------------
+class OverrideIn(BaseModel):
+    enabled: bool = True
+    limit_value: int | None = Field(None, ge=0, description="Empty = unlimited")
+    expires_at: datetime | None = None
+    reason: str = Field(min_length=1, max_length=500)
+
+
+async def _known_feature(db, feature: str) -> None:
+    if not (
+        await db.execute(
+            text("SELECT 1 FROM plan_entitlements WHERE feature_key=:f LIMIT 1"), {"f": feature}
+        )
+    ).first():
+        raise _err(404, f"There is no feature called {feature}.", "feature")
+
+
+@router.get("/tenants/{org_id}/overrides")
+async def list_overrides(org_id: uuid.UUID, p: Principal = Depends(require_super_admin)):
+    async with admin_session(
+        actor_user_id=p.user_id, reason=f"read overrides of {org_id}", action="admin.read"
+    ) as db:
+        rows = (
+            await db.execute(
+                text(
+                    "SELECT feature_key, enabled, limit_value, expires_at, reason, created_at, (expires_at IS NOT NULL AND expires_at <= now()) AS expired "
+                    "FROM entitlement_overrides WHERE organization_id=:o ORDER BY feature_key"
+                ),
+                {"o": org_id},
+            )
+        ).all()
+    return [
+        {
+            "feature": r.feature_key,
+            "enabled": r.enabled,
+            "limit_value": r.limit_value,
+            "expires_at": r.expires_at,
+            "reason": r.reason,
+            "created_at": r.created_at,
+            "expired": r.expired,
+        }
+        for r in rows
+    ]
+
+
+@router.put("/tenants/{org_id}/overrides/{feature}")
+async def set_override(
+    org_id: uuid.UUID, feature: str, body: OverrideIn, p: Principal = Depends(require_super_admin)
+):
+    """An exception for ONE organisation (a negotiated limit, an early feature). It replaces the plan's value for that
+    feature until it expires or is removed, is audit-logged with the reason, and shows in the organisation's own audit log."""
+    if body.expires_at and body.expires_at <= datetime.now(body.expires_at.tzinfo):
+        raise _err(422, "The end date must be in the future.", "expires_at")
+    async with admin_session(
+        actor_user_id=p.user_id, reason=body.reason, action="entitlement.override_set"
+    ) as db:
+        await _known_feature(db, feature)
+        if not (
+            await db.execute(text("SELECT 1 FROM organizations WHERE id=:o"), {"o": org_id})
+        ).first():
+            raise _err(404, "No such organisation.")
+        await db.execute(
+            text(
+                "INSERT INTO entitlement_overrides (organization_id, feature_key, enabled, limit_value, expires_at, reason, created_by) "
+                "VALUES (:o,:f,:e,:l,:x,:r,:u) ON CONFLICT (organization_id, feature_key) DO UPDATE SET enabled=:e, limit_value=:l, expires_at=:x, reason=:r, created_by=:u, created_at=now()"
+            ),
+            {
+                "o": org_id,
+                "f": feature,
+                "e": body.enabled,
+                "l": body.limit_value,
+                "x": body.expires_at,
+                "r": body.reason,
+                "u": p.user_id,
+            },
+        )
+        db.add(
+            AuditLog(
+                organization_id=org_id,
+                actor_user_id=p.user_id,
+                action="entitlement.override_set",
+                detail={
+                    "feature": feature,
+                    "enabled": body.enabled,
+                    "limit_value": body.limit_value,
+                    "expires_at": body.expires_at.isoformat() if body.expires_at else None,
+                    "reason": body.reason,
+                },
+            )
+        )
+    return {
+        "feature": feature,
+        "enabled": body.enabled,
+        "limit_value": body.limit_value,
+        "expires_at": body.expires_at,
+    }
+
+
+@router.delete("/tenants/{org_id}/overrides/{feature}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_override(
+    org_id: uuid.UUID,
+    feature: str,
+    reason: str = Query(min_length=1, max_length=500),
+    p: Principal = Depends(require_super_admin),
+):
+    async with admin_session(
+        actor_user_id=p.user_id, reason=reason, action="entitlement.override_removed"
+    ) as db:
+        n = (
+            await db.execute(
+                text(
+                    "DELETE FROM entitlement_overrides WHERE organization_id=:o AND feature_key=:f"
+                ),
+                {"o": org_id, "f": feature},
+            )
+        ).rowcount
+        if not n:
+            raise _err(404, "That organisation has no override for that feature.")
+        db.add(
+            AuditLog(
+                organization_id=org_id,
+                actor_user_id=p.user_id,
+                action="entitlement.override_removed",
+                detail={"feature": feature, "reason": reason},
+            )
+        )

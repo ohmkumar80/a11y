@@ -263,6 +263,9 @@ class Coupon(Base):
         ARRAY(String), server_default=text("'{}'")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    campaign: Mapped[str | None] = mapped_column(
+        String(60), index=True
+    )  # a batch of codes made together
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -799,3 +802,24 @@ class UserPreference(Base):
     )
     email_scan: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EntitlementOverride(Base):
+    """A negotiated exception for ONE organisation: replaces what its plan says for a feature, optionally until a date.
+    Read by the organisation (row-level security); written only by a platform administrator, with a reason."""
+
+    __tablename__ = "entitlement_overrides"
+    __table_args__ = (
+        CheckConstraint("limit_value IS NULL OR limit_value >= 0", name="ck_override_limit"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    feature_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    limit_value: Mapped[int | None] = mapped_column(BigInteger)  # NULL = unlimited
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -5,7 +5,7 @@ export interface Subscription {
   status: SubStatus;
   trial_ends_at: string | null;
   seats: { used: number; limit: number | null };
-  quotas: Array<{ feature: string; enabled: boolean; used: number; limit: number | null }>;
+  quotas: Array<{ feature: string; enabled: boolean; used: number; limit: number | null; custom?: boolean }>;
   coupon: { code: string; type: "PERCENTAGE" | "FIXED_INR"; value: number } | null;
 }
 

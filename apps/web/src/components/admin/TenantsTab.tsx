@@ -6,6 +6,7 @@ import { post } from "@/lib/api";
 import { STATUS_LABEL, formatDate, type SubStatus } from "@/lib/billing";
 import { useApi } from "@/lib/useApi";
 import { useForm } from "../useForm";
+import { OverridesDialog } from "./OverridesDialog";
 
 interface Tenant { id: string; name: string; plan_id: string | null; status: SubStatus | null; trial_ends_at: string | null; active_users: number }
 interface Funnel { by_status: Record<string, number>; signups_last_30_days: number; trials_ending_within_7_days: number }
@@ -49,6 +50,7 @@ export function TenantsTab() {
             { id: "status", header: "Status", render: (t) => (t.status ? STATUS_LABEL[t.status] : "None") },
             { id: "trial", header: "Trial ends", render: (t) => (t.trial_ends_at ? formatDate(t.trial_ends_at) : "Not applicable") },
             { id: "users", header: "Active users", render: (t) => t.active_users },
+            { id: "ov", header: "Exceptions", render: (t) => <OverridesDialog orgId={t.id} orgName={t.name} /> },
           ]}
         />
       </section>

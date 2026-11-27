@@ -7,10 +7,15 @@ import { post } from "@/lib/api";
 import { STATUS_LABEL, daysLeft, discountText, featureLabel, formatDate, type Subscription } from "@/lib/billing";
 import { useForm } from "./useForm";
 
-function Usage({ label, used, limit, unit }: { label: string; used: number; limit: number | null; unit: string }) {
-  if (limit === null) return <p><span className="font-semibold">{label}:</span> {used} used. Unlimited on your plan.</p>;
+function Usage({ label, used, limit, unit, custom }: { label: string; used: number; limit: number | null; unit: string; custom?: boolean }) {
+  if (limit === null) return <p><span className="font-semibold">{label}:</span> {used} used. {custom ? "No limit for your organisation." : "Unlimited on your plan."}</p>;
   if (limit === 0) return <p><span className="font-semibold">{label}:</span> not included in your plan.</p>;
-  return <Meter label={label} value={Math.min(used, limit)} maxValue={limit} valueText={`${used} of ${limit}${unit}`} />;
+  return (
+    <div className="flex flex-col gap-1">
+      <Meter label={label} value={Math.min(used, limit)} maxValue={limit} valueText={`${used} of ${limit}${unit}`} />
+      {custom && <p className="text-sm">A custom limit has been set for your organisation.</p>}
+    </div>
+  );
 }
 
 export function PlanPanel({ sub, onChanged }: { sub: Subscription; onChanged: () => void }) {
@@ -51,7 +56,7 @@ export function PlanPanel({ sub, onChanged }: { sub: Subscription; onChanged: ()
       <div className="flex max-w-xl flex-col gap-4">
         <Usage label="Seats" used={sub.seats.used} limit={sub.seats.limit} unit=" seats" />
         {sub.quotas.map((q) => (
-          <Usage key={q.feature} label={featureLabel(q.feature)} used={q.used} limit={q.enabled ? q.limit : 0} unit="" />
+          <Usage key={q.feature} label={featureLabel(q.feature)} used={q.used} limit={q.enabled ? q.limit : 0} unit="" custom={q.custom} />
         ))}
       </div>
 

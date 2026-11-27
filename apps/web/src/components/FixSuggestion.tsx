@@ -58,7 +58,7 @@ export function FixSuggestion({ scanId, findingId }: { scanId: string; findingId
         <>
           <p className="text-sm">
             We try a ready-made fix first. If there is none, an AI model may propose one, which sends only this element&apos;s tag (not the page&apos;s text) to our AI provider.
-            Either way, we run our scanner on the result and show it only if the problem is gone and nothing new appears.
+            Either way, we run our scanner on the result and show it only if the problem is gone and nothing new appears. A ready-made fix is free; a fix written by an AI model uses one of your AI code fixes for the month, and only if we accept it.
           </p>
           <Button variant="secondary" isPending={starting} pendingLabel="Checking a fix" onPress={() => void ask(false)}>Suggest a fix</Button>
         </>
@@ -81,6 +81,7 @@ function Ready({ fix }: { fix: Fix }) {
     <div>
       <p>{fix.explanation}</p>
       <p className="text-sm">{RUNG_LABEL[fix.rung ?? ""] ?? "Suggested fix"}{fix.from_cache ? " (reused from an identical element)" : ""}.</p>
+      {fix.credit_used && <p className="text-sm">This used one of your AI code fixes for the month.</p>}
       <p className="mt-2 text-sm font-semibold">Before</p>
       <pre className="overflow-x-auto rounded border border-border p-2"><code>{fix.original_html}</code></pre>
       <p className="mt-2 text-sm font-semibold">After</p>

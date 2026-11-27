@@ -69,9 +69,9 @@ export async function mockScanApi(page: Page, state: { status?: string } = {}) {
 }
 
 export const FIX_ID = "22222222-aaaa-4bbb-8ccc-222222222222";
-const fixBase = { id: FIX_ID, finding_id: "f1", rule: "button-name", original_html: "<button></button>", explanation: "", notes: [], checks: [], reason: null, detail: null, model_id: null, attempts: 0, from_cache: false, rung: null, fixed_html: null };
+const fixBase = { id: FIX_ID, finding_id: "f1", rule: "button-name", original_html: "<button></button>", explanation: "", notes: [], checks: [], reason: null, detail: null, model_id: null, attempts: 0, from_cache: false, credit_used: false, rung: null, fixed_html: null };
 export const FIX_READY = {
-  ...fixBase, status: "READY", rung: "light", model_id: "m-light", attempts: 1,
+  ...fixBase, status: "READY", rung: "light", model_id: "m-light", attempts: 1, credit_used: true,
   fixed_html: '<button aria-label="Close"></button>', explanation: "Gives the button a name so screen readers can say what it does.",
   notes: ["Written by an AI model: read it before you use it."],
   checks: [{ name: "The fix is valid HTML", passed: true, detail: "" }, { name: "The problem no longer appears in our checks", passed: true, detail: "" }, { name: "The fix creates no new problems", passed: true, detail: "" }],

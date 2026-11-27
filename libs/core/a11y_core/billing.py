@@ -27,6 +27,11 @@ from .models import (
 
 SEATS = "seats"
 UPGRADE_PATH = "/org#plan"
+FIX_FEATURE = (
+    "ai_code_fixes_monthly"  # one credit per fix an AI model produced and our checks accepted
+)
+# Entitlements that are switches, not monthly counters: they never appear as usage meters.
+NON_METERS = frozenset({"api_access", "byok_ai"})
 
 
 class BillingError(Exception):
@@ -124,9 +129,26 @@ async def require_writable(db: AsyncSession, *, lock: bool = False) -> Subscript
 class Entitlement:
     enabled: bool
     limit: int | None  # None = unlimited
+    custom: bool = (
+        False  # True when a platform administrator set an exception for this organisation
+    )
 
 
 async def entitlement(db: AsyncSession, plan_id: str, feature: str) -> Entitlement:
+    """What this organisation may do with ``feature``: its plan's row, unless a platform administrator set an unexpired
+    override for this organisation (a negotiated exception). ``app_org_id()`` limits the lookup to the organisation the
+    session belongs to, so cross-tenant admin reads never pick up somebody else's override."""
+    ov = (
+        await db.execute(
+            text(
+                "SELECT enabled, limit_value FROM entitlement_overrides WHERE organization_id = app_org_id() "
+                "AND feature_key = :f AND (expires_at IS NULL OR expires_at > now())"
+            ),
+            {"f": feature},
+        )
+    ).first()
+    if ov is not None:
+        return Entitlement(ov.enabled, ov.limit_value, custom=True)
     row = (
         await db.execute(
             select(PlanEntitlement).where(

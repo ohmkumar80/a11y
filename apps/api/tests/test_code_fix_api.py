@@ -90,6 +90,10 @@ async def test_recipe_fix_end_to_end_and_idempotent(client, site, dev):
 async def test_model_fix_is_validated_before_it_is_shown(client, site, dev, monkeypatch):
     org, user, sid, h = await scanned(client, site)
     fid = await finding(client, h, sid, "button-name")
+    # sampling is random by design: switch it off so the number of model calls is deterministic
+    await get_config().save(
+        "ai.code_fix", Scope.ORG, str(org), {"validation": "off"}, comment="test-off", actor=None
+    )
     gw = FakeGateway('<button aria-label="Submit form"></button>')
     monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
     fix = (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json={})).json()
@@ -312,3 +316,169 @@ async def test_escalation_can_be_switched_off(client, site, dev, monkeypatch):
     fix = (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json={})).json()
     assert await run_fix(org, uuid.UUID(fix["id"])) == "NEEDS_REVIEW"
     assert "code_fix_escalate" not in gw.calls
+
+
+# -- credits: pay only for a fix an AI model produced and our checks accepted ----------------------
+FIXC = "ai_code_fixes_monthly"
+
+
+async def set_fix_limit(org, limit):
+    await sql(
+        "INSERT INTO entitlement_overrides (organization_id, feature_key, enabled, limit_value, reason) VALUES ($1,$2,true,$3,'test') "
+        "ON CONFLICT (organization_id, feature_key) DO UPDATE SET limit_value=$3",
+        org,
+        FIXC,
+        limit,
+    )
+
+
+async def meter(client, h):
+    q = (await client.get("/org/subscription", headers=h)).json()["quotas"]
+    return next(m for m in q if m["feature"] == FIXC)
+
+
+async def ask(client, h, sid, fid, **body):
+    return (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json=body)).json()
+
+
+async def test_only_an_accepted_ai_fix_uses_a_credit(client, site, dev, monkeypatch):
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 5)
+    assert (await meter(client, h))["used"] == 0
+    # a ready-made recipe is free
+    f1 = await finding(client, h, sid, "form-field-label")
+    r1 = await ask(client, h, sid, f1)
+    assert await run_fix(org, uuid.UUID(r1["id"])) == "READY"
+    assert (await meter(client, h))["used"] == 0 and (
+        await client.get(f"/fixes/{r1['id']}", headers=h)
+    ).json()["credit_used"] is False
+    # an AI fix that is accepted costs one
+    f2 = await finding(client, h, sid, "button-name")
+    gw = TaskGateway(code_fix=[BTN_FIX], code_fix_validate=[PASS])
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
+    r2 = await ask(client, h, sid, f2)
+    assert (await meter(client, h))["used"] == 1  # held while the job is queued
+    assert await run_fix(org, uuid.UUID(r2["id"])) == "READY"
+    got = (await client.get(f"/fixes/{r2['id']}", headers=h)).json()
+    assert (await meter(client, h))["used"] == 1 and got["credit_used"] is True
+    # asking again returns the same fix: no second charge
+    again = await ask(client, h, sid, f2)
+    assert again["id"] == r2["id"] and (await meter(client, h))["used"] == 1
+
+
+async def test_a_fix_nobody_could_produce_is_free_and_a_retry_charges_only_on_success(
+    client, site, dev, monkeypatch
+):
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 5)
+    fid = await finding(client, h, sid, "button-name")
+    monkeypatch.setattr(
+        "a11y_core.ai.get_gateway",
+        lambda: TaskGateway(code_fix=["<button></button>", "<button></button>"]),
+    )
+    r = await ask(client, h, sid, fid)
+    assert await run_fix(org, uuid.UUID(r["id"])) == "NEEDS_REVIEW"
+    assert (await meter(client, h))["used"] == 0  # nothing delivered: not charged
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: TaskGateway(code_fix=[BTN_FIX]))
+    retry = await ask(client, h, sid, fid, retry=True)
+    assert (
+        retry["id"] == r["id"] and (await meter(client, h))["used"] == 1
+    )  # a new credit is held for the new attempt
+    assert await run_fix(org, uuid.UUID(r["id"])) == "READY"
+    assert (await meter(client, h))["used"] == 1
+
+
+async def test_a_crash_never_charges(client, site, dev, monkeypatch):
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 5)
+    fid = await finding(client, h, sid, "button-name")
+    r = await ask(client, h, sid, fid)
+
+    async def boom(*a, **k):
+        raise RuntimeError("browser crashed")
+
+    monkeypatch.setattr("a11y_web_audit.fixes.ladder.suggest", boom)
+    assert await run_fix(org, uuid.UUID(r["id"])) == "FAILED"
+    assert (await meter(client, h))["used"] == 0
+
+
+async def test_when_the_monthly_credits_run_out_recipes_still_work_and_the_model_is_not_called(
+    client, site, dev, monkeypatch
+):
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 0)
+    gw = TaskGateway(code_fix=[BTN_FIX])
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
+    b = await finding(client, h, sid, "button-name")
+    r = await ask(client, h, sid, b)
+    assert r["status"] == "PENDING"  # not refused: the person is told why when it finishes
+    assert await run_fix(org, uuid.UUID(r["id"])) == "NEEDS_REVIEW"
+    got = (await client.get(f"/fixes/{r['id']}", headers=h)).json()
+    assert (
+        got["reason"] == "ai_quota_reached"
+        and "used all your AI code fixes" in got["detail"]
+        and got["fixed_html"] is None
+    )
+    assert gw.calls == []  # no tokens were spent
+    free = await ask(client, h, sid, await finding(client, h, sid, "form-field-label"))
+    assert (
+        await run_fix(org, uuid.UUID(free["id"])) == "READY"
+    )  # a recipe costs nothing, so it still works
+    assert (await meter(client, h))["used"] == 0
+
+
+async def test_the_last_credit_goes_to_exactly_one_of_many_simultaneous_requests(
+    client, site, dev, monkeypatch
+):
+    import asyncio
+
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 1)
+    fs = (await client.get(f"/scans/{sid}/findings?kind=violation&limit=12", headers=h)).json()[
+        "findings"
+    ]
+    ids = [f["id"] for f in fs][:8]
+    await asyncio.gather(*[ask(client, h, sid, i) for i in ids])
+    assert (await meter(client, h))[
+        "used"
+    ] == 1  # never more than the limit, however many arrive at once
+
+
+async def test_the_sweeper_settles_fix_credits_left_by_a_dead_job(client, site, dev):
+    from a11y_core import billing
+    from a11y_core.db import tenant_session
+    from a11y_core.scan_jobs import sweep_orphaned_reservations
+
+    org, user, sid, h = await scanned(client, site)
+    await set_fix_limit(org, 10)
+    f = await finding(client, h, sid, "button-name")
+    delivered, vanished = uuid.uuid4(), uuid.uuid4()
+    await sql(
+        "INSERT INTO fix_suggestions (id, organization_id, scan_id, finding_id, rule, input_hash, original_html, status, rung, finished_at) "
+        "VALUES ($1,$2,$3,$4,'button-name',$5,'<button></button>','READY','light',now())",
+        delivered,
+        org,
+        sid,
+        uuid.UUID(f),
+        "h" * 64,
+    )
+    for job in (
+        delivered,
+        vanished,
+    ):  # the worker died after reserving; one fix was delivered, one row never existed
+        async with tenant_session(org) as db:
+            await billing.reserve(db, org, FIXC, str(job))
+        await sql(
+            "UPDATE usage_reservations SET created_at = now() - interval '3 hours' WHERE job_id=$1",
+            str(job),
+        )
+    await sweep_orphaned_reservations()
+    status = {
+        j: (await sql("SELECT status FROM usage_reservations WHERE job_id=$1", str(j)))[0]["status"]
+        for j in (delivered, vanished)
+    }
+    assert status == {
+        delivered: "COMMITTED",
+        vanished: "RELEASED",
+    }  # charged only for what was delivered
+    assert (await meter(client, h))["used"] == 1

@@ -251,9 +251,21 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
             update(FixSuggestion).where(FixSuggestion.id == fix_id).values(status="RUNNING")
         )
         rule, original = row.rule, row.original_html
+        # The credit held for this job (if the plan still had one when it was requested). Without one only ready-made
+        # recipes may answer, and they cost nothing.
+        held = (
+            await db.execute(
+                text(
+                    "SELECT job_id FROM usage_reservations WHERE feature_key=:f AND job_id LIKE :p AND status='RESERVED' "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"f": billing.FIX_FEATURE, "p": f"{fix_id}%"},
+            )
+        ).scalar_one_or_none()
 
     gw = get_gateway()
     policy = (await get_config().effective("ai.code_fix", org_id=org_id, plan_id=sub.plan_id)).value
+    ai_ok = held is not None
 
     def caller(task: str):
         async def call(messages):
@@ -283,11 +295,13 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
                     criteria=list(f.sc) if f else [],
                     message=f.message if f else "",
                     original_html=original,
-                    complete=complete if policy.use_ai else None,
+                    complete=complete if policy.use_ai and ai_ok else None,
                     complete_escalate=caller("code_fix_escalate")
-                    if policy.use_ai and policy.escalate
+                    if policy.use_ai and policy.escalate and ai_ok
                     else None,
-                    complete_validate=caller("code_fix_validate") if policy.use_ai else None,
+                    complete_validate=caller("code_fix_validate")
+                    if policy.use_ai and ai_ok
+                    else None,
                     validation=policy.validation,
                     sample_rate=policy.validation_sample_rate,
                 )
@@ -296,6 +310,8 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
     except Exception:  # noqa: BLE001 - a platform fault: say so plainly, keep the detail in our logs
         log.exception("fix %s failed", fix_id)
         async with tenant_session(org_id) as db:
+            if held:  # our fault: the customer is not charged
+                await billing.release_usage(db, billing.FIX_FEATURE, held)
             await db.execute(
                 update(FixSuggestion)
                 .where(FixSuggestion.id == fix_id)
@@ -305,7 +321,23 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
 
     from .fixes.ladder import REASONS
 
+    if (
+        out.status == "NEEDS_REVIEW"
+        and out.reason == "ai_unavailable"
+        and not ai_ok
+        and policy.use_ai
+    ):
+        out.reason = "ai_quota_reached"
+    paid = out.status == "READY" and out.rung in (
+        "light",
+        "standard",
+    )  # only a fix an AI model produced and we accepted
     async with tenant_session(org_id) as db:
+        if held:
+            if paid:
+                await billing.commit_usage(db, billing.FIX_FEATURE, held)
+            else:
+                await billing.release_usage(db, billing.FIX_FEATURE, held)
         await db.execute(
             update(FixSuggestion)
             .where(FixSuggestion.id == fix_id)

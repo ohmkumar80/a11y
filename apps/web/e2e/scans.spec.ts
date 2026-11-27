@@ -125,6 +125,8 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(dialog.getByText('<button aria-label="Close"></button>')).toBeVisible();
     await expect(dialog.getByRole("status").filter({ hasText: "A checked fix is ready." })).toHaveCount(1);
     await expect(dialog.getByText("Suggested by an AI model")).toBeVisible();
+    await expect(dialog.getByText("This used one of your AI code fixes for the month.")).toBeVisible();
+    await expect(dialog.getByText(/A ready-made fix is free/)).toHaveCount(0); // the notice is before asking, not after
     await expect(dialog.getByText("The problem no longer appears in our checks")).toBeVisible();
     await expect(dialog.getByText(/do not prove the page is accessible/)).toBeVisible();
     await expect(dialog.getByText("Written by an AI model: read it before you use it.")).toBeVisible();

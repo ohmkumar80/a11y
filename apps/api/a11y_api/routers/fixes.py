@@ -6,6 +6,7 @@ when the fix passed our checks; otherwise NEEDS_REVIEW with the reason, and no c
 import hashlib
 import uuid
 
+from a11y_core import billing
 from a11y_core.celery_app import celery_app
 from a11y_core.config import get_config
 from a11y_core.db import tenant_session
@@ -29,7 +30,7 @@ def _problem(http_status: int, detail: str, **extra) -> HTTPException:
     return HTTPException(http_status, detail={"detail": detail, **extra})
 
 
-def fix_json(r: FixSuggestion) -> dict:
+def fix_json(r: FixSuggestion, credit_used: bool = False) -> dict:
     return {
         "id": str(r.id),
         "finding_id": str(r.finding_id),
@@ -46,9 +47,35 @@ def fix_json(r: FixSuggestion) -> dict:
         "model_id": r.model_id,
         "attempts": r.attempts,
         "from_cache": r.from_cache,
+        "credit_used": credit_used,
         "created_at": r.created_at,
         "finished_at": r.finished_at,
     }
+
+
+async def _reserve_credit(db, org_id: uuid.UUID, fix_id: uuid.UUID, attempt: int) -> bool:
+    """Hold one AI code-fix credit for this job. Inside a savepoint so a refusal leaves no half-made reservation. False =
+    no credit available: the job still runs, but only ready-made recipes may answer (they cost nothing)."""
+    job = str(fix_id) if attempt == 0 else f"{fix_id}:r{attempt}"
+    try:
+        async with db.begin_nested():
+            await billing.reserve(db, org_id, billing.FIX_FEATURE, job)
+        return True
+    except billing.QuotaExceeded:
+        return False
+
+
+async def _credit_used(db, fix_id: uuid.UUID) -> bool:
+    return bool(
+        (
+            await db.execute(
+                text(
+                    "SELECT 1 FROM usage_reservations WHERE feature_key=:f AND job_id LIKE :p AND status='COMMITTED' LIMIT 1"
+                ),
+                {"f": billing.FIX_FEATURE, "p": f"{fix_id}%"},
+            )
+        ).first()
+    )
 
 
 async def _enqueue(org_id: uuid.UUID, fix_id: uuid.UUID) -> None:
@@ -122,6 +149,15 @@ async def request_fix(
                 )
             )
             fix_id = cur.id
+            tries = (
+                await db.execute(
+                    text(
+                        "SELECT count(*) FROM usage_reservations WHERE feature_key=:f AND job_id LIKE :p"
+                    ),
+                    {"f": billing.FIX_FEATURE, "p": f"{cur.id}%"},
+                )
+            ).scalar_one()
+            await _reserve_credit(db, p.org_id, cur.id, int(tries))
         else:
             await _rate_limit(p.org_id, policy.per_minute, bucket="fix", what="fixes")
             h = hashlib.sha256(f.html.encode()).hexdigest()
@@ -163,11 +199,13 @@ async def request_fix(
             db.add(row)
             await db.flush()
             fix_id = row.id
+            await _reserve_credit(db, p.org_id, row.id, 0)
     await _enqueue(p.org_id, fix_id)
     async with tenant_session(p.org_id) as db:
-        return fix_json(
-            (await db.execute(select(FixSuggestion).where(FixSuggestion.id == fix_id))).scalar_one()
-        )
+        row = (
+            await db.execute(select(FixSuggestion).where(FixSuggestion.id == fix_id))
+        ).scalar_one()
+        return fix_json(row, await _credit_used(db, fix_id))
 
 
 @router.get("/fixes/{fix_id}")
@@ -178,4 +216,6 @@ async def get_fix(fix_id: uuid.UUID, p: Principal = Depends(current_principal)):
         ).scalar_one_or_none()
     if r is None:
         raise _problem(404, "We could not find that fix.")
-    return fix_json(r)
+    async with tenant_session(p.org_id) as db:
+        used = await _credit_used(db, fix_id)
+    return fix_json(r, used)

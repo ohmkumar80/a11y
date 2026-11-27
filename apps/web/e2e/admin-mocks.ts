@@ -17,6 +17,7 @@ export const SUBSCRIPTION = {
 };
 
 export const opsState = { healthy: false };
+export const overrideCalls: string[] = [];
 const RUNBOOK = `# Stuck scans
 
 ## What it means
@@ -72,6 +73,20 @@ export async function mockAdminApi(page: Page) {
     if (p === "/admin/security/mfa") return r.fulfill({ json: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y", environment: "development" } });
     if (p === "/admin/settings/auth.mfa") return r.fulfill({ json: { key: "auth.mfa", source: "default", version: null, value: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y" } } });
     if (p.startsWith("/admin/ai/providers/") && p.endsWith("/test")) return r.fulfill({ json: { ok: true, detail: "Connected.", model_id: "m", latency_ms: 120 } });
+    if (p === "/admin/coupons/bulk") {
+      const b = r.request().postDataJSON() as { campaign: string; count: number };
+      if (b.campaign === "Duplicate") return r.fulfill({ status: 409, json: { detail: "A campaign with that name already exists. Choose another name.", field: "campaign" } });
+      return r.fulfill({ status: 201, json: { campaign: b.campaign, count: b.count, codes: Array.from({ length: b.count }, (_, i) => `WEBINAR-AB${i}CDEFG`) } });
+    }
+    if (p.startsWith("/admin/coupons-campaigns/") && p.endsWith("/deactivate")) return r.fulfill({ json: { deactivated: 4 } });
+    if (p === "/admin/coupons-campaigns") return r.fulfill({ json: [{ campaign: "Partner webinar", codes: 25, redeemed: 3, active: 25, created_at: "2026-11-20T00:00:00Z", valid_until: null }, { campaign: "Old promo", codes: 10, redeemed: 10, active: 0, created_at: "2026-10-01T00:00:00Z", valid_until: null }] });
+    const ov = /^\/admin\/tenants\/([^/]+)\/overrides(?:\/([^/]+))?$/.exec(p);
+    if (ov) {
+      const m = r.request().method();
+      if (m === "PUT") { overrideCalls.push(`put:${ov[2]}`); return r.fulfill({ json: {} }); }
+      if (m === "DELETE") { overrideCalls.push(`delete:${ov[2]}:${new URL(r.request().url()).searchParams.get("reason")}`); return r.fulfill({ status: 204, body: "" }); }
+      return r.fulfill({ json: [{ feature: "urls_monthly", enabled: true, limit_value: 500, expires_at: "2027-01-31T23:59:59Z", reason: "Pilot extension", expired: false }, { feature: "byok_ai", enabled: true, limit_value: null, expires_at: null, reason: "Early access", expired: false }] });
+    }
     if (p.startsWith("/admin/ops/runbooks/")) return r.fulfill({ json: { slug: p.split("/").pop(), markdown: RUNBOOK } });
     if (p === "/admin/ops") return r.fulfill({ json: opsState.healthy ? OPS_OK : OPS_BAD });
     if (p === "/admin/notifications/preview") {
