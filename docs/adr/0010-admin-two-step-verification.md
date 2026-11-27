@@ -28,8 +28,20 @@
 - **Users table holds the MFA state** (columns, not a new table) so the existing row-level-security and pre-login lookup
   rules apply unchanged, including for Super Admins who have no tenant.
 
+## Sessions (added with platform-admin refresh)
+- **Super Admins now have a rotating refresh cookie** (`a11y_platform`, httpOnly, path `/api/auth`), stored hashed in
+  `platform_sessions`. A Super Admin has no tenant, so this table has no `organization_id`; row-level policies make a row
+  reachable only by presenting its token (nothing visible without one; inserts only for the presented token; the token's
+  family becomes visible only after the token is proven, so a replayed token can revoke every sibling). Each token is
+  valid for 12 hours and rotates on use; a sign-in can never exceed 24 hours in total.
+- **Replay = theft:** presenting an already-used token revokes the whole sign-in. Concurrent refreshes cannot both win.
+- **MFA and sessions:** every session records whether it passed two-step verification. If policy later becomes
+  `required` and a session never did, its next refresh is refused ("two-step verification is now required") and its
+  family is revoked. This applies to organisation admins too, closing the gap where tightening policy left existing
+  sessions untouched.
+- Dead cookies are really deleted (a 401 built from an injected response drops its headers; refresh now returns a
+  response that carries the cookie deletion). An expired-session purge runs every 6 hours.
+
 ## Not done
 WebAuthn/passkeys (the plan's preferred second factor for later); SMS/email codes (deliberately not offered: weaker);
-a platform-admin session refresh (Super Admin sessions are still 15 minutes with no refresh, which makes MFA more
-noticeable); revoking existing organisation-admin sessions when their policy becomes `required`; trusted-device
-"remember me for 30 days".
+"remember this device" for 30 days; revoking organisation users' sessions when an administrator is demoted or removed.

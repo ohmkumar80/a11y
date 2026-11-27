@@ -253,7 +253,7 @@ async def verify(body: MfaVerifyIn, response: Response):
         raise _bad("Enter the code from your authenticator app.")
     if not await _check(user, body.code, body.recovery_code):
         raise _bad(BAD_CODE, field="recovery_code" if body.recovery_code.strip() else "code")
-    return await finish_login(user, response)
+    return await finish_login(user, response, mfa_verified=True)
 
 
 @router.post("/enroll/start")
@@ -286,7 +286,7 @@ async def enroll_confirm(body: MfaConfirmIn, response: Response):
     user = await _load(t.org_id, t.email, t.user_id)
     codes = await _confirm_enrolment(user, body.code)
     user = await _load(t.org_id, t.email, t.user_id)
-    session = await finish_login(user, response)
+    session = await finish_login(user, response, mfa_verified=True)
     return EnrolledSession(**session.model_dump(), recovery_codes=codes)
 
 

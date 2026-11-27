@@ -20,7 +20,9 @@ async def test_create_and_login_super_admin_then_use_admin_api(client, admin_ema
     assert await create_super_admin(admin_email, pw) is False  # idempotent
     r = await client.post("/auth/login", json={"email": admin_email, "password": pw})
     assert r.status_code == 200 and r.json()["user"]["role"] == "SUPER_ADMIN"
-    assert "a11y_refresh" not in r.cookies  # no tenant => no refresh cookie
+    assert (
+        "a11y_refresh" not in r.cookies and "a11y_platform" in r.cookies
+    )  # no tenant cookie; a platform one instead
     h = {"authorization": f"Bearer {r.json()['access_token']}"}
     assert (await client.get("/admin/plans", headers=h)).status_code == 200
     assert (await client.get("/me", headers=h)).status_code == 403  # not a tenant member

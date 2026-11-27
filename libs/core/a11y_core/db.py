@@ -84,6 +84,24 @@ async def login_lookup_session(email: str) -> AsyncIterator[AsyncSession]:
 
 
 @asynccontextmanager
+async def platform_session(token_hash: str) -> AsyncIterator[AsyncSession]:
+    """Pre-authentication session for Super Admin refresh tokens: sees only the row whose hash matches (and, once the
+    caller sets it with ``set_platform_family``, that token's family so a replay can revoke all of it)."""
+    maker = async_sessionmaker(app_engine(), expire_on_commit=False)
+    async with maker() as session, session.begin():
+        await _set(session, "app.platform_token", token_hash)
+        yield session
+
+
+async def set_platform_token(session: AsyncSession, token_hash: str) -> None:
+    await _set(session, "app.platform_token", token_hash)
+
+
+async def set_platform_family(session: AsyncSession, family_id: uuid.UUID) -> None:
+    await _set(session, "app.platform_family", str(family_id))
+
+
+@asynccontextmanager
 async def admin_session(
     *, actor_user_id: uuid.UUID | None, reason: str, action: str = "admin.cross_tenant_access"
 ) -> AsyncIterator[AsyncSession]:

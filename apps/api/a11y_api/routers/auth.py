@@ -1,13 +1,22 @@
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
 from a11y_core import billing
+from a11y_core import mfa as mfalib
 from a11y_core.config import definitions as _definitions  # noqa: F401
 from a11y_core.config import get_config
-from a11y_core.db import app_engine, login_lookup_session, tenant_session
-from a11y_core.models import AuthToken, Organization, Role, TokenKind, User
+from a11y_core.db import (
+    app_engine,
+    login_lookup_session,
+    platform_session,
+    set_platform_family,
+    tenant_session,
+)
+from a11y_core.models import AuthToken, Organization, PlatformSession, Role, TokenKind, User
 from a11y_core.settings import get_settings
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 
@@ -76,6 +85,58 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
 
 
+PLATFORM_COOKIE = "a11y_platform"
+PLATFORM_TTL = timedelta(hours=12)  # one token; it rotates on every refresh
+PLATFORM_MAX_AGE = timedelta(
+    hours=24
+)  # a sign-in can never be extended past this, however often it refreshes
+
+
+def _set_platform_cookie(response: Response, raw: str) -> None:
+    s = get_settings()
+    response.set_cookie(
+        PLATFORM_COOKIE,
+        raw,
+        httponly=True,
+        secure=s.cookie_secure,
+        samesite="lax",
+        path=REFRESH_COOKIE_PATH,
+        max_age=int(PLATFORM_TTL.total_seconds()),
+    )
+
+
+def _clear_platform_cookie(response: Response) -> None:
+    response.delete_cookie(PLATFORM_COOKIE, path=REFRESH_COOKIE_PATH)
+
+
+async def _start_platform_session(
+    user: User,
+    response: Response,
+    *,
+    family: uuid.UUID | None = None,
+    started: datetime | None = None,
+    mfa_verified: bool = False,
+) -> None:
+    """A Super Admin has no tenant, so their refresh token lives in platform_sessions (see migration 0010)."""
+    raw = secrets.token_urlsafe(32)
+    h = hash_token(raw)
+    now = _now()
+    started = started or now
+    async with platform_session(h) as db:
+        db.add(
+            PlatformSession(
+                token_hash=h,
+                family_id=family or uuid.uuid4(),
+                user_id=user.id,
+                email=user.email,
+                mfa_verified=mfa_verified,
+                family_started_at=started,
+                expires_at=min(now + PLATFORM_TTL, started + PLATFORM_MAX_AGE),
+            )
+        )
+    _set_platform_cookie(response, raw)
+
+
 def _user_out(u: User, org_name: str) -> UserOut:
     return UserOut(
         id=str(u.id),
@@ -88,7 +149,11 @@ def _user_out(u: User, org_name: str) -> UserOut:
 
 
 async def _start_session(
-    user: User, org_name: str, response: Response, family: uuid.UUID | None = None
+    user: User,
+    org_name: str,
+    response: Response,
+    family: uuid.UUID | None = None,
+    mfa_verified: bool = False,
 ) -> SessionOut:
     """Issue refresh token (new row in the user's tenant) + access JWT."""
     s = get_settings()
@@ -101,6 +166,7 @@ async def _start_session(
                 kind=TokenKind.REFRESH,
                 token_hash=hashed,
                 family_id=family or uuid.uuid4(),
+                mfa_verified=mfa_verified,
                 expires_at=_now() + timedelta(days=s.refresh_token_ttl_days),
             )
         )
@@ -206,11 +272,12 @@ async def verify_email(body: TokenIn):
 
 
 async def finish_login(
-    user: User, response: Response, *, password: str | None = None
+    user: User, response: Response, *, password: str | None = None, mfa_verified: bool = False
 ) -> SessionOut:
     """The final step of signing in, after the password (and any second step) succeeded."""
     if user.role == Role.SUPER_ADMIN:
-        # No tenant, so no refresh token or cookie: a short-lived access token only, then log in again.
+        # No tenant: the refresh token lives in platform_sessions and its cookie rotates like a tenant one.
+        await _start_platform_session(user, response, mfa_verified=mfa_verified)
         access, ttl = issue_access_token(Principal(user.id, None, user.role, user.email))
         return SessionOut(
             access_token=access,
@@ -232,7 +299,7 @@ async def finish_login(
                 .values(hashed_password=hash_password(password))
             )
         org_name = (await db.execute(select(Organization.name))).scalar_one()
-    return await _start_session(user, org_name, response)
+    return await _start_session(user, org_name, response, mfa_verified=mfa_verified)
 
 
 @router.post("/login", response_model=SessionOut | MfaChallenge)
@@ -262,9 +329,114 @@ async def login(body: LoginIn, response: Response):
     return await finish_login(user, response, password=body.password)
 
 
-@router.post("/refresh", response_model=SessionOut)
-async def refresh(response: Response, a11y_refresh: str | None = Cookie(default=None)):
+def _fail_clearing(
+    cookie: str, detail: str = "Session expired. Log in again.", code: str | None = None
+) -> JSONResponse:
+    """A 401 that really deletes the cookie (headers set on an injected Response are dropped when an exception is raised)."""
+    r = JSONResponse(
+        {"detail": detail, **({"code": code} if code else {})},
+        status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+    r.delete_cookie(cookie, path=REFRESH_COOKIE_PATH)
+    return r
+
+
+async def _mfa_policy_blocks(user: User, verified: bool) -> bool:
+    """True when policy now requires two-step verification but this session never passed it."""
+    if verified or user.role not in (Role.SUPER_ADMIN, Role.COMPANY_ADMIN):
+        return False
+    from .mfa import policy_for  # noqa: PLC0415  (mfa imports finish_login from this module)
+
+    mode, _ = await policy_for(user.role)
+    return mfalib.requirement(mode, user.mfa_enabled_at is not None) != "none"
+
+
+async def _platform_refresh(raw: str, response: Response) -> SessionOut | JSONResponse:
     unauthorised = HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
+    h = hash_token(raw)
+    bad = False
+    async with platform_session(h) as db:
+        tok = (
+            await db.execute(select(PlatformSession).where(PlatformSession.token_hash == h))
+        ).scalar_one_or_none()
+        if tok is None:
+            raise unauthorised
+        if tok.used_at is not None or tok.revoked_at is not None:
+            # A rotated token came back: assume theft and revoke the whole sign-in.
+            await set_platform_family(db, tok.family_id)
+            await db.execute(
+                update(PlatformSession)
+                .where(PlatformSession.family_id == tok.family_id)
+                .values(revoked_at=_now())
+            )
+            bad = True
+        elif tok.expires_at <= _now() or tok.family_started_at + PLATFORM_MAX_AGE <= _now():
+            raise unauthorised
+        else:
+            claimed = (
+                await db.execute(
+                    update(PlatformSession)
+                    .where(PlatformSession.id == tok.id, PlatformSession.used_at.is_(None))
+                    .values(used_at=_now())
+                    .returning(PlatformSession.id)
+                )
+            ).scalar_one_or_none()
+            bad = claimed is None
+    if bad:
+        return _fail_clearing(PLATFORM_COOKIE)
+    async with login_lookup_session(tok.email) as db:
+        user = (await db.execute(select(User).where(User.id == tok.user_id))).scalar_one_or_none()
+    if (
+        user is None
+        or not user.is_active
+        or user.role != Role.SUPER_ADMIN
+        or await _mfa_policy_blocks(user, tok.mfa_verified)
+    ):
+        async with platform_session(h) as db:  # end this sign-in
+            await set_platform_family(db, tok.family_id)
+            await db.execute(
+                update(PlatformSession)
+                .where(PlatformSession.family_id == tok.family_id)
+                .values(revoked_at=_now())
+            )
+        if user is not None and user.is_active and user.role == Role.SUPER_ADMIN:
+            return _fail_clearing(
+                PLATFORM_COOKIE,
+                "Two-step verification is now required. Sign in again.",
+                "mfa_required",
+            )
+        return _fail_clearing(PLATFORM_COOKIE)
+    await _start_platform_session(
+        user,
+        response,
+        family=tok.family_id,
+        started=tok.family_started_at,
+        mfa_verified=tok.mfa_verified,
+    )
+    access, ttl = issue_access_token(Principal(user.id, None, user.role, user.email))
+    return SessionOut(
+        access_token=access,
+        expires_in=ttl,
+        user=UserOut(
+            id=str(user.id),
+            email=user.email,
+            role=user.role,
+            organization_id="",
+            organization_name="",
+            mfa_enabled=user.mfa_enabled_at is not None,
+        ),
+    )
+
+
+@router.post("/refresh", response_model=SessionOut)
+async def refresh(
+    response: Response,
+    a11y_refresh: str | None = Cookie(default=None),
+    a11y_platform: str | None = Cookie(default=None),
+):
+    unauthorised = HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
+    if a11y_refresh is None and a11y_platform:
+        return await _platform_refresh(a11y_platform, response)
     org_id = token_org(a11y_refresh)
     if org_id is None:
         raise unauthorised
@@ -308,13 +480,28 @@ async def refresh(response: Response, a11y_refresh: str | None = Cookie(default=
                 ).scalar_one_or_none()
                 org_name = (await db.execute(select(Organization.name))).scalar_one()
     if reuse or user is None or not user.is_active:
-        _clear_refresh_cookie(response)
-        raise unauthorised
-    return await _start_session(user, org_name, response, family=tok.family_id)
+        return _fail_clearing(REFRESH_COOKIE)
+    if await _mfa_policy_blocks(user, tok.mfa_verified):
+        async with tenant_session(org_id) as db:
+            await db.execute(
+                update(AuthToken)
+                .where(AuthToken.family_id == tok.family_id)
+                .values(revoked_at=_now())
+            )
+        return _fail_clearing(
+            REFRESH_COOKIE, "Two-step verification is now required. Sign in again.", "mfa_required"
+        )
+    return await _start_session(
+        user, org_name, response, family=tok.family_id, mfa_verified=tok.mfa_verified
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response, a11y_refresh: str | None = Cookie(default=None)):
+async def logout(
+    response: Response,
+    a11y_refresh: str | None = Cookie(default=None),
+    a11y_platform: str | None = Cookie(default=None),
+):
     org_id = token_org(a11y_refresh)
     if org_id:
         async with tenant_session(org_id) as db:
@@ -329,7 +516,23 @@ async def logout(response: Response, a11y_refresh: str | None = Cookie(default=N
                 await db.execute(
                     update(AuthToken).where(AuthToken.family_id == fam).values(revoked_at=_now())
                 )
+    if a11y_platform:
+        h = hash_token(a11y_platform)
+        async with platform_session(h) as db:
+            fam = (
+                await db.execute(
+                    select(PlatformSession.family_id).where(PlatformSession.token_hash == h)
+                )
+            ).scalar_one_or_none()
+            if fam:
+                await set_platform_family(db, fam)
+                await db.execute(
+                    update(PlatformSession)
+                    .where(PlatformSession.family_id == fam)
+                    .values(revoked_at=_now())
+                )
     _clear_refresh_cookie(response)
+    _clear_platform_cookie(response)
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)

@@ -109,6 +109,8 @@ class AuthToken(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     # Refresh-token rotation: all tokens from one login share a family; reuse revokes the family.
     family_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Did this session pass two-step verification? Lets a refresh be refused if policy later requires MFA.
+    mfa_verified: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     # Invites only:
     invited_email: Mapped[str | None] = mapped_column(String(320))
     invited_role: Mapped[str | None] = mapped_column(String(32))
@@ -558,3 +560,22 @@ class VpatReport(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlatformSession(Base):
+    """Refresh tokens for Super Admins, who have no tenant. No organization_id, so it is not a tenant table: rows are
+    reachable only by presenting the token (row policy on app.platform_token / app.platform_family)."""
+
+    __tablename__ = "platform_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    family_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    email: Mapped[str] = mapped_column(String(320))
+    mfa_verified: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    family_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

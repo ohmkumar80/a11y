@@ -689,6 +689,99 @@ Autonomy levels, set per action and per environment: **Observe → Suggest → A
 | Chartered accountant | GST rate, SAC code, e-invoicing, invoice retention | Before the first invoice |
 | Privacy contact | DPA, data requests, retention | Before the first customer |
 | Ops owner and on-call | Approvals for Ops Agent actions, incident response | 1b |
+| Content owner and editor | Editorial calendar, style guide, final approval of every published article (3.20). The accessibility lead is the reviewer for law and compliance articles | 2 |
+| Pricing owner | Plan prices, discount policy, grandfathering decisions (3.19) | Before the first paid customer |
+
+### 3.19 Subscription, pricing and promotions management
+
+**What exists.** The SaaS core already has `Plan`, `PlanEntitlement` (a row per feature, so new quotas need no migration), `PlanPrice` (per plan, currency and cycle, in minor units), `Coupon` with a concurrency-safe redemption counter, `CouponRedemption`, trials, seat limits, and admin screens for plans and coupons. Nothing below replaces them. Every item is additive: new tables and new columns with defaults, so Phase 1 work in progress is not disturbed.
+
+**What is missing.** Plans are edited in place, so a price or quota change would silently change every subscriber. A coupon is global and has one shape. There is no single function that turns "organisation, plan, cycle, coupon" into a price, so checkout, Payment Links, invoices and previews could disagree. There are no add-ons, no per-customer overrides and no campaign tooling.
+
+**One pricing function.** `price_quote(org, plan_version, cycle, add_ons, coupons, billing_profile, at)` is a pure function that returns list price, each discount line, taxable value, GST split and total, all as integer minor units. Checkout, Payment Links (3.16), invoices, the pricing page, the admin preview and the tests all call it, so there is one source of truth. Property tests: never negative, never above list price, deterministic, the rounding rule is documented, and stacking never exceeds the configured cap. Razorpay only ever sees the final amount (3.16).
+
+**Plan management**
+
+| Capability | Design |
+|---|---|
+| **Plan versions** | A published plan version is immutable. Editing a price or entitlement creates a new draft version. Existing subscribers stay on their version (grandfathering) until an admin moves them. A price change needs two-person approval (3.16) and shows an impact preview first: subscribers affected, MRR change and who gets notified. |
+| **Moving subscribers** | Scheduled for the next renewal, never mid-cycle unless the customer agrees. The notice email comes from a template (3.14). A downgrade is blocked while the organisation exceeds the new limits (for example more seats), with a message saying what to remove. Data is never deleted by a downgrade. |
+| **Price book** | Prices per currency and cycle, with a tax-inclusive or tax-exclusive flag and an annual-discount setting. INR first; other currencies only when Razorpay international payments are enabled (3.16 spike item 7). |
+| **Visibility** | `public` (on the pricing page), `hidden` (assigned by an admin or by link) and `legacy` (existing subscribers only). The public pricing page is generated from published versions, so it cannot disagree with billing. It uses a real comparison table with header cells. |
+| **Custom enterprise terms** | `OrgEntitlementOverride(org, feature_key, limit, reason, expires_at, approved_by)` overrides a plan limit for one organisation, with an expiry and an audit entry. The entitlement resolver reads plan version, then add-ons, then overrides. |
+| **Add-ons and top-ups** | Extra seats, extra quota packs (URLs, document pages, alt texts, video minutes), human-review credits and white-label. Recurring or one-off. Prepaid credit packs expire after an admin-set period. Add-ons add to plan limits through the same entitlement resolver. |
+| **Subscription operations** (`/admin/subscriptions`) | Per organisation: change plan, extend trial, grant a credit or a complimentary period (reason required, approval above a threshold), pause, cancel, reactivate, view the entitlement breakdown and every change. |
+| **Metrics** | MRR and ARR, average revenue per account, trial conversion, churn, expansion, plan mix and margin per tenant (3.18). CSV export. |
+
+**Discounts and coupons.** Several kinds exist, and they differ in how they are found, who may use them and how they stack.
+
+| Kind | How it applies | Notes |
+|---|---|---|
+| **Coupon code** (built) | The customer enters it | Extended below |
+| **Automatic promotion** | Applies without a code when its rules match, inside a date window | Annual prepay discount, launch offer, seat or volume tiers |
+| **Eligibility discount** | An admin verifies eligibility, then applies it | Non-profit, education, government. Evidence is stored, and re-verification is yearly |
+| **Partner or referral code** | Attributes the customer to a partner or referrer | Revenue and discount reporting only. Commission payouts are out of scope |
+| **Goodwill or win-back credit** | An admin grants a one-off credit, or a targeted code goes to lapsed accounts | Reason required, approval above a threshold |
+
+**Coupon rules (extend the existing table).**
+- **Eligibility:** plans and cycles, first purchase only, minimum organisation age, email-domain allow-list (for example a university domain), country, minimum and maximum order value.
+- **Duration:** first cycle, first N cycles, a fixed number of months, or the life of the subscription (the same choices as 3.16).
+- **Stacking:** an admin setting with `exclusive`, `best_of` or `stack`, plus a cap on the total discount, so an automatic promotion and a code cannot add up to a free product.
+- **Limits:** global and per-organisation redemption limits (built), plus an optional per-user limit.
+- **Campaigns:** a campaign groups codes. Bulk generation produces N unique single-use codes from an unambiguous character set, with expiry and a CSV export.
+- **Abuse controls:** rate-limit code attempts, return the same error for an unknown and an expired code so codes cannot be enumerated, one trial per organisation domain, and a per-coupon kill switch. Redemption is confirmed only on payment success, and an abandoned checkout releases it (3.16).
+- **Invoice presentation:** list price, discount lines and tax are shown separately, and the GST base is the discounted value. Confirm the treatment with the chartered accountant (open decision 12).
+- **Analytics:** redemptions, discount given, revenue influenced, conversion by code or campaign, and unused or expired codes.
+
+**Accessibility of buying.** The coupon field keeps its value after an error (SC 3.3.7), uses no cognitive test (SC 3.3.8) and announces the result through a live region. A price change after choosing a plan or cycle is announced too. No countdown timers or fake-urgency banners: a time limit must be extendable (SC 2.2.1), and artificial urgency is a poor fit for an accessibility vendor.
+
+**Settings (3.11.3):** stacking policy and discount cap, coupon attempt limits, grandfathering default, approval thresholds, top-up expiry, visibility defaults and the pricing-page content.
+
+**Stages.** `price_quote` and the Payment Link flow arrive in **1a** with Razorpay, because Payment Links need a quote. Plan versions with grandfathering, entitlement overrides, bulk coupon campaigns and stacking rules arrive in **1b**. Automatic promotions, add-ons and top-ups, eligibility discounts, partner attribution, analytics and the generated pricing page arrive in **Phase 2**, together with self-serve checkout.
+
+### 3.20 Accessibility knowledge base: article management and AI authoring
+
+**Why.** Three jobs: attract search traffic from people looking for accessibility help, give customers a "learn more" page behind every rule explanation, and show real expertise. This is long-form editorial content. It is not the rule content library (3.14), which is structured per-rule data used at scan time. The two are linked: an article cites rules and the rule page links to its articles.
+
+**Content types:** how-to guides (for example "Label form fields in React"), WCAG criterion explainers, law and standard explainers (EAA, ADA Title II, GIGW 3.0, RPwD), checklists, product and release notes, case studies and glossary entries. Tags: WCAG criterion, standard, rule, audience (developer, designer, content author, compliance), stack and locale.
+
+**Data model.** `Article(slug, type, status, locale, translation_group, title, summary, author, reviewer, ai_assisted, review_due_at, published_at)`, immutable `ArticleVersion(body, change_note, validation_report, created_by)`, `ArticleSource` (the source pack, with licence and last-checked date), `ArticleBrief`, `ArticleSeries`, `ArticleRedirect` and `ArticleAsset`. Bodies are restricted Markdown with typed blocks (callout, code sample, comparison table, figure), so we control the HTML and can check it. No arbitrary HTML.
+
+**Workflow.** `Idea → Brief → Drafting → Validation → In review → Approved → Scheduled → Published → Review due → Archived`. Every transition is audited. Roles are Content editor, Accessibility reviewer and Publisher (they use the granular admin roles in 1b), and the author cannot publish their own article. Law and compliance articles always need the accessibility reviewer.
+
+**Publishing and our own accessibility.**
+- Public `/learn` with static or incremental rendering, search (Postgres full text first, with no new infrastructure), RSS, sitemap and structured data.
+- Rule detail pages and the Fix Workbench show "Learn more" links by rule reference.
+- An accessibility vendor's own articles must be accessible. Publishing is blocked unless our own scanner passes on the rendered page. Other gates: alt text on every image, a valid heading outline, descriptive link text, `lang` on text in another language, table header cells, keyboard-focusable scrollable code blocks, captions or transcripts for any media, and a reading-level target. Technical writing aims for plain language (the AI-assisted style guide enforces it).
+- Articles are `noindex` until approved.
+
+**Management screen (`/admin/content`).** Article list with filters, a source editor with live preview (no WYSIWYG widget, the same rule as decision 13), a brief editor, a review queue with a diff between the AI draft and the edited text, a validation panel, a calendar, and a **content gaps** view: criteria and rules with no article, search terms with no result, and the most common finding types across scans (aggregated across several tenants and anonymised, with no customer data). Performance uses privacy-friendly analytics with no third-party trackers by default.
+
+**Automated authoring (the Content Agent).** It is a pipeline on the AI gateway (3.13) with its own task keys: `content.plan`, `content.draft`, `content.validate`, `content.translate` and `content.refresh`. It reuses the principles of templates first, validate before delivery, and tokens only where they add value.
+
+1. **Plan (`LIGHT` or `STANDARD`).** From the content gaps, the topic backlog and the editorial themes set in admin, it proposes briefs: audience, angle, target criteria and laws, outline, sources and length. A similarity check against existing titles prevents duplicates.
+2. **Ground.** The drafter may use only the **source pack**: our rule content library, the WCAG text and Understanding documents, official legal texts, and admin-approved URLs. Each source records its licence and when it was last checked. Sources are paraphrased and cited, and long quotation is avoided. The licence terms of each source (W3C documents have their own) are confirmed in an ADR before the pack is built. Fetching a page at generation time goes through the same SSRF-guarded fetcher as the scanner (3.6).
+3. **Draft (`STANDARD`).** A fixed structure per article type (for example what the criterion says, who is affected, how to test, how to fix, common mistakes, further reading), as with report templates: the structure is permanent and the model fills slots. Code samples come from the rule content library first, which costs no tokens, and the model writes only the connecting prose. Every factual statement carries a source reference.
+4. **Validate, cheapest first.**
+   - **V1, deterministic, no tokens:** schema; every cited criterion exists in the registry with the right name and level; every legal statement points to a source and matches the stored clause text; **every code sample is run through our scanner, so a "before" sample must trigger the rule the article names and an "after" sample must pass**; links resolve; the accessibility gates above; reading level; a lint for overclaiming ("guarantees compliance", "fully compliant", anything that reads as legal advice), the same discipline as recommendation 7; near-duplicate and copied-passage detection against the source pack and existing articles; every date and "as of" statement is explicit.
+   - **V2 (`PREMIUM`, a different model family from the drafter):** claim-by-claim check against the cited sources, marking each claim supported, unsupported or contradicted, and flagging legal statements. Always on for law and compliance articles, sampled for others.
+   - **V3, human:** an editor approves every article. The default is that **nothing is published without a named human reviewer**.
+5. **Review and publish.** The editor sees the draft, the sources next to each claim and the validation results, then edits and approves. Publishing is scheduled and passes the accessibility gate.
+6. **Maintain.** Each article has a `review_due_at` (shorter for law). A change to a WCAG or standard mapping, to a rule's content, or a legal update marked by an admin flags the affected articles as "needs review". The agent then proposes a refreshed draft as a diff (Suggest mode). A monthly job checks links.
+7. **Translate (`LIGHT`, reviewed).** Drafts for Tamil, Hindi and others, linked through `translation_group`. V1 checks that code blocks, numbers and links are unchanged. A reviewer for that language approves before publishing. This supports the Indian-market wedge (3.18).
+
+**Autonomy and quality policy (same ladder as the Ops Agent, 3.15).** At launch the Content Agent is **draft-only**: AI drafts, a human publishes. Auto-publish is never available for law, compliance, pricing or claims about our own product. It may be considered later for low-risk types (for example glossary entries built from the rule library), only after a track record (a set number of consecutive drafts accepted with no material edits, and a measured validator precision), per type, off by default, with a kill switch and a sampled human audit. We recommend keeping human publishing for everything in version 1.
+- **Disclosure:** pages say "Drafted with AI assistance and reviewed by [name]". The named human is accountable.
+- **No scaled thin content:** a weekly publishing cap (admin setting), every article must offer something original (code samples verified by our scanner, our own data, an expert contribution), and unreviewed drafts are `noindex`. Search engines act against mass-produced low-value pages, so volume is not a goal.
+- **Style guide as a setting:** voice, plain language, inclusive and consistent disability language, a banned-phrase list and prompt versions, all versioned, with evaluation-gated activation (Phase 2 configuration, round 2).
+- **Privacy:** no customer scan data, URLs or findings appear in an article or in a prompt. Gap analytics use only aggregates across several tenants.
+- **Cost:** `max_cost_per_item` and a monthly content budget, metered in `AIUsage` per task key, with cost per published article on the FinOps view.
+
+**Notifications (3.14), to editors:** brief ready, draft awaiting review, validation failed, review due, translation ready.
+
+**Settings (3.11.3):** content types and templates, source pack, style guide and banned phrases, task routes and tiers, review periods, weekly cap, autonomy per type, analytics on or off, and the `/learn` page content.
+
+**Stage.** Phase 2. The CMS, public `/learn` and the first articles come before the agent: the agent needs 20 or so human-written, reviewed articles as style examples and as the golden set for evaluation. Two tasks can start earlier, without disturbing Phase 1: the owner writes a handful of launch articles in a Markdown repository folder, and the 1b rule content library already carries the explanation and fix text that the agent will reuse.
 
 ---
 
@@ -737,7 +830,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Built: audit PDF (veraPDF-gated), DOCX (structure-checked), CSV, and the VPAT (WCAG tables) with draft defaults, editing, sign-off and export ([ADR 0008](adr/0008-pdf-ua-generation.md), [ADR 0009](adr/0009-reports-and-vpat.md)). Not yet: the 508/EU/INT chapters, per-element screenshots |
 | Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Report templates built (sandboxed, versioned, accessibility-checked, golden-tested); admin template editor and the email events not started |
 | Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
-| Admin MFA for every admin role, and session refresh | 1a | MFA built and admin-configurable ([ADR 0010](adr/0010-admin-two-step-verification.md)); session refresh for Super Admins not started |
+| Admin MFA for every admin role, and session refresh | 1a | Built: MFA admin-configurable (dev default off, refused in production) and rotating Super Admin sessions ([ADR 0010](adr/0010-admin-two-step-verification.md)) |
 | Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
 | Workspace screens: new scan, findings list, Fix Workbench | 1a | New scan, scans list, results and findings built; Fix Workbench and screenshots not started |
 | Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |

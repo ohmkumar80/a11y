@@ -32,6 +32,32 @@ async def expire_trials() -> int:
     return n
 
 
+async def purge_platform_sessions() -> int:
+    """Delete Super Admin refresh rows a week past expiry. Audited like every cross-tenant action."""
+    async with admin_session(
+        actor_user_id=None,
+        reason="purge expired platform sessions",
+        action="system.purge_platform_sessions",
+    ) as db:
+        res = await db.execute(
+            text("DELETE FROM platform_sessions WHERE expires_at < now() - interval '7 days'")
+        )
+        return res.rowcount or 0
+
+
+@celery_app.task(name="billing.purge_platform_sessions")
+def purge_platform_sessions_task() -> int:
+    from .db import dispose_engines
+
+    async def run() -> int:
+        try:
+            return await purge_platform_sessions()
+        finally:
+            await dispose_engines()
+
+    return asyncio.run(run())
+
+
 @celery_app.task(name="billing.expire_trials")
 def expire_trials_task() -> int:
     from .db import dispose_engines
@@ -48,4 +74,5 @@ def expire_trials_task() -> int:
 celery_app.conf.beat_schedule = {
     **(celery_app.conf.beat_schedule or {}),
     "expire-trials-hourly": {"task": "billing.expire_trials", "schedule": 3600.0},
+    "purge-platform-sessions": {"task": "billing.purge_platform_sessions", "schedule": 6 * 3600.0},
 }
