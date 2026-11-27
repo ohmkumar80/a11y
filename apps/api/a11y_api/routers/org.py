@@ -141,7 +141,7 @@ async def create_invite(
             )
         )
         org_name = (await db.execute(select(Organization.name))).scalar_one()
-    bg.add_task(mailer.send, mailmod.invite_mail(email, raw, org_name))
+    bg.add_task(mailer.send, await mailmod.invite_mail(email, raw, org_name))
     return ACCEPTED
 
 

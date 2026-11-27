@@ -250,10 +250,10 @@ async def signup(
             )
     except IntegrityError:
         # Same response as success: signup must not reveal which emails are registered.
-        bg.add_task(mailer.send, mailmod.already_registered_mail(email))
+        bg.add_task(mailer.send, await mailmod.already_registered_mail(email))
         return ACCEPTED
     raw = await _issue_email_token(org_id, user_id, TokenKind.EMAIL_VERIFY, VERIFY_TTL)
-    bg.add_task(mailer.send, mailmod.verify_email_mail(email, raw))
+    bg.add_task(mailer.send, await mailmod.verify_email_mail(email, raw))
     return ACCEPTED
 
 
@@ -547,7 +547,7 @@ async def request_password_reset(
         raw = await _issue_email_token(
             user.organization_id, user.id, TokenKind.PASSWORD_RESET, RESET_TTL
         )
-        bg.add_task(mailer.send, mailmod.reset_password_mail(user.email, raw))
+        bg.add_task(mailer.send, await mailmod.reset_password_mail(user.email, raw))
     return ACCEPTED
 
 

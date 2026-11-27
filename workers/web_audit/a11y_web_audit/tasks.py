@@ -16,14 +16,14 @@ import json
 import logging
 import uuid
 
-from a11y_core import billing
+from a11y_core import billing, notify
 from a11y_core.celery_app import celery_app
 from a11y_core.config import definitions as _definitions  # noqa: F401
 from a11y_core.config import get_config
 from a11y_core.db import dispose_engines, tenant_session
 from a11y_core.models import PageScreenshot, ScanFinding, ScanPage
 from a11y_core.rules import get_registry
-from a11y_core.scan_jobs import USAGE_FEATURE, fail_scan
+from a11y_core.scan_jobs import USAGE_FEATURE, fail_scan, is_customer_fault
 from sqlalchemy import func, text
 
 from .engines import load_bundles
@@ -33,26 +33,7 @@ log = logging.getLogger(__name__)
 MAX_SHOT_BYTES = (
     1_500_000  # below the table's 2 MB limit; a bigger image is dropped, the scan still succeeds
 )
-# Errors on the START page that are the customer's doing: the credit is kept.
-CUSTOMER_FAULTS = {
-    "dns_failed",
-    "private_address",
-    "invalid_url",
-    "invalid_scheme",
-    "port_not_allowed",
-    "credentials_in_url",
-    "not_html",
-    "tls_error",
-    "unreachable",
-    "timeout",
-    "blocked_redirect",
-    "navigation_failed",
-    "robots",
-}
-
-
-def _is_customer_fault(code: str | None) -> bool:
-    return bool(code) and (code in CUSTOMER_FAULTS or code.startswith("http_"))
+_is_customer_fault = is_customer_fault  # the rule lives in a11y_core so the sweeper can share it
 
 
 async def run_scan(
@@ -224,6 +205,7 @@ async def run_scan(
             {"i": scan_id},
         )
         await billing.commit_usage(db, USAGE_FEATURE, str(scan_id))
+    await notify.notify_scan_done(org_id, scan_id)
     return "SUCCEEDED"
 
 

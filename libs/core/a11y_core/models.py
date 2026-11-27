@@ -651,3 +651,33 @@ class FixSuggestion(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationLog(Base):
+    """One email to one recipient. ``dedupe_key`` + recipient is unique, so sending is idempotent; only delivery
+    progress (status, attempts, error) can change after the row is written."""
+
+    __tablename__ = "notification_log"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "dedupe_key", "to_email", name="uq_notification_once"),
+        CheckConstraint(
+            "status IN ('QUEUED', 'SENT', 'FAILED', 'SKIPPED')", name="ck_notification_status"
+        ),
+        Index("ix_notification_log_created", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    event: Mapped[str] = mapped_column(String(40))
+    to_email: Mapped[str] = mapped_column(String(320))
+    status: Mapped[str] = mapped_column(String(8), server_default="QUEUED")
+    variables: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    dedupe_key: Mapped[str] = mapped_column(String(200))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    subject: Mapped[str | None] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text)
+    config_ref: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

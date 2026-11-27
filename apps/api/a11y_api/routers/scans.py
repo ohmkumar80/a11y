@@ -4,7 +4,7 @@ import time
 import uuid
 from urllib.parse import urldefrag
 
-from a11y_core import billing
+from a11y_core import billing, notify
 from a11y_core.celery_app import celery_app
 from a11y_core.config import definitions as _definitions  # noqa: F401
 from a11y_core.config import get_config
@@ -113,41 +113,50 @@ async def create_scan(body: ScanIn, p: Principal = Depends(current_principal)):
     await _rate_limit(p.org_id, s.creations_per_minute)
 
     scan_id = uuid.uuid4()
-    async with tenant_session(p.org_id) as db:
-        # Serialise per organisation so the concurrency cap cannot be raced past.
-        await billing.require_writable(db, lock=True)
-        running = (
+    try:
+        async with tenant_session(p.org_id) as db:
+            # Serialise per organisation so the concurrency cap cannot be raced past.
+            await billing.require_writable(db, lock=True)
+            running = (
+                await db.execute(
+                    text("SELECT count(*) FROM scan_jobs WHERE status IN ('QUEUED','RUNNING')")
+                )
+            ).scalar_one()
+            if running >= s.max_concurrent_per_org:
+                raise HTTPException(
+                    status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail={
+                        "detail": f"{running} scans are already running. Wait for one to finish.",
+                        "code": "too_many_scans",
+                    },
+                    headers={"Retry-After": "30"},
+                )
+            await billing.reserve(
+                db, p.org_id, USAGE_FEATURE, str(scan_id)
+            )  # QuotaExceeded -> 402, nothing is created
             await db.execute(
-                text("SELECT count(*) FROM scan_jobs WHERE status IN ('QUEUED','RUNNING')")
-            )
-        ).scalar_one()
-        if running >= s.max_concurrent_per_org:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                detail={
-                    "detail": f"{running} scans are already running. Wait for one to finish.",
-                    "code": "too_many_scans",
+                text(
+                    "INSERT INTO scan_jobs (id, organization_id, created_by, start_url, mode, max_pages, standards) "
+                    "VALUES (:i, :o, :u, :url, :m, :p, :s)"
+                ),
+                {
+                    "i": scan_id,
+                    "o": p.org_id,
+                    "u": p.user_id,
+                    "url": url,
+                    "m": body.mode,
+                    "p": pages,
+                    "s": body.standards,
                 },
-                headers={"Retry-After": "30"},
             )
-        await billing.reserve(
-            db, p.org_id, USAGE_FEATURE, str(scan_id)
-        )  # QuotaExceeded -> 402, nothing is created
-        await db.execute(
-            text(
-                "INSERT INTO scan_jobs (id, organization_id, created_by, start_url, mode, max_pages, standards) "
-                "VALUES (:i, :o, :u, :url, :m, :p, :s)"
-            ),
-            {
-                "i": scan_id,
-                "o": p.org_id,
-                "u": p.user_id,
-                "url": url,
-                "m": body.mode,
-                "p": pages,
-                "s": body.standards,
-            },
-        )
+    except billing.QuotaExceeded as e:
+        # Outside the block above on purpose: the connection is released first, so a burst of refusals cannot hold
+        # one connection each while waiting for a second one.
+        if e.code == "quota_exceeded" and e.extra.get("limit") is not None:
+            await notify.notify_quota_reached(
+                p.org_id, e.extra["used"], e.extra["limit"], str(billing.period_start())
+            )
+        raise
     try:
         celery_app.send_task("web.scan", args=[str(p.org_id), str(scan_id)], queue="web")
     except Exception:  # noqa: BLE001
@@ -157,6 +166,7 @@ async def create_scan(body: ScanIn, p: Principal = Depends(current_principal)):
             "queue_unavailable",
             "We could not start the scan. Your credit was returned. Try again shortly.",
             system_fault=True,
+            email=False,  # the person is told right now, in the response
         )
         raise _problem(
             503,

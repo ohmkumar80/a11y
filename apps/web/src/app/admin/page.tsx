@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { get } from "@/lib/api";
 import { SecurityTab } from "@/components/admin/SecurityTab";
 import { AiTab } from "@/components/admin/AiTab";
+import { EmailsTab } from "@/components/admin/EmailsTab";
 import { CouponsTab } from "@/components/admin/CouponsTab";
 import { PlansTab } from "@/components/admin/PlansTab";
 import { SettingsTab } from "@/components/admin/SettingsTab";
@@ -39,6 +40,7 @@ export default function AdminPage() {
               { id: "plans", label: "Plans", content: <PlansTab /> },
               { id: "coupons", label: "Coupons", content: <CouponsTab /> },
               { id: "ai", label: "AI", content: <AiTab /> },
+              { id: "emails", label: "Emails", content: <EmailsTab /> },
               { id: "security", label: "Security", content: <SecurityTab onChanged={bump} /> },
               { id: "settings", label: "Settings", content: <SettingsTab /> },
             ]}

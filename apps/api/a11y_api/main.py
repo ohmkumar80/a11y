@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+from a11y_core import notify  # noqa: F401  (registers the notify.templates setting)
 from a11y_core.billing import BillingError
 from a11y_core.db import app_engine, dispose_engines
 from a11y_core.settings import get_settings
@@ -13,6 +14,7 @@ from sqlalchemy import text
 from .routers import (
     admin_ai,
     admin_billing,
+    admin_notifications,
     admin_security,
     admin_settings,
     auth,
@@ -90,6 +92,7 @@ app.include_router(org.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_security.router)
 app.include_router(admin_billing.router)
+app.include_router(admin_notifications.router)
 app.include_router(admin_ai.router)
 app.include_router(org_ai.router)
 app.include_router(standards.router)

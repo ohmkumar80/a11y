@@ -15,7 +15,7 @@ from .settings import get_settings
 QUEUES = ("system", "web", "docs", "media", "mobile", "ai")
 
 # Task modules a worker loads. The browser scanner only exists in the web-worker image.
-_include = ["a11y_core.billing_jobs", "a11y_core.scan_jobs"]
+_include = ["a11y_core.billing_jobs", "a11y_core.scan_jobs", "a11y_core.notify"]
 if importlib.util.find_spec("a11y_web_audit"):
     _include.append("a11y_web_audit.tasks")
 if importlib.util.find_spec("a11y_documents"):

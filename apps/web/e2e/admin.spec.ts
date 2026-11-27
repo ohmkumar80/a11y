@@ -28,7 +28,7 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.getByRole("row", { name: /WELCOME20/ })).toBeVisible();
     await audit(page, "coupons tab");
 
-    await page.getByRole("tab", { name: "AI" }).click();
+    await page.getByRole("tab", { name: "AI", exact: true }).click();
     await expect(page.getByRole("row", { name: /DeepSeek/ })).toBeVisible();
     await page.getByRole("button", { name: "Test connection for DeepSeek" }).click();
     await expect(page.getByText(/Connected in 120 ms/)).toBeVisible();

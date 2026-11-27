@@ -256,7 +256,10 @@ async def test_quota_is_reserved_atomically_and_refused_with_upgrade_prompt(clie
     codes = sorted(r.status_code for r in rs)
     assert codes == [202] * 10 + [402] * 15
     assert next(r for r in rs if r.status_code == 402).json()["code"] == "quota_exceeded"
-    assert await used(org) == 10 and len(dev) == 10
+    assert await used(org) == 10
+    assert len([d for d in dev if d[0] == "web.scan"]) == 10
+    # 15 refused requests in one burst: one email, and none of them starved the connection pool waiting for a second connection
+    assert len([d for d in dev if d[0] == "notify.deliver"]) == 1
 
 
 async def test_concurrency_cap_and_rate_limit(client, site):
@@ -524,3 +527,67 @@ async def test_fetch_refuses_internal_addresses_and_redirects():
 
     assert await dom._fetch("http://169.254.169.254/latest/meta-data/") is None
     assert await dom._fetch("http://10.0.0.1/.well-known/a11y-verification.txt") is None
+
+
+# --- orphaned reservation sweeper (reliability layer 0) ------------------------------------------------------------
+async def _orphan(org, user, *, scan_status, error_code=None, age_minutes=120, with_scan=True):
+    """A reservation for a scan that has already ended (or never existed), left RESERVED by a crashed job."""
+    from a11y_core import billing
+    from a11y_core.scan_jobs import USAGE_FEATURE
+
+    sid = uuid.uuid4()
+    async with tenant_session(org) as db:
+        await billing.reserve(db, org, USAGE_FEATURE, str(sid))
+    if with_scan:
+        await sql(
+            "INSERT INTO scan_jobs (id, organization_id, created_by, start_url, mode, max_pages, standards, status, error_code) "
+            "VALUES ($1,$2,$3,'http://127.0.0.1:1/','single',1,ARRAY['WCAG_2_2_AA'],$4,$5)",
+            sid,
+            org,
+            user,
+            scan_status,
+            error_code,
+        )
+    await sql(
+        "UPDATE usage_reservations SET created_at = now() - make_interval(mins => $2) WHERE job_id = $1",
+        str(sid),
+        age_minutes,
+    )
+    return sid
+
+
+async def _resv(sid):
+    return (await sql("SELECT status FROM usage_reservations WHERE job_id=$1", str(sid)))[0][
+        "status"
+    ]
+
+
+async def test_orphaned_reservations_are_settled_by_the_same_rules_as_a_live_scan():
+    from a11y_core.scan_jobs import sweep_orphaned_reservations
+
+    org, user, _ = await make_org(plan="GROWTH")
+    done = await _orphan(org, user, scan_status="SUCCEEDED")
+    customer = await _orphan(org, user, scan_status="FAILED", error_code="dns_failed")
+    http404 = await _orphan(org, user, scan_status="FAILED", error_code="http_404")
+    platform = await _orphan(org, user, scan_status="FAILED", error_code="system_error")
+    cancelled = await _orphan(org, user, scan_status="CANCELLED")
+    vanished = await _orphan(org, user, scan_status="", with_scan=False)
+    running = await _orphan(org, user, scan_status="RUNNING")  # still alive: not ours to touch
+    recent = await _orphan(
+        org, user, scan_status="SUCCEEDED", age_minutes=5
+    )  # give the job time to settle itself
+    assert await used(org) == 8
+
+    out = await sweep_orphaned_reservations()
+    assert out["committed"] >= 3 and out["released"] >= 3
+    assert [await _resv(x) for x in (done, customer, http404)] == [
+        "COMMITTED"
+    ] * 3  # work was done / customer's fault
+    assert [await _resv(x) for x in (platform, cancelled, vanished)] == [
+        "RELEASED"
+    ] * 3  # our fault / never ran
+    assert [await _resv(x) for x in (running, recent)] == ["RESERVED"] * 2
+    assert await used(org) == 5  # only the three released credits came back
+
+    again = await sweep_orphaned_reservations()
+    assert again == {"committed": 0, "released": 0} and await used(org) == 5  # idempotent
