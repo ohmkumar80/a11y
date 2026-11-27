@@ -15,6 +15,7 @@ from .routers import (
     admin_ai,
     admin_billing,
     admin_notifications,
+    admin_ops,
     admin_security,
     admin_settings,
     auth,
@@ -97,6 +98,7 @@ app.include_router(admin_settings.router)
 app.include_router(admin_security.router)
 app.include_router(admin_billing.router)
 app.include_router(admin_notifications.router)
+app.include_router(admin_ops.router)
 app.include_router(admin_ai.router)
 app.include_router(org_ai.router)
 app.include_router(standards.router)

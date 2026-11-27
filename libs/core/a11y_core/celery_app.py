@@ -37,6 +37,7 @@ celery_app.conf.update(
     # Browser work needs the Playwright image, so it has its own queue and worker (PROJECT_PLAN 3.9).
     task_routes={
         "web.*": {"queue": "web"},
+        "docs.*": {"queue": "docs"},
         "billing.*": {"queue": "system"},
         "scans.*": {"queue": "system"},
     },

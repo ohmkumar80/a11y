@@ -16,6 +16,39 @@ export const SUBSCRIPTION = {
   coupon: null,
 };
 
+export const opsState = { healthy: false };
+const RUNBOOK = `# Stuck scans
+
+## What it means
+A scan has been \`RUNNING\` with no heartbeat for over **10 minutes**.
+
+## Check
+1. Is \`beat\` running? \`docker compose ps beat\`.
+2. Is the system worker consuming the queue?
+
+## Fix
+1. Restart the scheduler: \`docker compose restart beat\`.
+2. Wait 5 minutes and refresh this page.
+
+## Escalate
+If it is still listed after 15 minutes, escalate.
+`;
+const CANARIES = [
+  { key: "web_scan", label: "Browser and scan engines", state: "ok", at: "2026-11-28T08:00:00Z", detail: "3 engines agree on the planted problem (axe, ibm, htmlcs)", duration_ms: 740 },
+  { key: "docs_pdf", label: "Accessible PDF generation and the PDF/UA check", state: "failing", at: "2026-11-28T08:00:00Z", detail: "PDF/UA-1 failed: 7.1#3 x2", duration_ms: 2089 },
+  { key: "email_smtp", label: "Mail server connection", state: "never", at: null, detail: "", duration_ms: null },
+];
+const STATS = { scans_24h: 42, scans_succeeded_24h: 40, reports_ready_24h: 9, emails_sent_24h: 120, webhooks_delivered_24h: 15, ai_calls_24h: 77 };
+const OPS_BAD = {
+  generated_at: "2026-11-28T08:05:00Z", status: "down", health: { postgres: "ok", redis: "ok" }, queues: { system: 3, web: 0, docs: 150, media: 0, mobile: 0, ai: 0 }, canaries: CANARIES, stats: STATS,
+  incidents: [
+    { key: "stuck_scans", severity: "critical", title: "Scans are stuck", count: 2, detail: "The stuck-scan sweeper should have failed these.", runbook: "stuck-scans" },
+    { key: "failed_scans", severity: "warning", title: "Scans failed for platform reasons (24 hours)", count: 3, detail: "system_error: 2, worker_lost: 1", runbook: "failed-scans" },
+    { key: "abandoned_webhooks", severity: "info", title: "Webhook deliveries given up on (24 hours)", count: 1, detail: "", runbook: "webhook-failures" },
+  ],
+};
+const OPS_OK = { ...OPS_BAD, status: "ok", incidents: [], canaries: CANARIES.map((c) => ({ ...c, state: "ok", detail: "fine", at: "2026-11-28T08:00:00Z" })), queues: { system: 0, web: 0, docs: 0, media: 0, mobile: 0, ai: 0 } };
+
 export const EMAIL_EVENTS = [
   { key: "scan.completed", label: "Scan finished", audience: "actor", category: "scan", required: false, variables: { url: "The address that was scanned", summary: "A short summary", scan_id: "The scan's id" }, has_link: true,
     default: { subject: "Your accessibility scan of {url} is ready", intro: "The scan of {url} has finished. {summary}", action_label: "View the results", outro: "Automated tests find only some accessibility problems." }, enabled: true, edited: false },
@@ -39,6 +72,8 @@ export async function mockAdminApi(page: Page) {
     if (p === "/admin/security/mfa") return r.fulfill({ json: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y", environment: "development" } });
     if (p === "/admin/settings/auth.mfa") return r.fulfill({ json: { key: "auth.mfa", source: "default", version: null, value: { super_admin: mfaState.superAdmin, org_admin: "optional", issuer: "a11y" } } });
     if (p.startsWith("/admin/ai/providers/") && p.endsWith("/test")) return r.fulfill({ json: { ok: true, detail: "Connected.", model_id: "m", latency_ms: 120 } });
+    if (p.startsWith("/admin/ops/runbooks/")) return r.fulfill({ json: { slug: p.split("/").pop(), markdown: RUNBOOK } });
+    if (p === "/admin/ops") return r.fulfill({ json: opsState.healthy ? OPS_OK : OPS_BAD });
     if (p === "/admin/notifications/preview") {
       const b = r.request().postDataJSON() as { subject: string; action_label: string };
       if (b.subject.includes("{nope}")) return r.fulfill({ status: 422, json: { detail: "Scan finished, subject: {nope} is not available here. You can use: {url}, {summary}, {scan_id}.", field: "wording" } });

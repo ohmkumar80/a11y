@@ -108,16 +108,49 @@ class Mail:
     html: str
 
 
+async def _route() -> tuple[MailProvider, dict, str]:
+    """(provider settings, aiosmtplib connection arguments, sender address) from the admin setting or the environment."""
+    env = get_settings()
+    try:
+        p = (await get_config().effective("notify.provider")).value
+    except Exception:  # noqa: BLE001 - never let a settings problem stop mail: fall back to the environment
+        log.exception("mail provider settings unavailable; using the environment")
+        p = MailProvider()
+    use = p.mode == "smtp"
+    kwargs: dict = {
+        "hostname": p.host if use else env.smtp_host,
+        "port": p.port if use else env.smtp_port,
+        "timeout": 10,
+    }
+    if use:
+        kwargs["use_tls"] = p.security == "tls"
+        kwargs["start_tls"] = p.security == "starttls"
+        if p.username:
+            kwargs["username"] = p.username
+            kwargs["password"] = p.password.value() if p.password.is_set else ""
+    sender = p.from_address if use and p.from_address else env.mail_from
+    return p, kwargs, sender
+
+
+async def check_connection() -> str:
+    """Connect to the mail server and log in, WITHOUT sending anything. Returns a short description; raises on failure."""
+    p, kwargs, _ = await _route()
+    client_args = {k: v for k, v in kwargs.items() if k not in ("username", "password")}
+    client = aiosmtplib.SMTP(**client_args)
+    await client.connect()
+    try:
+        if "username" in kwargs:
+            await client.login(kwargs["username"], kwargs["password"])
+        await client.noop()
+    finally:
+        await client.quit()
+    return f"{kwargs['hostname']}:{kwargs['port']}"
+
+
 class Mailer:
     async def send(self, mail: Mail, *, raise_errors: bool = False) -> None:
-        env = get_settings()
-        try:
-            p = (await get_config().effective("notify.provider")).value
-        except Exception:  # noqa: BLE001 - never let a settings problem stop mail: fall back to the environment
-            log.exception("mail provider settings unavailable; using the environment")
-            p = MailProvider()
+        p, kwargs, sender = await _route()
         use = p.mode == "smtp"
-        sender = p.from_address if use and p.from_address else env.mail_from
         msg = EmailMessage()
         msg["From"] = formataddr((p.from_name, sender)) if use and p.from_name else sender
         msg["To"], msg["Subject"] = mail.to, mail.subject
@@ -125,17 +158,6 @@ class Mailer:
             msg["Reply-To"] = p.reply_to
         msg.set_content(mail.text)
         msg.add_alternative(mail.html, subtype="html")
-        kwargs: dict = {
-            "hostname": p.host if use else env.smtp_host,
-            "port": p.port if use else env.smtp_port,
-            "timeout": 10,
-        }
-        if use:
-            kwargs["use_tls"] = p.security == "tls"
-            kwargs["start_tls"] = p.security == "starttls"
-            if p.username:
-                kwargs["username"] = p.username
-                kwargs["password"] = p.password.value() if p.password.is_set else ""
         try:
             await aiosmtplib.send(msg, **kwargs)
         except Exception:

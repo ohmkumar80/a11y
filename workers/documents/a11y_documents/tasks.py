@@ -207,3 +207,35 @@ def render_report_task(org_id: str, report_id: str) -> str:
             await dispose_engines()
 
     return asyncio.run(run())
+
+
+# -- canary (PROJECT_PLAN 3.15): a sample report must still become an accessible PDF that passes PDF/UA ----------------------
+async def run_canary() -> bool:
+    from a11y_core import canaries
+
+    from .pdf import render_pdf_ua
+    from .registry import render_html
+    from .samples import sample_audit_data
+    from .verapdf import validate_pdf_ua
+
+    async def check() -> str:
+        pdf = await asyncio.to_thread(
+            lambda: render_pdf_ua(render_html("audit_report", sample_audit_data()))
+        )
+        result = await asyncio.to_thread(validate_pdf_ua, pdf)
+        if not result.compliant:
+            raise RuntimeError(result.summary())
+        return f"{result.summary()} ({len(pdf) // 1024} KB)"
+
+    return await canaries.run_timed("docs_pdf", check)
+
+
+@celery_app.task(name="docs.canary", max_retries=0)
+def canary_task() -> bool:
+    async def run() -> bool:
+        try:
+            return await run_canary()
+        finally:
+            await dispose_engines()
+
+    return asyncio.run(run())

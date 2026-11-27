@@ -335,3 +335,43 @@ def suggest_fix_task(org_id: str, fix_id: str) -> str:
             await dispose_engines()
 
     return asyncio.run(run())
+
+
+# -- canary (PROJECT_PLAN 3.15): proves the browser, the engines and the normaliser work, with no network and no credits ---
+_BAD = '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">'
+_GOOD = '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Canary test image">'
+
+
+async def run_canary() -> bool:
+    from a11y_core import canaries
+    from playwright.async_api import async_playwright
+
+    from .oracle import found, scan_snippet
+
+    async def check() -> str:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(chromium_sandbox=False)
+            try:
+                before = await scan_snippet(browser, _BAD)
+                after = await scan_snippet(browser, _GOOD)
+            finally:
+                await browser.close()
+        hit = found(before, "image-alt")
+        if not hit:
+            raise RuntimeError("the engines no longer find a missing image description")
+        if found(after, "image-alt"):
+            raise RuntimeError("the engines still flag a correct image description")
+        return f"3 engines agree on the planted problem ({', '.join(hit[0].engines)})"
+
+    return await canaries.run_timed("web_scan", check)
+
+
+@celery_app.task(name="web.canary", max_retries=0)
+def canary_task() -> bool:
+    async def run() -> bool:
+        try:
+            return await run_canary()
+        finally:
+            await dispose_engines()
+
+    return asyncio.run(run())
