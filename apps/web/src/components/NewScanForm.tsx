@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button, Checkbox, ErrorSummary, Form, Select, StatusMessage, TextField } from "@a11y/ui";
 import { post, type Problem } from "@/lib/api";
 import { LEGAL_LABEL, type StandardInfo } from "@/lib/scans";
+import { useFlags } from "@/lib/flags";
 import { useApi } from "@/lib/useApi";
 import { useForm } from "./useForm";
 
@@ -24,6 +25,7 @@ function NextStep({ problem }: { problem: Problem }) {
 export function NewScanForm({ canVerify }: { canVerify: boolean }) {
   const router = useRouter();
   const standards = useApi<{ standards: StandardInfo[] }>("/standards");
+  const flags = useFlags();
   const [url, setUrl] = useState("");
   const [picked, setPicked] = useState<string[]>(["WCAG_2_2_AA"]);
   const [mode, setMode] = useState("single");
@@ -61,8 +63,8 @@ export function NewScanForm({ canVerify }: { canVerify: boolean }) {
               onChange={(on) => setPicked(on ? [...picked, s.id] : picked.filter((x) => x !== s.id))} />
           ))}
         </fieldset>
-        <Select label="Scan" value={mode} onChange={(k) => setMode(String(k))} options={[{ id: "single", label: "This page only" }, { id: "crawl", label: "This page and the pages it links to on the same site" }]} />
-        {mode === "crawl" && (
+        {flags.crawl_scans && <Select label="Scan" value={mode} onChange={(k) => setMode(String(k))} options={[{ id: "single", label: "This page only" }, { id: "crawl", label: "This page and the pages it links to on the same site" }]} />}
+        {flags.crawl_scans && mode === "crawl" && (
           <TextField id="field-max_pages" label="Most pages to scan" type="number" inputMode="numeric" value={pages} onChange={setPages} isRequired
             description={canVerify ? "Larger crawls need you to verify the site first." : "Larger crawls need an administrator to verify the site first."} error={form.fieldError("max_pages")} />
         )}

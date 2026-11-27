@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy import text
 
-from ..deps import current_principal
+from ..deps import current_principal, ensure_flag
 from ..security import Principal
 
 router = APIRouter(prefix="/scans", tags=["scans"])
@@ -71,6 +71,8 @@ async def create_scan(body: ScanIn, p: Principal = Depends(current_principal)):
     for s in body.standards:
         if s not in reg.standards:
             raise _problem(422, f"Unknown standard {s}.", "standards")
+    if body.mode == "crawl":
+        await ensure_flag("crawl_scans", p)
     url = urldefrag(body.url.strip())[0]
     try:
         target = await check_url(url)

@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from ..deps import current_principal, require_company_admin
+from ..deps import current_principal, ensure_flag, require_company_admin
 from ..security import Principal
 
 router = APIRouter(tags=["reports"])
@@ -318,6 +318,8 @@ async def create_vpat(
 ):
     from a11y_core.vpat import create_draft  # noqa: PLC0415
 
+    await ensure_flag("vpat", p)
+
     if body.standard not in get_registry().standards:
         raise _problem(422, f"Unknown standard {body.standard}.", "standard")
     async with tenant_session(p.org_id) as db:
@@ -471,6 +473,7 @@ async def reopen(vpat_id: uuid.UUID, p: Principal = Depends(require_company_admi
 async def export_vpat(
     vpat_id: uuid.UUID, body: ExportIn, p: Principal = Depends(require_company_admin)
 ):
+    await ensure_flag("vpat", p)
     async with tenant_session(p.org_id) as db:
         v = await _load_vpat(db, vpat_id)
     if v.status != "SIGNED_OFF":

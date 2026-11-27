@@ -25,6 +25,7 @@ export async function mockApi(page: Page, role: Role) {
   await page.route("**/api/org/users", (r) =>
     r.fulfill({ json: [user("COMPANY_ADMIN"), { ...user("STANDARD_USER"), id: "33333333-3333-4333-8333-333333333333", email: "member@example.com" }] }),
   );
+  await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: true, crawl_scans: true, notification_center: true } }));
   await page.route("**/api/org/subscription", (r) => r.fulfill({ json: SUBSCRIPTION }));
   await page.route("**/api/org/ai", (r) => r.fulfill({ json: BYOK }));
   await page.route("**/api/org/ai/test", (r) => r.fulfill({ json: { ok: false, detail: "authentication failed (check the API key)" } }));

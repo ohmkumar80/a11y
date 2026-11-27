@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from a11y_core import notify  # noqa: F401  (registers the notify.templates setting)
+from a11y_core import flags, notify  # noqa: F401  (registers the notify.templates and flags settings)
 from a11y_core.billing import BillingError
 from a11y_core.db import app_engine, dispose_engines
 from a11y_core.settings import get_settings

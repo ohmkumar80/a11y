@@ -163,3 +163,14 @@ test("a refused request (rate limit or switched off) is explained in words", asy
   await expect(dialog.getByText("Fix suggestions are turned off for your account.")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Suggest a fix" })).toBeVisible(); // can try again later
 });
+
+test("features an administrator switched off are not offered", async ({ page }) => {
+  await mockApi(page, "COMPANY_ADMIN");
+  await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: false, crawl_scans: false, notification_center: true } }));
+  await page.goto("/workspace");
+  await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Scan/ }).filter({ hasText: "This page only" })).toHaveCount(0); // no crawl choice
+  await page.goto(`/workspace/scan?id=${SCAN_ID}`);
+  await expect(page.getByRole("heading", { level: 2, name: "Summary" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Accessibility Conformance Report/ })).toHaveCount(0);
+});

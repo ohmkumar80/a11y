@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Select, StatusMessage } from "@a11y/ui";
 import { post } from "@/lib/api";
+import { useFlags } from "@/lib/flags";
 import { useAuth } from "./AuthProvider";
 
 const EDITIONS = [
@@ -14,11 +15,12 @@ const EDITIONS = [
 /** Starts (or reopens) the VPAT draft for this scan. Only administrators sign off, so only they see the button. */
 export function VpatStart({ scanId, standard }: { scanId: string; standard: string }) {
   const { user } = useAuth();
+  const flags = useFlags();
   const router = useRouter();
   const [edition, setEdition] = useState("WCAG");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (user?.role !== "COMPANY_ADMIN") return null;
+  if (user?.role !== "COMPANY_ADMIN" || !flags.vpat) return null;
   return (
     <section aria-labelledby="vpat" className="flex max-w-xl flex-col gap-3">
       <h2 id="vpat" className="text-xl font-bold">Accessibility Conformance Report (VPAT)</h2>

@@ -36,6 +36,16 @@ async def me(p: Principal = Depends(current_principal)):
     )
 
 
+@router.get("/org/flags")
+async def my_flags(p: Principal = Depends(current_principal)):
+    """Which features are switched on for this organisation, so the UI can leave out what is off."""
+    from a11y_core import flags  # noqa: PLC0415
+
+    async with tenant_session(p.org_id) as db:
+        plan_id = (await billing.load_subscription(db)).plan_id
+    return (await flags.effective_flags(p.org_id, plan_id)).model_dump()
+
+
 @router.get("/org/subscription")
 async def subscription(p: Principal = Depends(current_principal)):
     """Everything the plan/quota UI needs: status, trial end, seats used of limit, quota meters."""

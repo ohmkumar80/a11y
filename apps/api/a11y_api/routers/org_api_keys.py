@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text, update
 
-from ..deps import require_company_admin
+from ..deps import ensure_flag, require_company_admin
 from ..security import Principal
 
 router = APIRouter(prefix="/org/api-keys", tags=["org"])
@@ -81,6 +81,7 @@ async def list_keys(p: Principal = Depends(require_company_admin)):
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_key(body: KeyIn, p: Principal = Depends(require_company_admin)):
+    await ensure_flag("public_api", p)
     unknown = sorted(set(body.scopes) - set(api_keys.SCOPES))
     if unknown:
         raise _problem(422, f"Unknown scope: {', '.join(unknown)}.", "unknown_scope", "scopes")

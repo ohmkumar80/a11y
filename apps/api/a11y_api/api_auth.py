@@ -12,7 +12,7 @@ import time
 import uuid
 from datetime import timedelta
 
-from a11y_core import api_keys, billing
+from a11y_core import api_keys, billing, flags
 from a11y_core.config import get_config
 from a11y_core.db import tenant_session
 from a11y_core.settings import get_settings
@@ -122,6 +122,13 @@ async def authenticate(request: Request, response: Response) -> ApiCaller:
                 "Your plan does not include API access.",
                 "api_not_in_plan",
                 upgrade_url="/org#plan",
+            )
+        if not await flags.enabled("public_api", org_id=org, plan_id=row.plan_id):
+            raise _problem(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "The API is temporarily switched off for your account.",
+                "feature_disabled",
+                headers={"Retry-After": "300"},
             )
         if row.stale:
             await db.execute(

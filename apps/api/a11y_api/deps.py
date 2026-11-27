@@ -35,3 +35,21 @@ def require_super_admin(request: Request) -> Principal:
     if p.role != "SUPER_ADMIN":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Platform administrator access required")
     return p
+
+
+async def ensure_flag(name: str, p: Principal) -> None:
+    """Refuse cleanly when an administrator has switched a feature off for this organisation or its plan."""
+    from a11y_core import billing, flags  # noqa: PLC0415
+    from a11y_core.db import tenant_session  # noqa: PLC0415
+
+    async with tenant_session(p.org_id) as db:
+        plan_id = (await billing.load_subscription(db)).plan_id
+    if not await flags.enabled(name, org_id=p.org_id, plan_id=plan_id):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail={
+                "detail": "This feature is switched off for your account at the moment.",
+                "code": "feature_disabled",
+                "feature": name,
+            },
+        )
