@@ -262,3 +262,56 @@ register(
         tags=("ai", "byok"),
     )
 )
+
+
+# --- Web scanner ----------------------------------------------------------------------------------
+
+
+class ScanEngines(BaseModel):
+    axe: bool = Field(True, description="axe-core")
+    ibm: bool = Field(True, description="IBM Equal Access")
+    htmlcs: bool = Field(True, description="HTML_CodeSniffer")
+    page_timeout_seconds: int = Field(45, ge=5, le=180, description="Per page: load and analysis")
+    max_pages_cap: int = Field(
+        100,
+        ge=1,
+        le=2000,
+        description="Platform ceiling on pages per scan, whatever the plan allows",
+    )
+    politeness_delay_ms: int = Field(
+        250, ge=0, le=5000, description="Pause between pages of a crawl"
+    )
+    respect_robots: bool = Field(True, description="Honour robots.txt when crawling")
+    unverified_crawl_pages: int = Field(
+        5,
+        ge=1,
+        le=50,
+        description="Largest crawl allowed on a site the organisation has not verified",
+    )
+    max_concurrent_per_org: int = Field(
+        2, ge=1, le=20, description="Scans one organisation can run at once"
+    )
+    creations_per_minute: int = Field(
+        10, ge=1, le=600, description="Scan requests per organisation per minute"
+    )
+
+    @model_validator(mode="after")
+    def _one_engine(self):
+        if not (self.axe or self.ibm or self.htmlcs):
+            raise ValueError("At least one scan engine must stay enabled.")
+        return self
+
+    def enabled(self) -> tuple[str, ...]:
+        return tuple(e for e in ("axe", "ibm", "htmlcs") if getattr(self, e))
+
+
+register(
+    SettingDef(
+        key="scan.engines",
+        model=ScanEngines,
+        default=ScanEngines(),
+        description="Which engines run, timeouts, crawl limits and rate limits. Override per plan or organisation.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("scan",),
+    )
+)

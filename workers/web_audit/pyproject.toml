@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "a11y-web-audit"
+version = "0.1.0"
+description = "Web scanner: three engines in one Playwright page, normalisation, SSRF-safe fetching"
+requires-python = ">=3.11"
+dependencies = ["a11y-core", "playwright==1.65.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.25", "ruff>=0.9"]
+
+[tool.setuptools.packages.find]
+include = ["a11y_web_audit*"]
+
+[tool.setuptools.package-data]
+a11y_web_audit = ["runner.js"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = ["S101", "E501"]

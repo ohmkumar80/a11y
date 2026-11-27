@@ -1,0 +1,71 @@
+# Standards and how they map to WCAG success criteria (PROJECT_PLAN 3.8).
+#
+# THIS IS LEGAL CONTENT. Every entry carries its citation, a version, and a review record.
+# `review.status: draft` means NO accessibility SME has signed it off yet; the UI must show that.
+# Never present a result as "compliant": scores show "automated coverage" only (see rules.summarise).
+#
+# kind: wcag     -> criteria = all WCAG criteria at <version> up to <level>
+# kind: derived  -> criteria = the criteria of `base`, with the citation/clause format of that law
+version: "2026-11-27.1"
+standards:
+  - {id: WCAG_2_0_A,   label: "WCAG 2.0 Level A",   kind: wcag, wcag_version: "2.0", level: A,   legal_status: reference}
+  - {id: WCAG_2_0_AA,  label: "WCAG 2.0 Level AA",  kind: wcag, wcag_version: "2.0", level: AA,  legal_status: reference}
+  - {id: WCAG_2_1_A,   label: "WCAG 2.1 Level A",   kind: wcag, wcag_version: "2.1", level: A,   legal_status: reference}
+  - {id: WCAG_2_1_AA,  label: "WCAG 2.1 Level AA",  kind: wcag, wcag_version: "2.1", level: AA,  legal_status: reference}
+  - {id: WCAG_2_2_A,   label: "WCAG 2.2 Level A",   kind: wcag, wcag_version: "2.2", level: A,   legal_status: reference}
+  - {id: WCAG_2_2_AA,  label: "WCAG 2.2 Level AA",  kind: wcag, wcag_version: "2.2", level: AA,  legal_status: reference}
+  - id: WCAG_2_2_AAA
+    label: "WCAG 2.2 Level AAA (informational)"
+    kind: wcag
+    wcag_version: "2.2"
+    level: AAA
+    legal_status: informational
+    notes: "AAA is not required as a general conformance level; some criteria cannot be satisfied for all content (W3C)."
+
+  - id: US_SECTION_508
+    label: "US Section 508 (web content)"
+    kind: derived
+    base: WCAG_2_0_AA
+    legal_status: regulation
+    citation: "Revised 508 Standards, 36 CFR Part 1194, Appendix C, E205.4 (incorporates WCAG 2.0 Level A and AA)"
+    notes: "Chapters 3, 5 and 6 of the Standards (functional performance, software, support documentation) cannot be tested by a web scan and need manual evaluation."
+  - id: US_ADA_TITLE_II
+    label: "US ADA Title II (state and local government)"
+    kind: derived
+    base: WCAG_2_1_AA
+    legal_status: regulation
+    citation: "28 CFR Part 35, Subpart H (DOJ final rule, April 2024): WCAG 2.1 Level AA"
+  - id: US_ADA_TITLE_III
+    label: "US ADA Title III (private businesses)"
+    kind: derived
+    base: WCAG_2_1_AA
+    legal_status: benchmark
+    citation: "No regulatory technical standard exists for Title III. WCAG 2.1 Level AA is the benchmark commonly used in settlements and consent decrees."
+    notes: "Shown as a benchmark, not as a legal requirement."
+  - id: EU_EAA_EN_301_549
+    label: "EU European Accessibility Act (EN 301 549)"
+    kind: derived
+    base: WCAG_2_1_AA
+    legal_status: regulation
+    clause_format: "9.{sc}"
+    citation: "EN 301 549 V3.2.1 (2021-03), clause 9 (web content), which incorporates WCAG 2.1 Level A and AA; Directive (EU) 2019/882"
+    notes: "Clauses 10 (non-web documents) and 11 (software) are covered by the document and mobile scanners when those ship."
+  - id: IN_RPWD_GIGW_3
+    label: "India RPwD Act / GIGW 3.0"
+    kind: derived
+    base: WCAG_2_1_AA
+    legal_status: regulation
+    citation: "Guidelines for Indian Government Websites and Apps (GIGW 3.0); IS 17802 (Part 1): 2021, aligned with WCAG 2.1 Level AA; Rights of Persons with Disabilities Act, 2016"
+    notes: "GIGW 3.0 also contains requirements beyond WCAG (content governance, bilingual support, etc.) that an automated scan cannot test."
+  - id: AU_DDA_AS_EN_301_549
+    label: "Australia DDA (AS EN 301 549), recommended target"
+    kind: derived
+    base: WCAG_2_2_AA
+    legal_status: recommended_target
+    citation: "AS EN 301 549:2020 is based on an earlier edition of EN 301 549. WCAG 2.2 Level AA is a RECOMMENDED target, not a legal requirement."
+    notes: "The UI must label this as a recommended target."
+
+review:
+  status: draft          # draft | reviewed
+  reviewed_by: null      # named accessibility SME (IAAP CPACC/WAS), PROJECT_PLAN open decision 7
+  reviewed_at: null

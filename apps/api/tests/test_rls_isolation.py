@@ -23,6 +23,11 @@ TENANT_TABLES = [
     "usage_ledger",
     "usage_reservations",
     "coupon_redemptions",
+    "ai_usage",
+    "scan_jobs",
+    "scan_pages",
+    "scan_findings",
+    "verified_domains",
 ]
 # Tables that carry organization_id but intentionally also hold platform-wide rows (see policy).
 PLATFORM_AND_TENANT_TABLES = ["setting_versions"]

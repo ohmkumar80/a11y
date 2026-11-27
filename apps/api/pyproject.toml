@@ -40,3 +40,6 @@ ignore = ["S101", "B008", "E501"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106", "S608"]
 "alembic/*" = ["E501", "S608"]
+# scans.py builds WHERE clauses from a fixed allow-list of column names; every VALUE is a bound
+# parameter (tests/test_scans_api.py sends hostile filter input to prove it).
+"a11y_api/routers/scans.py" = ["S608"]

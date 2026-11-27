@@ -359,3 +359,123 @@ class AIUsage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+# --- Web scans ------------------------------------------------------------------------------------
+
+
+class ScanStatus(enum.StrEnum):
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class ScanJob(Base):
+    __tablename__ = "scan_jobs"
+    __table_args__ = (
+        CheckConstraint(f"status IN ({_values(ScanStatus)})", name="ck_scan_status"),
+        CheckConstraint("mode IN ('single', 'crawl')", name="ck_scan_mode"),
+        Index("ix_scan_jobs_org_created", "organization_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    start_url: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(8), server_default="single")
+    max_pages: Mapped[int] = mapped_column(Integer, server_default="1")
+    standards: Mapped[list[str]] = mapped_column(ARRAY(String), server_default=text("'{}'"))
+    status: Mapped[str] = mapped_column(String(12), server_default="QUEUED")
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    pages_scanned: Mapped[int] = mapped_column(Integer, server_default="0")
+    findings_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    # Reproducibility: exact engine versions, rule-registry version and config the scan ran with.
+    engine_versions: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    rules_version: Mapped[str | None] = mapped_column(String(40))
+    config_refs: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScanPage(Base):
+    __tablename__ = "scan_pages"
+    __table_args__ = (Index("ix_scan_pages_scan", "scan_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    url: Mapped[str] = mapped_column(Text)
+    final_url: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10))  # OK | FAILED | BLOCKED
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    title: Mapped[str | None] = mapped_column(Text)
+    lang: Mapped[str | None] = mapped_column(String(35))
+    engines: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    duration_ms: Mapped[int] = mapped_column(Integer, server_default="0")
+    scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScanFinding(Base):
+    __tablename__ = "scan_findings"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('violation', 'needs_review', 'best_practice')", name="ck_finding_kind"
+        ),
+        Index("ix_scan_findings_scan_rule", "scan_id", "canonical_rule_id"),
+        Index("ix_scan_findings_scan_kind", "scan_id", "kind", "severity"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    page_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_pages.id", ondelete="CASCADE"))
+    canonical_rule_id: Mapped[str] = mapped_column(String(120))
+    title: Mapped[str] = mapped_column(Text)
+    sc: Mapped[list[str]] = mapped_column(ARRAY(String), server_default=text("'{}'"))
+    kind: Mapped[str] = mapped_column(String(14))
+    severity: Mapped[str] = mapped_column(String(10))
+    confidence: Mapped[str] = mapped_column(String(8))
+    engines: Mapped[list[str]] = mapped_column(ARRAY(String))
+    covering: Mapped[list[str]] = mapped_column(ARRAY(String), server_default=text("'{}'"))
+    engine_rule_ids: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    xpath: Mapped[str] = mapped_column(Text)
+    css: Mapped[str] = mapped_column(Text)
+    tag: Mapped[str] = mapped_column(String(40))
+    html: Mapped[str] = mapped_column(Text)
+    message: Mapped[str] = mapped_column(Text)
+    rect: Mapped[dict | None] = mapped_column(JSONB)
+    cluster_key: Mapped[str] = mapped_column(String(16))
+    fingerprint: Mapped[str] = mapped_column(String(16))
+    help_url: Mapped[str | None] = mapped_column(Text)
+    mapped: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+
+
+class VerifiedDomain(Base):
+    """Proof that the organisation controls a site, required before large crawls."""
+
+    __tablename__ = "verified_domains"
+    __table_args__ = (UniqueConstraint("organization_id", "host", name="uq_verified_domain"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    host: Mapped[str] = mapped_column(String(253))
+    token: Mapped[str] = mapped_column(String(64))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    method: Mapped[str | None] = mapped_column(String(8))  # file | meta
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

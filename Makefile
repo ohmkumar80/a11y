@@ -22,7 +22,8 @@ reset: ## Stop the stack and delete all data volumes
 venv: ## Create the Python venv with API deps
 	python3.12 -m venv .venv
 	$(PY) -m pip install -q -U pip
-	$(PY) -m pip install -q -e "libs/core[dev]" -e "apps/api[dev]"
+	$(PY) -m pip install -q -e "libs/core[dev]" -e "workers/web_audit[dev]" -e "apps/api[dev]"
+	$(PY) -m playwright install chromium
 
 migrate: ## Run Alembic migrations against local Postgres
 	cd apps/api && ../../$(PY) -m alembic upgrade head
@@ -36,8 +37,14 @@ test-api: ## API tests (needs `docker compose up -d postgres`)
 test-web: ## UI + web tests
 	pnpm -r --if-present test
 
+engines: ## Build the pinned scan-engine bundles (needed by the scanner and its tests)
+	pnpm install --filter @a11y/engine-bundles... && pnpm --filter @a11y/engine-bundles build
+
+rules-catalog: ## Regenerate rules/engine-catalog.json after changing engine versions
+	$(PY) workers/web_audit/scripts/gen_engine_catalog.py
+
 lint: ## Lint everything
-	.venv/bin/ruff check libs apps/api
+	.venv/bin/ruff check libs apps/api workers
 	pnpm -r --if-present lint
 
 a11y-tokens: ## Verify design-token contrast

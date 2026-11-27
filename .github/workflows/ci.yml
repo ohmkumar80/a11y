@@ -40,8 +40,16 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
           set -a; . ./.env; set +a
           POSTGRES_USER=postgres POSTGRES_DB=a11y PGHOST=localhost sh infra/postgres/01-roles.sh
-      - run: pip install -e "libs/core[dev]" -e "apps/api[dev]"
-      - run: ruff check libs apps/api && ruff format --check libs apps/api
+      - run: pip install -e "libs/core[dev]" -e "workers/web_audit[dev]" -e "apps/api[dev]"
+      # The scanner tests drive real Chromium with the pinned engine bundles.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile --filter @a11y/engine-bundles...
+      - name: Engine bundles are built from the pinned versions and the rule catalogue matches them
+        run: pnpm --filter @a11y/engine-bundles build
+      - run: python -m playwright install --with-deps chromium
+      - run: ruff check libs apps/api workers && ruff format --check libs apps/api workers
       - name: Migrations apply, roll back and re-apply; models match migrations
         working-directory: apps/api
         run: |
@@ -82,6 +90,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -f infra/api.Dockerfile -t a11y-api .
       - run: docker build -f infra/web.Dockerfile -t a11y-web .
+      - run: docker build -f infra/web-worker.Dockerfile -t a11y-web-worker .
 
   secrets:
     name: Secret scanning

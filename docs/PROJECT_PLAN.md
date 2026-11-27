@@ -729,19 +729,19 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|---|
 | Settings framework, `/admin/settings`, schema-generated admin forms (3.11.1) | 1a | Built |
 | SaaS core: plans and entitlements, trial, seat guard, quota reservations, coupons; admin screens for organisations, plans and coupons | 1a | Built |
-| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built with the fake adapter only; two real adapters not started |
-| Rule registry and switching standards | 1a | Not started |
-| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Not started |
-| SSRF protection, domain verification, rate limits | 1a | Not started |
+| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built. Adapters: DeepSeek, Azure OpenAI, OpenAI, OpenAI-compatible (and fake); enterprise own-key (BYOK) built. Anthropic and Bedrock not started |
+| Rule registry and switching standards | 1a | Built (87 criteria, 12 standards, 42 canonical rules; mappings still `draft` until SME review) |
+| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built except screenshots and the benchmark baseline |
+| SSRF protection, domain verification, rate limits | 1a | Built (egress proxy, domain verification, per-org rate and concurrency limits) |
 | Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Not started |
 | Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Not started |
 | Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Not started |
 | Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
 | Admin MFA for every admin role, and session refresh | 1a | Not started |
 | Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
-| Workspace screens: new scan, findings list, Fix Workbench | 1a | Not started |
+| Workspace screens: new scan, findings list, Fix Workbench | 1a | New scan, scans list, results and findings built; Fix Workbench and screenshots not started |
 | Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |
-| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Not started |
+| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Built for scans (state machine, heartbeat, idempotent redelivery, stuck-scan sweeper, credit rules); orphaned-reservation sweeper not started |
 | Remaining notification events, in-app notification centre | 1b | Not started |
 | Content library for all rules | 1b | Not started |
 | Outbound webhooks and the audit-log endpoint (3.17) | 1b | Not started |

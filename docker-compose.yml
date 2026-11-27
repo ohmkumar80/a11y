@@ -101,7 +101,19 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-    command: celery -A a11y_core.celery_app worker -Q web,docs,media,ai --loglevel=INFO
+    command: celery -A a11y_core.celery_app worker -Q system,docs,media,ai --loglevel=INFO
+
+  # Browser worker: scans customer-supplied URLs. All browser traffic goes through an egress proxy that
+  # refuses private/internal addresses (ADR 0007). In production this service must ALSO run in a
+  # network segment with no route to internal services; the proxy is defence in depth, not the only control.
+  web-worker:
+    build: { context: ., dockerfile: infra/web-worker.Dockerfile }
+    environment: *api-env
+    init: true
+    ipc: host
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
 
   # Exactly one scheduler (hourly trial expiry). Never scale this service above 1.
   beat:

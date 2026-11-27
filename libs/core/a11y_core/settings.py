@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     public_web_url: str = "http://localhost:3000"
     cors_origins: str = "http://localhost:3000"
 
+    # DEV/TEST ONLY: comma-separated hosts the scanner may reach even though they are private
+    # (e.g. "127.0.0.1" for a local fixture server). Refused when ENV=production.
+    scan_dev_allow_hosts: str = ""
+    # Where the pinned engine bundles live (packages/engine-bundles/dist).
+    engine_bundles_dir: str = ""
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     mail_from: str = "no-reply@a11y.local"
@@ -45,6 +51,8 @@ class Settings(BaseSettings):
                 raise ValueError("A11Y_MASTER_KEYS must be set to real keys in production")
             if self.jwt_secret.startswith("dev-only"):
                 raise ValueError("JWT_SECRET must be set to a real secret in production")
+            if self.scan_dev_allow_hosts:
+                raise ValueError("SCAN_DEV_ALLOW_HOSTS is not allowed in production")
         return self
 
     def _url(self, user: str, password: str) -> str:
