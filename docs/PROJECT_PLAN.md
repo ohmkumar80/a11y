@@ -1,6 +1,6 @@
 # Project Plan: Omni-Channel AI Accessibility Platform
 
-**Status:** Draft v1 · 2026-11-26
+**Status:** Draft v2 · 2026-11-27 (v2 adds model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent, and Razorpay billing: sections 3.13 to 3.16)
 **Inputs:** [MASTER_BUILD_PROMPT.md](MASTER_BUILD_PROMPT.md) (product spec) · [ARCHITECTURE.md](ARCHITECTURE.md) (blueprint)
 
 This plan sets out the build order and the changes recommended to the spec. It also commits us to making our own product accessible: an accessibility vendor whose app fails WCAG will not win enterprise or government deals.
@@ -18,6 +18,10 @@ This plan sets out the build order and the changes recommended to the spec. It a
 7. **Never claim compliance from automation alone.** Automated engines cover only part of WCAG. VPATs we generate are *drafts*: criteria that automation cannot test default to "Not Evaluated", and a human signs off before export. The FTC's 2025 $1M order against accessiBe over AI "compliance" claims is the precedent to avoid.
 8. **Design for scanning untrusted content.** Arbitrary URLs bring SSRF risk, uploaded files can be zip bombs or malicious PDFs, and APKs can be malware. Workers run sandboxed with network egress controls. See [section 3.6](#36-security-of-scanning-untrusted-content).
 9. **Use configuration, not code, for anything commercial or AI-related.** AI providers and models, task routing, plans, quotas, trials, coupons, payment and email providers, scan engines, compliance mappings and feature flags are all managed from the Super Admin panel. Every setting is typed, scoped (global → plan → organization), versioned, audited and can be rolled back, and changes apply without a redeploy. See [section 3.11](#311-admin-configurable-platform).
+10. **Match the model to the job, and add a validation layer.** Routine work (labelling, simple alt text, common-pattern fixes, triage) runs on light, cheap models or on no model at all, and a premium model validates what matters. Output is produced, then checked by deterministic tests (our own scan engines re-run on every proposed patch), then optionally by a stronger model. Unvalidated output is never delivered. Tiers and policies are admin settings. See [section 3.13](#313-model-tiering-and-the-validation-layer).
+11. **Templates first, tokens last.** Every report and every notification email is a permanent, versioned template that admins can edit, and every rule has a stored explanation and fix in a content library. AI fills only named dynamic slots, each with a deterministic fallback. See [section 3.14](#314-templates-reports-and-notifications-templates-first).
+12. **Build a monitor-and-heal agent on top of ordinary resilience.** Retries, checkpoints, dead-letter queues and watchdogs handle most failures without any AI. An Ops Agent then diagnoses unfamiliar failures and acts only through an allow-listed, audited, rate-limited action catalogue, starting in suggest-only mode. See [section 3.15](#315-reliability-and-self-healing-monitor-and-heal-agent).
+13. **Payments run on Razorpay.** Webhooks are the source of truth, we issue GST-compliant accessible invoices, and a nightly reconciliation catches drift. See [section 3.16](#316-billing-with-razorpay).
 
 ---
 
@@ -174,7 +178,7 @@ We run as a hosted service, so GPL components are fine when used server-side and
 - **Quota reservations, not just counters:** add a `UsageReservation` table (`RESERVED → COMMITTED | RELEASED`) keyed by job ID (idempotent). The reserve step is a single conditional `UPDATE … SET used = used + n WHERE used + n <= quota RETURNING`, so it stays atomic under concurrency. A failure caused by the system releases the reservation; a failure caused by the user (bad URL, corrupt file) commits it. Separate `UsageLedger` rows per period, including for annual plans that reset monthly.
 - **AI cost metering:** record tokens and cost per LLM call against org and job. This feeds the Super Admin FinOps view and a per-tenant spend cap.
 - **Coupons:** add a `CouponRedemption` table (unique `(coupon_id, organization_id)`) and increment `current_redemptions` with a conditional update, so two simultaneous checkouts can't exceed `max_redemptions`.
-- **Payments are missing from the spec.** INR pricing needs a payment gateway with GST-compliant invoices (18% GST, GSTIN capture for B2B). Recommendation: Phase 1 uses Super Admin–assigned plans and manual invoices (enough for early B2B deals); Phase 2 integrates a gateway with subscriptions and webhooks.
+- **Payments are missing from the spec.** INR pricing needs a payment gateway and GST-compliant invoices. The gateway is **Razorpay**; design, flows and the pre-build spike are in [3.16](#316-billing-with-razorpay). Phase 1 uses Super Admin–assigned plans paid through Razorpay Payment Links; Phase 2 adds self-serve subscriptions.
 - **Trial expiry:** run the Celery beat job hourly. The guard also checks `trial_ends_at` on each request, so a missed cron run can never extend a trial.
 
 ### 3.6 Security of scanning untrusted content
@@ -189,6 +193,7 @@ We run as a hosted service, so GPL components are fine when used server-side and
 ### 3.7 AI gateway
 
 - One internal `LLMGateway` interface with provider adapters. Providers, models and per-task routing are **admin-configured data, not code** (see [3.11.2](#3112-ai-provider-and-model-management)). The gateway also handles per-tenant budgets, retries and fallback, and a response cache keyed by template fingerprint.
+- **Model tiers and validation:** routine tasks run on light models or on none, premium models act as validators, and unvalidated output is never delivered. See [3.13](#313-model-tiering-and-the-validation-layer).
 - **Customer data to third-party LLMs:** use zero-data-retention or enterprise agreements, let tenants opt out (falling back to deterministic-only output), and support regional endpoints for public-sector customers.
 - **Human in the loop by default:** AI code fixes are suggestions with a diff and are never applied automatically. AI alt text and AD scripts need approval before they go into a delivered file.
 - **Evaluation harness:** a golden set of issues with expected fixes and alt text, scored in CI whenever prompts or models change.
@@ -215,6 +220,9 @@ Different workers need very different runtimes, so build **separate images and C
 | `media` | Python + FFmpeg + faster-whisper | GPU optional, large disk |
 | `mobile` | Appium + Android emulator | Needs **KVM**: bare-metal or nested-virt hosts, not standard serverless containers |
 | `ai` | Lightweight Python | I/O-bound LLM calls, high concurrency |
+| `notify` | Lightweight Python | Email and in-app notifications; isolated so a mail-provider outage cannot block scans (3.14) |
+| `billing` | Lightweight Python | Razorpay webhooks, reconciliation, invoice generation (3.16) |
+| `ops` | Lightweight Python | Ops Agent and runbook executor, with its own least-privilege credentials (3.15) |
 
 Celery on Redis: use `acks_late`, idempotent task IDs, and set `visibility_timeout` above the longest job (video), or move long media jobs to RabbitMQ.
 
@@ -259,7 +267,8 @@ Recommended implementation: our own `LLMGateway` interface over **LiteLLM** (MIT
 AIProvider      id, type, display_name, base_url, region, credential_ref (secret),
                 data_policy {zero_retention, processing_regions[], gov_approved},
                 is_enabled, health_status, last_checked_at
-AIModel         id, provider_id, model_name, capabilities {text, vision, json, tools},
+AIModel         id, provider_id, model_name, tier (LIGHT|STANDARD|PREMIUM),   -- see 3.13
+                capabilities {text, vision, json, tools},
                 context_window, input_cost_per_1m, output_cost_per_1m, is_enabled
 AITask          key: code_fix | vision_audit | alt_text | mathml | ad_script |
                      vpat_narrative | focus_anomaly | doc_layout | ...
@@ -274,7 +283,7 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 **Admin screens (`/admin/ai`)**
 - **Providers:** add or edit, enter credentials once (write-only), "Test connection", enable/disable switch, health status.
 - **Models:** catalogue per provider with capabilities and prices (prices drive FinOps cost reports).
-- **Task routing:** for each AI task, pick a primary model and an ordered fallback chain. The router only offers models with the required capability (for example vision for `vision_audit`). Overrides are possible per plan or per organization.
+- **Task routing:** for each AI task, set the tier ladder (which tier produces, which validates, when to escalate; see [3.13](#313-model-tiering-and-the-validation-layer)) and, within each tier, a primary model and an ordered fallback chain. The router only offers models with the required capability (for example vision for `vision_audit`). Overrides are possible per plan or per organization.
 - **Prompts:** versioned templates per task, with evaluation score shown; activation is blocked if the score falls below the threshold.
 - **Budgets and limits:** token and cost caps per tenant and per plan, rate limits per provider, alert thresholds.
 - **Data policy:** organizations can restrict processing regions or require zero-retention providers. The router then automatically leaves out providers that don't qualify, and if none qualify, the AI step is skipped and the run falls back to deterministic-only output, never silently ignoring the restriction.
@@ -289,9 +298,9 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **Coupons** | Type, value, validity, max redemptions, plan applicability, stacking rules, first-purchase-only | 1 |
 | **Compliance registry** | Standards, rule ↔ clause mappings, versions; SME review workflow before publish | 1 |
 | **Scan engines** | Enable/disable each engine, pinned version, crawl page limits, timeouts and concurrency per plan | 1 |
-| **Email** | Provider (SMTP / SES / other), sender identity, templates (checked for accessibility on save) | 1 |
+| **Email and notifications** | Provider (SMTP / SES / other), sender identity, templates, and which event sends what to whom and when (3.14) | 1 |
 | **Feature flags** | Global, per plan, per tenant, percentage rollout, kill switches | 1 |
-| **Payment gateways** | Provider registry using the same pattern as AI providers, tax (GST rate, GSTIN, invoice series) | 2 |
+| **Payment gateway and tax** | Razorpay account (mode, keys, webhook secret), plan sync, GST settings, invoice series, dunning and grace periods (3.16) | 1 (payment links), 2 (subscriptions) |
 | **Auth and security policy** | SSO providers per tenant, MFA enforcement, session length, password policy, IP allow-lists | 2 |
 | **White-label defaults** | Allowed customisations per plan, report branding | 2 |
 | **Data retention** | Retention period per plan and asset type, deletion schedules | 2 |
@@ -299,6 +308,9 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **Media** | STT models, supported languages, TTS engines and voices, AD style guide | 4 |
 | **Mobile** | Device and emulator profiles, Android API levels | 5 |
 | **Legal content** | Terms, privacy policy, Accessibility Statement, versions shown to users | 1 |
+| **Report templates and rule content** | Report layouts, rule explanations and fix examples, with review workflow and versioning (3.14) | 1 |
+| **AI tiers and validation** | Tier per model, tier ladder per task, validation mode and sample rate, escalation limits (3.13) | 1 |
+| **Ops Agent** | Autonomy level per action, runbooks, canaries, escalation contacts, token budgets (3.15) | 2 |
 
 ### 3.12 Proposed repository layout
 
@@ -307,20 +319,254 @@ apps/
   web/                 Next.js (App Router, TS) – all three dashboards + marketing
   api/                 FastAPI service + Alembic migrations
 libs/
-  core/                Shared Python: models, RLS session, guardrails, storage, LLM gateway
+  core/                Shared Python: models, RLS session, guardrails, storage, LLM gateway, payment providers, template renderer
 workers/
   web_audit/           Playwright + injected engines
   documents/           PDF / DOCX / PPTX / EPUB
   media/               FFmpeg + Whisper + TTS
   mobile/              Appium + emulator (Phase 5)
+  notify/              Email and in-app notification delivery (3.14)
+  billing/             Razorpay webhooks, reconciliation, invoices (3.16)
+  ops_agent/           Monitor-and-heal agent and runbook executor (3.15)
 packages/
   ui/                  Accessible component library (React Aria) + design tokens + Storybook
   engine-bundles/      Pinned axe-core / IBM / HTMLCS browser bundles
 rules/                 Versioned rule registry + standard mappings (YAML, SME-reviewed)
+  content/             Rule content library: plain-language explanation and fixes per rule (3.14)
+templates/             Default report and notification templates, shared accessible blocks (3.14)
+runbooks/              Self-healing runbooks (YAML) and their fault-injection tests (3.15)
 fixtures/              Known-bad test sites/files for scanner benchmarks
 infra/                 docker-compose, Dockerfiles, deployment
 docs/                  Architecture, plan, ADRs, accessibility statement
 ```
+
+### 3.13 Model tiering and the validation layer
+
+**Principle:** spend premium-model tokens only where a wrong answer is costly or hard to detect. Routine work runs on cheap models or on no model at all, and a stronger model checks the output that matters.
+
+**Resolution ladder.** Every AI task tries the cheapest rung first and stops at the first rung that produces a validated result:
+
+| Rung | What | Tokens |
+|---|---|---|
+| 1 | Content library or cache hit (rule library text, response cache keyed by template fingerprint) | 0 |
+| 2 | Deterministic recipe: a DOM or AST patch for a known pattern (add `lang`, associate a `<label>`, mark a decorative image `alt=""`, add table header scope) | 0 |
+| 3 | `LIGHT` model | Low |
+| 4 | `STANDARD` model (escalation) | Medium |
+| 5 | `PREMIUM` model (escalation, or the validator) | High |
+| 6 | Human review (HITL queue) | None, but slow and costly |
+
+**Tiers.** Tier is an attribute of each model in the admin panel (`AIModel.tier`), so which concrete models sit in which tier is a setting, not code.
+
+| Tier | Typical models (examples only; admins decide) | Used for |
+|---|---|---|
+| `LIGHT` | Small, fast, cheap: Haiku-, Flash- and mini-class models, DeepSeek, self-hosted open-weight models | Normalising and labelling findings, naming root-cause clusters, simple alt text, patches for common patterns, caption clean-up, language detection, incident triage |
+| `STANDARD` | Mid-size general models | Component-level code patches, vision audit of screenshots, document layout analysis, audio-description drafts, diagram alt text |
+| `PREMIUM` | Top reasoning and frontier models | **Validation**, STEM and MathML, complex charts, VPAT conformance reasoning, resolving disagreement between engines, diagnosing novel incidents |
+
+**Validation layer: produce, then verify.** Three validators, cheapest first:
+
+1. **V1, deterministic (always on, no tokens).** Schema and JSON validity; the patch applies cleanly; the **re-scan oracle**: apply the patch to an isolated copy of the DOM fragment, re-run the scan engines, and require that the targeted violation is gone and no new one appears; the cited WCAG criterion exists in the registry; alt-text rules (length, no "image of", not a filename, correct language); every number in a generated narrative matches the data; veraPDF, EPUBCheck and Ace re-validation for files; MathML parses and renders. Our own scan engines act as the oracle, which is a structural advantage over general-purpose AI tools.
+2. **V2, LLM validator (`PREMIUM`, policy-driven).** Reviews the producer's output against the evidence (screenshot, DOM, rule) and returns pass or fail with reasons in a strict schema. It prefers a **different model family** from the producer, to avoid correlated mistakes. Mode per task: `always`, `sample` (a percentage), `on_low_confidence` or `never`.
+3. **V3, human.** The HITL queue takes anything left after escalation and all high-risk categories. An SME also audits a small sample of validator "passes", so we can measure the validator's own precision.
+
+**Escalation.** Per task: `max_attempts`, `escalate_on` (validation failure, unparsable output, timeout, low confidence), `max_cost_per_item` and `max_cost_per_job`. On a validation failure there is one repair attempt on the same tier with the validator's feedback in the prompt, then escalation by one tier. When the ladder is exhausted the item becomes `needs_review`: **unvalidated output is never delivered**. Model self-reported confidence is not trusted alone; confidence comes from validator results, agreement between scan engines, and agreement with the deterministic recipe.
+
+**Defaults by task** (all editable in admin):
+
+| Task | Producer | Validation |
+|---|---|---|
+| Finding normalisation, cluster names | Light | V1 |
+| Code fix, known pattern | Recipe, then Light | V1 re-scan oracle |
+| Code fix, component-level | Standard | V1 + V2 sampled |
+| Alt text, simple images | Light | V1 + V2 sampled, user approval |
+| Alt text, charts and diagrams | Standard | V1 + V2 always, user approval |
+| Vision audit findings | Standard | V2 on serious and critical findings; shown as "AI-detected, please confirm" |
+| STEM and MathML | Premium | V1 + V2 always + SME |
+| Audio description script | Standard | V2 always + user approval |
+| VPAT remarks and conformance level | Standard draft | V2 always + human sign-off |
+| Incident triage (3.15) | Light | V1 + policy engine |
+| Novel incident diagnosis (3.15) | Premium | Policy engine + human approval |
+
+**Cost controls.** Prompt caching for long static prefixes (rule text, instructions) where the provider supports it. Batch or async APIs at a discount for non-interactive work (scheduled monitoring, bulk alt text). Structured output with `max_tokens` caps. DOM snippets and computed context instead of whole pages. Downscaled images for vision. One fix per template fingerprint, not per page. Per-job and per-tenant budgets with a hard stop.
+
+**Evidence-driven tuning.** Each task has a golden set scored per model. To move a task to a cheaper model, an admin runs it in **shadow mode** on real items; the console shows the quality delta and the cost delta against the current route, and promotion is blocked below the evaluation threshold. Tracked: cost per accepted fix, first-pass acceptance by tier, escalation rate, validator rejection rate, validator precision (from V3 audits), and tokens avoided by rungs 1 and 2.
+
+**Data model additions to 3.11.2:** `AIModel.tier`; `AITaskRoute` becomes per stage (`produce` or `validate`) with an ordered chain of tiers, each holding models; `ValidationPolicy(task_key, mode, sample_rate, validator_tier, require_different_provider)`; `EscalationPolicy`; `AIUsage` gains `stage`, `attempt`, `escalated_from` and `validator_verdict`. New admin screens: tier per model, ladder editor per task, validation policy editor, and a cost-versus-quality dashboard.
+
+### 3.14 Templates, reports and notifications (templates first)
+
+**Principle:** static content costs zero tokens. Every report and every notification is a permanent, versioned template. AI fills only named dynamic slots, each with a deterministic fallback, and its output is cached by input hash.
+
+**Reports with permanent templates**
+
+| Report | Formats | Optional AI slot (admin toggle per plan) |
+|---|---|---|
+| Full audit report | PDF (PDF/UA), DOCX, CSV, JSON | Executive summary paragraph |
+| One-page executive summary | PDF | None; generated from data |
+| VPAT 2.5 / ACR (WCAG, 508, EU, INT editions) | DOCX, PDF | "Remarks and explanations" on partial and failing rows |
+| Document remediation report (before and after validator results) | PDF, DOCX | None |
+| Media report (captions, audio description) | PDF | None |
+| Mobile report | PDF | None |
+| Scan-to-scan regression report | PDF, email digest | None |
+| Usage and quota statement | PDF, CSV | None |
+| GST tax invoice, credit note, receipt | PDF/UA | None |
+| Super Admin reports (MRR/ARR, AI FinOps, trial funnel) | CSV, PDF | None |
+
+**Notification event catalogue.** Every event maps to a template, channels, recipients and timing, all editable in admin:
+
+- **Account:** verify email, welcome, invite, invite reminder, password reset, new-device sign-in, MFA change, data export ready, account deletion.
+- **Trial:** started, ending (days configurable, for example 7 / 3 / 1), expired and locked, converted.
+- **Usage:** quota at 80% and 100%, seat limit reached, plan changed, coupon applied.
+- **Scans and files:** complete, failed (with a credit-refund notice), regression detected, scheduled digest, remediated file ready, review assigned, review completed.
+- **Billing:** payment link, payment succeeded with invoice, payment failed with retry date, final notice, subscription cancelled, renewal reminder, refund processed.
+- **Operations (to admins):** provider outage and fallback active, incident opened and resolved, budget threshold reached, agent action awaiting approval.
+
+Channels: email and an in-app notification centre in Phase 1; outbound webhooks (Enterprise) and Slack or Teams alerts for admins in Phase 2.
+
+**How the template system works**
+
+| Concern | Design |
+|---|---|
+| **Registry** | Each template is declared in code: `key`, channels, variable schema (Pydantic), sample data, default content, category (`transactional`, `product`, `marketing`) and `requires_approval`. |
+| **Versions** | `TemplateVersion(key, locale, channel, subject, body, scope, status, author, comment, a11y_check)`. One published version per key, locale, channel and scope (global, or organization for white-label). A generated report records the `template_version_id` it used. |
+| **Rendering** | Sandboxed Jinja2 with autoescape and whitelisted variables only. Saving fails on an unknown variable or a syntax error. Plurals and dates go through ICU-style helpers, with a locale fallback chain (for example `ta` → `en`). |
+| **Shared blocks** | Header, heading, paragraph, button, table and legal footer are built and accessibility-tested once, then reused by every email and report, so a brand change is made in one place. |
+| **Editor (`/admin/templates`)** | Subject, preheader and body as source, with a variable picker, side-by-side preview (desktop, mobile, dark mode, plain text), "send test to me", diff, rollback and publish. Billing and legal templates need two-person approval. **No WYSIWYG widget** unless it passes our own audit: most fail, and a source editor with live preview is easier to make accessible. |
+| **Save-time checks (blocking)** | Required variables present; renders with sample data; our own scanner on the rendered HTML (heading order, link text, contrast, alt text, `lang`, text size, reflow); no broken links; unsubscribe and legal footer where the category requires them; size limit. |
+| **CI** | A golden-render test for every template and locale, using sample data. |
+| **Fallback** | If a published template fails at send time, the last known-good version is used and an incident is raised (3.15). |
+| **Delivery** | `notify` queue; an idempotency key per event and recipient; email provider from the registry (3.11.3) with failover; retries with backoff; bounce and complaint handling into a suppression list; per-user preferences (transactional mail cannot be switched off); digests; rate limits; an SPF, DKIM and DMARC checklist for the sender domain; no open-tracking pixels by default, for privacy. |
+| **Log** | `NotificationLog(event, template_version, recipient, status, provider_message_id, variables_hash)` for support and audit, with a retention limit. |
+
+**Rule content library (the biggest token saver).** For every `CanonicalRule` we keep, once: a plain-language title and summary, why it matters, who is affected, how to fix it (steps), before-and-after code for each stack (HTML, React, Angular, Jetpack Compose, SwiftUI), WCAG and legal clause links, the test method, and severity guidance. It is authored in `rules/content/*.yaml` (LLM-assisted drafting at authoring time, SME review, versioning, localisable) and edited through the compliance registry's review workflow. At scan time findings are filled by lookup. AI is called only for **context-specific patches** where the generic example does not fit, following the ladder in 3.13.
+
+**Report assembly.** A report is `template + data snapshot`, rendered deterministically:
+- Jinja2 → HTML → Chromium print to **tagged PDF** (document title, language, headings, table header cells, bookmarks) → veraPDF gate, with `pikepdf` repairs where tags are incomplete. Whether Chromium's tagged output reaches PDF/UA-1 without repairs is a Phase 0 spike.
+- DOCX through python-docx or docxtpl with real Heading styles and table header rows. CSV from code.
+- Charts are rendered server-side as SVG with `<title>` and `<desc>` and an adjacent data table.
+- The snapshot is stored, so any report can be re-downloaded or re-rendered later at no token cost. A template change affects new reports only, unless the user regenerates.
+- **Narrative paragraphs** default to deterministic text built from the data ("142 issues across 38 pages; 12 are critical; the most common is..."). An AI narrative is an optional toggle per report type and plan, produced by the light tier, cached by input hash, and checked by V1 (every number in the text must match the data).
+
+**Rule of thumb:** zero tokens for emails, report structure, rule explanations and invoices. Tokens go only to per-customer context: code patches, alt text, vision findings and optional narrative slots. FinOps reports "tokens avoided" next to "tokens spent".
+
+### 3.15 Reliability and self-healing (monitor-and-heal agent)
+
+**Scope:** any step in the platform that fails unexpectedly and unattended: scans, remediation jobs, AI calls, queues, webhooks, email, scheduled jobs.
+
+**Principles:** (1) heal deterministically first, because it is cheap, predictable and testable; (2) the agent diagnoses, and acts only through an allow-listed catalogue of bounded actions; (3) every action is reversible, rate-limited and audited; (4) the healer must not depend on what it heals.
+
+**Layers**
+
+| Layer | What | AI? |
+|---|---|---|
+| 0. Resilient by design | Built into every job (below) | No |
+| 1. Detection | Watchdogs, SLO alerts, synthetic canaries, reconciliation | No |
+| 2. Runbooks | Versioned, tested remediation steps for known failure signatures | No |
+| 3. Ops Agent | Triage, diagnosis of unknown failures, proposes or runs catalogue actions | Yes, bounded |
+| 4. Humans | Approvals, and anything outside the catalogue | n/a |
+
+**Where things break, and what happens automatically**
+
+| Area | Typical failures | Automatic response |
+|---|---|---|
+| Web scans | Browser crash, hang or out-of-memory; target blocks us (403, 429, WAF); crawl traps; redirect loops; TLS errors | Kill and retry in a fresh browser; resume from the crawl checkpoint; per-domain back-off; page and depth caps; blocked pages recorded with a reason; partial results delivered |
+| AI providers | Outage, 429, invalid JSON, expired or revoked key, deprecated model, runaway cost | Circuit breaker, then the fallback chain (3.11.2); repair-retry on invalid output; key-expiry alerts; per-job and per-tenant budget stop |
+| Queue and workers | Lost or stuck tasks, poison messages, redelivery loops, backlog | Heartbeats and a stuck-job sweeper; retry cap, then the dead-letter queue; quarantine; scale workers within limits |
+| Documents | Encrypted or corrupt files, JVM out-of-memory, validator still failing after remediation | Classify as user fault or system fault (3.5); route to review; never deliver an unvalidated file |
+| Media | FFmpeg or GPU out-of-memory, transcription loops | Chunked processing with resume; duration limits |
+| Mobile | Emulator will not boot, ADB offline, Appium session dies | Recycle the emulator; retry on another host |
+| Billing | Missed, duplicate or out-of-order webhooks; credits stuck in `RESERVED`; missed trial job | Idempotent handlers; nightly reconciliation; reservation sweeper; request-time trial check |
+| Email | Provider down, bounces, template render error | Provider failover; retry; last known-good template |
+| Platform | DB connection exhaustion, slow queries, full disk, certificate expiry | Alerts and a runbook (the agent suggests but does not act) |
+
+**Layer 0: in every job.** An explicit state machine (`QUEUED → RUNNING → SUCCEEDED | FAILED | NEEDS_REVIEW | CANCELLED`, plus `RETRYING`); a heartbeat; idempotency keys; checkpoints; timeouts and resource limits; a retry policy by error class (transient, user fault, system fault, poison); a dead-letter queue; circuit breakers per provider, engine and target domain; bulkheads (per-queue concurrency); graceful degradation (a scan whose AI step is down still completes with deterministic findings, flagged "AI step skipped"); and release of the credit reservation on a system fault (3.5).
+
+**Layer 1: detection.** Stuck-job sweeper; queue age and depth; error-rate and latency SLOs per queue, provider, engine and domain; **synthetic canaries** (scan a known fixture page, send a tiny prompt to each provider, send a test email, check the Razorpay webhook heartbeat); cost-anomaly detection; billing reconciliation; orphaned-reservation sweeper. Each detection opens an `Incident` with a fingerprint, so repeats are grouped, not duplicated.
+
+**Layer 2: runbooks.** `runbooks/*.yaml` holds the trigger signature, diagnostics to collect, ordered steps from the action catalogue, a verification check, rollback, maximum attempts and escalation. Runbooks are versioned and **tested with fault injection** in CI and in periodic game days. Most incidents end here, with no tokens spent.
+
+**Layer 3: Ops Agent.** Event-driven: it starts when an incident opens and does not poll continuously, which saves tokens. Flow: triage → diagnose → plan → act through the policy engine → verify → report and learn.
+
+*Action catalogue and default autonomy (all editable in `/admin/ops`):*
+
+| Class | Examples | Default |
+|---|---|---|
+| A: safe and reversible | Retry a job; resume from a checkpoint; release an orphaned reservation; recycle a worker, browser or emulator; close a circuit breaker after the canary passes | Auto, with notification |
+| B: bounded configuration | Switch an AI route to its fallback (auto-reverts when the primary is healthy); lower crawl concurrency; pause or resume a queue; scale workers within limits; disable a failing engine for N hours | Auto only for runbooks with a proven record, otherwise approval |
+| C: customer-affecting | Fail a job with a reason and refund credits; cancel a tenant's jobs | Approval |
+| D: forbidden | Change prices, plans or quotas; read or write secrets; touch RLS or security settings; read customer content; delete data; deploy code | The agent has no tool for these |
+
+Autonomy levels, set per action and per environment: **Observe → Suggest → Approve-to-run → Auto-with-notify**. Everything ships at Suggest. An action is promoted to Auto only after a configurable number of supervised successes, and the console shows that evidence.
+
+*Safeguards:*
+- A deterministic **policy engine** authorises every action. The agent outputs structured proposals only, and tool arguments are validated against schemas.
+- **Untrusted input:** logs, URLs, page content and uploaded files are data, never instructions. Customer content and secrets are redacted before anything reaches a model; the agent works from error signatures, stack frames, metrics and ids.
+- Rate limits and blast-radius caps (for example no more than N jobs per hour, one route switch per provider per hour). Loop guard: after N attempts on one fingerprint, hand over to a human. Temporary changes expire or auto-revert. A global kill switch.
+- Token budgets per incident and per day: `LIGHT` tier for triage and `PREMIUM` for novel diagnosis (3.13). If every AI provider is down, the agent falls back to runbook-only mode.
+- It runs as its own `ops` service and queue, with least-privilege credentials and a read-only database role. **Watching the watcher:** a simple external uptime and dead-man's-switch check covers the agent and the core.
+
+*Learning loop:* a fix the agent finds for a new failure becomes a draft runbook, and a human approves it before it joins the library. Each incident gets a templated post-incident summary (3.14) and a drafted backlog item for the permanent fix.
+
+**Ops console (`/admin/ops`):** incident list and timeline with the agent's reasoning and evidence, pending approvals (fully keyboard-operable), runbook library, autonomy matrix, canary status, heal rate, mean time to recovery, and the agent's own token cost.
+
+**Customer-visible behaviour:** job pages say "Retrying automatically (attempt 2 of 3)"; users are told only if the outcome changes; credits are refunded automatically on system faults; a public status page fed by the canaries arrives in Phase 2.
+
+**Observability baseline (Phase 0):** structured JSON logs carrying `trace_id`, `job_id` and `org_id`; OpenTelemetry traces; Prometheus metrics; Grafana dashboards; Loki for logs; an open-source error tracker (GlitchTip or similar); Alertmanager routing to email and Slack. One ADR picks the stack.
+
+### 3.16 Billing with Razorpay
+
+**Decision:** Razorpay is the payment gateway (INR). It sits behind a `PaymentProvider` interface with a fake provider for tests, so the admin gateway registry (3.11.3) still holds and another gateway can be added later.
+
+**Which Razorpay product for which case**
+
+| Case | Razorpay product | Notes |
+|---|---|---|
+| Self-serve monthly plans | Subscriptions (auto-debit by card, UPI AutoPay or e-mandate) | Webhooks drive state |
+| Annual plans, and anything above e-mandate limits | Orders + Checkout, or Payment Links, with renewal reminders (or a yearly subscription if limits allow) | Decide in the spike. RBI rules require per-charge customer authentication for recurring debits above a per-transaction limit (₹15,000 when last checked; verify the current figure) |
+| Enterprise and invoice-based | Payment Link on a GST invoice, or bank transfer to a virtual account (NEFT, RTGS, UPI) | Reconcile TDS deductions on bank transfers |
+| First design partners (Phase 1) | Super Admin assigns the plan and creates a Payment Link; the `payment_link.paid` webhook activates it | Same webhook pipeline as later phases |
+| Refunds | Refund API plus a credit note | Admin-initiated, reason required |
+
+**Self-serve flow**
+1. On `/org/billing` the admin picks plan, cycle and coupon. The server calculates the price (our coupon engine is the source of truth; amounts are integers in paise) and shows a GST preview.
+2. The server creates a local `CheckoutSession` (with an idempotency key) and the Razorpay subscription or order. Razorpay Plans are created lazily and mapped through `RazorpayPlanMap(plan, cycle, amount) → razorpay_plan_id`.
+3. The browser opens Razorpay Checkout with the public `key_id` and ids only. The success callback is a hint: the server verifies its HMAC signature, but **entitlements change only after the webhook**.
+4. **Webhook receiver:** verify `X-Razorpay-Signature` (HMAC-SHA256 of the raw body with the webhook secret), de-duplicate by event id in `WebhookEvent` (unique key), store the raw payload, enqueue on the `billing` queue and return 200 quickly. Handlers are idempotent and tolerate out-of-order delivery by re-fetching authoritative state from the Razorpay API when in doubt.
+5. The handler updates `Subscription`, `Payment` and `Invoice`, sets `subscription_status` and entitlements, confirms the coupon redemption (only on payment success), and sends the invoice and notifications from templates (3.14).
+6. A nightly reconciliation compares Razorpay payments and subscriptions with ours. Mismatches open an incident (3.15).
+
+**Status mapping.** Razorpay subscription states (`created`, `authenticated`, `active`, `pending`, `halted`, `cancelled`, `completed`, `expired`, `paused`) map to our `TRIALING / ACTIVE / PAST_DUE / LOCKED_READ_ONLY` plus a `cancel_at_period_end` flag. A failing charge (`pending`) shows a warning and keeps access. `halted` becomes `PAST_DUE`, then `LOCKED_READ_ONLY` after an admin-configurable grace period. `cancelled` keeps access to the end of the paid period. Cancelling never deletes data. Dunning messages come from templates.
+
+**Plan changes.** Upgrades take effect immediately, with the prorated difference charged as a one-off payment. Downgrades take effect at the next cycle. Entitlements change with the plan. Razorpay's own change semantics are verified in the spike.
+
+**Coupons.** Razorpay only ever sees the final amount; Razorpay Offers (managed in its dashboard) are not used. Version 1 supports a percentage or fixed discount for the first cycle, the first N cycles, or the lifetime of the subscription. A redemption is confirmed only on payment success, and an abandoned checkout releases it.
+
+**GST and invoicing (India).** A billing profile holds legal name, address, state and an optional GSTIN (format and checksum validation). We issue the tax invoice ourselves, because a gateway receipt is not a GST invoice: a gap-free sequential series per financial year; CGST + SGST or IGST by place of supply; GST rate and SAC code as admin settings, confirmed with a chartered accountant; credit notes for refunds; e-invoicing (IRN) if our turnover crosses the threshold; statutory retention. **Invoices are accessible PDF/UA** from the template system.
+
+**Data model.** `PaymentGatewayAccount` (mode test or live, key id, secret references), `BillingProfile`, `Subscription`, `Payment`, `Invoice`, `CreditNote`, `Refund`, `WebhookEvent`, `CheckoutSession`, `RazorpayPlanMap`, `DunningAttempt`. All are tenant-scoped under RLS except the gateway configuration.
+
+**Admin screens**
+- `/admin/billing`: gateway setup (mode, keys, webhook secret, test connection, webhook health), Razorpay plan sync with drift detection, subscriptions, payments, failed payments and dunning, refunds, invoices (re-send, re-download), reconciliation report, and GST settings (legal entity, GSTIN, state, SAC, rate, invoice series, bank details).
+- `/org/billing`: current plan and next charge date, plan change, coupon, GSTIN and billing address, payment-method update, invoice history, cancel.
+
+**Security.** Card data never touches our servers; hosted Checkout keeps PCI scope minimal. The key secret and webhook secret live in the secrets store, write-only. Test and live modes are separate, with a visible "TEST MODE" banner. The webhook endpoint is signature-only and rate-limited. Stored payloads are minimised and retention-limited. Every admin billing action is audited; refunds above a threshold and price changes need two-person approval.
+
+**Accessibility of paying.** Razorpay Checkout is third-party UI that we do not control. We test it with keyboard, NVDA and VoiceOver in the spike and report the result in our Accessibility Statement. An accessible fallback is always available: a hosted Payment Link, bank transfer against an invoice, or support-assisted payment. Our own billing screens (plan picker, GSTIN form, invoice list) meet section 2 in full.
+
+**Testing.** A `PaymentProvider` fake for unit tests; contract tests on recorded sandbox payloads; signed-webhook replay tests (duplicate, out-of-order, late, forged); coupon concurrency tests; reconciliation tests. Automating the Checkout iframe is flaky, so Checkout itself stays on the release checklist.
+
+**Spike before building** (validate against current Razorpay docs and the sandbox):
+1. Subscription lifecycle, statuses and webhook event order.
+2. Plan-change and proration behaviour.
+3. E-mandate limits, and the right approach for annual and high-value plans.
+4. Updating the payment method on an existing subscription.
+5. First-cycle and N-cycle discounts.
+6. Webhook retry window and event ids.
+7. International cards and multi-currency enablement.
+8. Virtual accounts for bank transfers.
+9. Checkout accessibility.
+10. GST invoicing duties and e-invoicing applicability, with a chartered accountant.
+11. Account activation and KYC lead time: start early, it can take days to weeks.
 
 ---
 
@@ -338,13 +584,17 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Accessible auth: signup, login, email verification, password reset, invite acceptance (SC 3.3.8). Short-lived JWT access tokens plus refresh tokens in `httpOnly` cookies.
 - Postgres RLS framework plus the isolation test suite.
 - **Settings framework (3.11.1):** typed registry, scope resolution, encrypted write-only secrets, versioning + audit + rollback, Redis cache with live invalidation, schema-generated admin forms.
-- `LLMGateway` interface with provider adapters and a fake provider for tests.
-- ADRs for: component library, cloud target, LLM providers, broker.
+- `LLMGateway` interface with provider adapters and a fake provider for tests, with hooks for tiers, escalation and validation (3.13).
+- **Template system (3.14):** registry, versioned storage, sandboxed renderer and shared accessible email blocks; move the existing auth emails onto it. Spike: does Chromium's tagged PDF reach PDF/UA-1?
+- **Reliability baseline (3.15):** job state machine with heartbeat, error classes, retry policy and dead-letter queue; structured logs with trace ids; OpenTelemetry, Prometheus and Grafana wired into docker-compose.
+- `PaymentProvider` interface, fake provider and billing data model (3.16). Start Razorpay account activation and KYC now, because it has a lead time.
+- ADRs for: component library, cloud target, LLM providers, broker, observability stack, template engine.
 
 **Exit criteria**
 - `docker compose up` brings up the full stack with seed data in one command.
 - Zero axe violations on every shell route. Keyboard and screen reader smoke test passed (NVDA + VoiceOver).
 - Cross-tenant isolation tests are green.
+- Every auth email renders from a published template and passes the template accessibility check.
 
 ### Phase 1: MVP, sellable web accessibility audits
 
@@ -352,13 +602,16 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - **SaaS core:** Plans, Organizations, Users and roles, Seat Limit Guard with upgrade prompt, Trial engine (14 days → `LOCKED_READ_ONLY`), Coupons + Redemptions, Usage Ledger + Reservations, audit logs.
 - **Rule registry:** WCAG 2.0/2.1/2.2 (A/AA, plus 2.2 AAA as informational), Section 508, ADA Title II + III, EN 301 549 Clause 9, GIGW 3.0, AU target. Switching standards recalculates scores and filters on existing scan data.
 - **Web scanner:** single URL + bounded crawl, three engines in one page, normalisation, deduplication, confidence score, template clustering, full-page + element screenshots, pinned engine versions.
-- **AI Code-Fix Copilot:** one suggested HTML/ARIA/React patch per clustered root cause, with explanation and the WCAG SC it addresses. Copy-only.
+- **AI Code-Fix Copilot:** one suggested HTML/ARIA/React patch per clustered root cause, with explanation and the WCAG SC it addresses. Copy-only. It follows the resolution ladder (3.13): library text, then deterministic recipes, then a light model, then escalation. Every fix passes the V1 re-scan check, and sampled fixes also pass premium-model validation (V2).
 - **Reports:** in-app results, CSV, **accessible PDF (veraPDF-gated)**, DOCX; **VPAT 2.5 draft** (WCAG / 508 / EU / INT editions) with "Not Evaluated" defaults and required human sign-off before export.
+- **Templates and content (3.14):** permanent templates for every report and for every notification in the event catalogue; admin template editor with preview and test send; rule content library covering every rule the scanner can emit; deterministic narrative text by default.
 - **Dashboards (first version):**
   - `/workspace`: New Scan dialog (URL + standards), live progress, findings list with filters, web Fix Workbench (issue list ↔ screenshot ↔ code fix), report export.
   - `/org`: team and invites with live "X of Y seats used", quota meters, plan details, coupon entry, branding (logo only).
-  - `/admin`: tenant directory, manual plan assignment, trial funnel counts, plus the configuration screens: **plans and entitlements, trials, coupons, AI providers / models / task routing / budgets, scan engines, compliance registry, email, feature flags, legal content** (3.11), with audit history and rollback.
-- **AI providers at launch:** at least two live adapters behind the gateway, so fallback works from day one. All provider types in 3.11.2 can be added as rows without code changes.
+  - `/admin`: tenant directory, manual plan assignment, trial funnel counts, plus the configuration screens: **plans and entitlements, trials, coupons, AI providers / models / tiers / task routing / validation policies / budgets, scan engines, compliance registry, report and email templates, notification events, feature flags, legal content, billing** (3.11, 3.13, 3.14, 3.16), with audit history and rollback.
+- **AI providers at launch:** at least two live adapters behind the gateway, so fallback works from day one. All provider types in 3.11.2 can be added as rows without code changes. Each task has a tier ladder and a validation policy; the validator runs on a different provider from the producer where two are available.
+- **Reliability, layers 0 to 2 (3.15)** for the web scan pipeline: retries by error class, checkpoints, dead-letter queue, stuck-job and orphaned-reservation sweepers, provider circuit breakers and failover, synthetic canaries, first deterministic runbooks, and a read-only incident list in `/admin/ops`.
+- **Billing foundation (3.16):** Razorpay test-mode spike, webhook receiver with signature check and de-duplication, Payment Link flow for design partners, GST invoice engine (accessible PDF/UA), essential `/admin/billing` screens, read-only `/org/billing` (plan and invoices).
 - **Security:** SSRF protections, domain verification, rate limits.
 - **Platform accessibility:** Accessibility Statement published; first human audit of our own UI.
 
@@ -368,6 +621,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Every exported PDF passes veraPDF; DOCX golden tests pass.
 - Our own ACR drafted from a human audit; zero open Critical/Serious accessibility issues in our UI.
 - Switching the code-fix task to a different provider in `/admin` takes effect on the next job with no redeploy, and an outage of one provider falls back automatically.
+- Killing a worker mid-scan ends in an automatic resume, or a failure with a reason within the target time, and no credits stay reserved. With the primary AI provider disabled, the canary detects it and the route fails over without staff action.
+- The share of findings explained and fixed without any model call (library plus recipes) is measured and reported, along with cost per accepted fix.
+- Every event in the notification catalogue has a published template that passes the template accessibility check.
+- A Razorpay Payment Link payment activates a plan through the webhook, and the duplicate, out-of-order and forged-signature webhook tests pass.
 - 3–5 design partners actively scanning.
 
 ### Phase 2: Deep web audit and monetisation
@@ -378,7 +635,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Virtual screen reader transcript in the workbench (spoken log next to the issue).
 - Vision-LLM auditor: text in images, contrast over gradients and images, alt text quality, missing focus indicators.
 - Scheduled monitoring, scan-to-scan regression diff, email digests (accessible HTML emails).
-- Payment gateway: subscriptions, GST invoices, webhooks, `PAST_DUE` handling, self-serve upgrade checkout (SC 3.3.7-compliant).
+- **Razorpay self-serve billing (3.16):** subscriptions for monthly plans, orders or yearly subscriptions for annual plans as decided in the spike, plan changes, coupons mapped to final amounts, dunning, refunds and credit notes, nightly reconciliation, `PAST_DUE` and lock handling, and an upgrade checkout that meets SC 3.3.7 with accessible fallback payment paths.
+- **Ops Agent (3.15):** Suggest and Approve-to-run modes, action catalogue with policy engine, approvals in `/admin/ops`, billing-reconciliation incidents, public status page; proven runbooks promoted to Auto.
+- **AI tiering, round 2 (3.13):** sampled premium validation, shadow-mode promotion of cheaper models, cost-versus-quality dashboard.
+- **Notifications, round 2 (3.14):** outbound webhooks for Enterprise, Slack or Teams admin alerts, per-user preferences and digests, Indian-language template variants (for example Tamil and Hindi).
 - Super Admin: MRR/ARR, trial conversion, AI FinOps (token cost per tenant), budget caps.
 - Configuration, round 2: payment gateway registry, tax settings, bring-your-own AI key for Enterprise, per-org data policy (regions, zero retention), prompt versioning with evaluation-gated activation, staged rollouts, two-person approval for high-risk changes.
 - White-label: contrast-validated brand colours, custom report branding.
@@ -388,6 +648,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Self-serve trial → paid conversion works end to end without staff involvement.
 - AI features pass the evaluation harness; per-tenant AI cost visible and capped.
 - Release screen-reader matrix (section 2.6) passed.
+- A self-serve payment through Razorpay works end to end in live mode, and the nightly reconciliation shows no unexplained differences over a full billing cycle.
+- In Suggest mode the Ops Agent makes correct proposals for injected faults (provider outage, stuck queue, orphaned reservations), and every action and proposal is in the audit log.
 
 ### Phase 3: Documents and eBooks
 
@@ -398,6 +660,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 4. **EPUB3:** EPUBCheck + Ace, accessibility metadata in `package.opf`, landmarks, alt text, MathML.
 - **HITL SME console:** queue, assignment, side-by-side review, approve/edit/reject, SLA tracking. Fully keyboard-operable, with no drag-only actions (SC 2.5.7).
 - Document workbench: side-by-side preview, editable alt text, **reading-order editor with move up/down buttons** (not drag-only), "Download Remediated File".
+- Document validators (veraPDF, EPUBCheck, Ace) are V1 checks in the validation layer (3.13). Add document runbooks (3.15) and the remediation report template (3.14).
 
 **Exit criteria**
 - Remediated files pass their validators, and SME review confirms reading order on a sample set.
@@ -410,6 +673,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - Caption editor: row-based text editing with time inputs; waveform as an optional aid; keyboard shortcuts documented and remappable (SC 2.1.4).
 - Audio Description: keyframes during pauses → LLM-drafted AD script → human approval → TTS (Kokoro/Piper) → mux AD track + captions into an accessible MP4. Extended AD when pauses are too short.
 - Indian-language captions (Whisper multilingual): a differentiator for the domestic market.
+- Light-tier caption clean-up; premium validation of audio-description scripts (3.13). Add media runbooks (chunk and resume) and the media report template (3.14, 3.15).
 
 **Exit criteria**
 - Caption accuracy (WER) measured on a reference set for each supported language.
@@ -420,6 +684,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 **Scope**
 - Android: APK upload → sandboxed emulator (KVM host) → Appium UiAutomator2 + Google ATF → TalkBack-order traversal, node info, screenshots → Kotlin / Jetpack Compose / React Native fixes.
 - iOS (XCUITest + VoiceOver on on-demand macOS hosts) and real NVDA/VoiceOver capture for web: backlog, prioritised by customer demand.
+- Mobile runbooks (emulator recycle, host failover) and the mobile report template (3.15, 3.14).
 
 **Exit criteria**
 - Benchmark against a known-bad sample APK set; sandbox escape and network-isolation tests pass.
@@ -432,12 +697,17 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|---|
 | 1 | UI primitive library | React Aria Components only (no Radix mixing) |
 | 2 | Production cloud | Pick **one** for v1 (S3 or Azure Blob); keep the storage abstraction for later |
-| 3 | Payment gateway and timing | Manual invoicing in Phase 1; gateway with INR + GST subscriptions in Phase 2 |
+| 3 | Payment gateway and timing | **Razorpay** (3.16). Payment Links with manual plan activation in Phase 1; subscriptions in Phase 2. Start account activation and KYC now |
 | 4 | LLM providers and data policy | Admin-configurable providers (3.11.2). Pick 2 for launch; zero-retention agreements; per-tenant region and provider restrictions |
 | 5 | Real screen reader capture | Virtual screen reader in Phase 2; real NVDA/VoiceOver hosts as a premium backlog item |
 | 6 | Celery broker | Redis to start (tuned `visibility_timeout`); revisit RabbitMQ when media jobs land |
 | 7 | Rule-mapping and VPAT sign-off | Named accessibility SME (IAAP CPACC/WAS) owns mappings and VPAT approvals |
 | 8 | PDF library replacing PyMuPDF | `pypdfium2` + `pdfplumber` unless we buy a commercial licence |
+| 9 | Concrete models per tier | Assign models to `LIGHT`, `STANDARD` and `PREMIUM` per provider. Use a premium model from a different provider than the producer as the default validator |
+| 10 | Observability stack | OpenTelemetry + Prometheus + Grafana + Loki + GlitchTip (or equivalent), chosen in a Phase 0 ADR |
+| 11 | Ops Agent autonomy and ownership | Every action starts at Suggest and is promoted only with a supervised track record. Name a human owner for approvals and on-call |
+| 12 | GST and e-invoicing | A chartered accountant confirms rate, SAC code, e-invoicing applicability and invoice retention before the first invoice |
+| 13 | Template editor | Source editor with live preview; no WYSIWYG widget unless it passes our own audit |
 
 ## 6. Top risks
 
@@ -446,7 +716,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | Overclaiming compliance (legal/regulatory exposure) | "Automated coverage X/Y" scoring, "Not Evaluated" defaults, human-signed VPATs, careful marketing copy |
 | Our own UI has accessibility defects | CI gates from Phase 0, release AT matrix, disabled-user testing, public statement and feedback loop |
 | Scope too broad, delaying revenue | Phase 1 kept to the web audit MVP; later phases driven by design-partner demand |
-| LLM cost grows with crawl size | Template clustering, response cache, per-tenant budgets, deterministic checks before AI |
+| LLM cost grows with crawl size | Template clustering, response cache, per-tenant budgets, deterministic checks before AI, model tiering and the resolution ladder (3.13), rule content library (3.14) |
 | Hostile inputs (SSRF, malicious files, APKs) | Sandboxed workers, egress controls, domain verification, malware scanning |
 | Admin misconfiguration breaks production (bad key, wrong price, disabled model) | Typed validation, test connection, draft/publish, evaluation gates, two-person approval, versioned rollback, audit log |
+| Cheaper models degrade quality unnoticed | Validation layer, shadow-mode promotion behind an evaluation gate, escalation caps, validator precision audits, cost-versus-quality dashboard |
+| The self-healing agent causes harm or loops | Allow-listed actions, deterministic policy engine, rate limits, auto-revert, Suggest-first autonomy, kill switch, no access to secrets or customer content |
+| Payment state drifts from Razorpay (missed or duplicate webhooks) | Signature check, event-id de-duplication, idempotent handlers, nightly reconciliation, incident on mismatch |
+| GST or e-invoicing mistakes | Chartered accountant sign-off, admin-configurable tax settings, gap-free invoice series, credit notes |
+| Razorpay Checkout is not fully accessible (we do not control it) | Test it in the spike, publish the result, offer accessible fallback payment paths |
+| Template edits break emails or reports | Save-time render and accessibility checks, two-person approval for billing and legal templates, last known-good fallback, version rollback |
 | Engine and rule drift over time | Pinned engine versions per scan, versioned rule registry, benchmark suite in CI |
