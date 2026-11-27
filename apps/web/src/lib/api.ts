@@ -106,3 +106,20 @@ export async function download(path: string): Promise<{ ok: true } | { ok: false
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
   return { ok: true };
 }
+
+/** Fetch a private image (the API needs our token, which an <img src> cannot send) and return a local URL for it. */
+export async function getBlobUrl(path: string): Promise<{ ok: true; url: string } | { ok: false; problem: Problem }> {
+  const headers = new Headers();
+  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { headers, credentials: "same-origin" });
+  } catch {
+    return { ok: false, problem: { detail: "We could not reach the server. Check your connection and try again." } };
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, problem: { detail: typeof body?.detail === "string" ? body.detail : "The picture could not be loaded." } };
+  }
+  return { ok: true, url: URL.createObjectURL(await res.blob()) };
+}

@@ -38,12 +38,19 @@
   const identity = (el) => {
     if (!el || el.nodeType !== 1) el = document.documentElement;
     const r = el.getBoundingClientRect();
+    // Page coordinates. An element inside a (same-origin) iframe is measured against that frame's viewport, so add
+    // each enclosing frame's own offset, then the top page's scroll.
+    let ox = 0, oy = 0, win = el.ownerDocument.defaultView;
+    try {
+      while (win && win.frameElement) { const f = win.frameElement.getBoundingClientRect(); ox += f.x; oy += f.y; win = win.parent; }
+    } catch (_) { /* cross-origin parent: keep what we have */ }
+    const sx = (win || window).scrollX || 0, sy = (win || window).scrollY || 0;
     let html = "";
     try { html = el.cloneNode(false).outerHTML; } catch (_) { html = `<${el.tagName.toLowerCase()}>`; }
     return {
       xpath: xpathOf(el), css: cssOf(el), tag: el.tagName.toLowerCase(), type: (el.getAttribute && el.getAttribute("type")) || null,
       html: html.slice(0, MAX_HTML),
-      rect: { x: Math.round(r.x + scrollX), y: Math.round(r.y + scrollY), w: Math.round(r.width), h: Math.round(r.height) },
+      rect: { x: Math.round(r.x + ox + sx), y: Math.round(r.y + oy + sy), w: Math.round(r.width), h: Math.round(r.height) },
     };
   };
   // Resolves an xpath, descending into same-origin iframes: ".../iframe[1]/html[1]/body[1]/p[1]".

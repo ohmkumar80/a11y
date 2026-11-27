@@ -21,7 +21,7 @@ from a11y_core.celery_app import celery_app
 from a11y_core.config import definitions as _definitions  # noqa: F401
 from a11y_core.config import get_config
 from a11y_core.db import dispose_engines, tenant_session
-from a11y_core.models import ScanFinding, ScanPage
+from a11y_core.models import PageScreenshot, ScanFinding, ScanPage
 from a11y_core.rules import get_registry
 from a11y_core.scan_jobs import USAGE_FEATURE, fail_scan
 from sqlalchemy import func, text
@@ -30,6 +30,9 @@ from .engines import load_bundles
 from .scanner import PageResult, ScanOptions, scan_site
 
 log = logging.getLogger(__name__)
+MAX_SHOT_BYTES = (
+    1_500_000  # below the table's 2 MB limit; a bigger image is dropped, the scan still succeeds
+)
 # Errors on the START page that are the customer's doing: the credit is kept.
 CUSTOMER_FAULTS = {
     "dns_failed",
@@ -90,6 +93,9 @@ async def run_scan(
         page_timeout_s=s.page_timeout_seconds,
         politeness_delay_ms=s.politeness_delay_ms,
         respect_robots=s.respect_robots,
+        screenshot=s.screenshots and s.screenshot_pages > 0,
+        screenshot_quality=s.screenshot_quality,
+        screenshot_max_height=s.screenshot_max_height,
     )
     async with tenant_session(org_id) as db:
         await db.execute(
@@ -104,7 +110,7 @@ async def run_scan(
             },
         )
 
-    totals = {"pages": 0, "findings": 0}
+    totals = {"pages": 0, "findings": 0, "shots": 0}
     first: list[PageResult] = []
 
     async def on_page(r: PageResult) -> None:
@@ -154,6 +160,27 @@ async def run_scan(
                 )
                 for f in r.findings
             )
+            if (
+                r.screenshot
+                and r.screenshot_meta
+                and totals["shots"] < s.screenshot_pages
+                and len(r.screenshot) <= MAX_SHOT_BYTES
+            ):
+                m = r.screenshot_meta
+                db.add(
+                    PageScreenshot(
+                        organization_id=org_id,
+                        scan_id=scan_id,
+                        page_id=page.id,
+                        content=r.screenshot,
+                        width=m["width"],
+                        height=m["height"],
+                        page_height=m["page_height"],
+                        truncated=m["truncated"],
+                        size_bytes=len(r.screenshot),
+                    )
+                )
+                totals["shots"] += 1
             if r.status == "OK":
                 totals["pages"] += 1
                 totals["findings"] += len(r.findings)

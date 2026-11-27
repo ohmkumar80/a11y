@@ -10,14 +10,20 @@ export const SCAN_ID = "11111111-aaaa-4bbb-8ccc-111111111111";
 export const FINDING = {
   id: "f1", rule: "image-alt", title: "Images need a text alternative", kind: "violation", severity: "critical", confidence: "high",
   criteria: [{ id: "1.1.1", name: "Non-text Content", level: "A", clause: "WCAG 1.1.1" }], engines: ["axe", "ibm", "htmlcs"], agreement: "3 of 3 engines",
-  message: "Element does not have an alt attribute", element: { xpath: "/html[1]/body[1]/img[1]", css: "html > body > img:nth-of-type(1)", tag: "img", html: '<img src="logo.png">' },
+  message: "Element does not have an alt attribute", element: { xpath: "/html[1]/body[1]/img[1]", css: "html > body > img:nth-of-type(1)", tag: "img", html: '<img src="logo.png">', rect: { x: 100, y: 200, w: 300, h: 80 } },
   page: { id: "p1", url: "https://example.com/" }, help_url: "https://dequeuniversity.com/rules/axe/4.14/image-alt", cluster_key: "abc",
 };
+export const FINDING2 = {
+  ...FINDING, id: "f2", rule: "button-name", title: "Buttons need a name", severity: "serious", criteria: [{ id: "4.1.2", name: "Name, Role, Value", level: "A", clause: "WCAG 4.1.2" }],
+  element: { xpath: "/html[1]/body[1]/button[1]", css: "html > body > button:nth-of-type(1)", tag: "button", html: "<button></button>", rect: { x: 0, y: 0, w: 0, h: 0 } },
+};
+export const PAGE_SHOT = { width: 1280, height: 1000, page_height: 2400, truncated: true };
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const detail = (status: string, pages = 1) => ({
   id: SCAN_ID, url: "https://example.com/", mode: "single", max_pages: 1, standards: ["WCAG_2_2_AA", "EU_EAA_EN_301_549"], status, error_code: null, error_detail: null,
   pages_scanned: pages, findings_count: 3, created_at: "2026-11-27T01:00:00Z", started_at: null, finished_at: null,
   engine_versions: { axe: "4.14.1", ibm: "4.0.35", htmlcs: "2.5.1" }, rules_version: "2026-11-27.1", attempts: 1,
-  pages: [{ id: "p1", url: "https://example.com/", status: "OK", error_detail: null, title: "Example" }],
+  pages: [{ id: "p1", url: "https://example.com/", status: "OK", error_detail: null, title: "Example", screenshot: PAGE_SHOT }],
   by_kind: { violation: { critical: 1, serious: 1 }, needs_review: { moderate: 2 }, best_practice: { minor: 1 } },
   summary: { standard: "WCAG_2_2_AA", label: "WCAG 2.2 Level AA", legal_status: "reference", citation: null, notes: null, automated_coverage: { tested: 30, total: 55 },
     failed: ["1.1.1", "4.1.2"], needs_review: ["1.4.3"], no_issues_found: ["3.1.1"], not_tested: ["1.2.5"], review_status: "draft",
@@ -54,8 +60,10 @@ export async function mockScanApi(page: Page, state: { status?: string } = {}) {
     const u = new URL(r.request().url());
     if (u.searchParams.get("group") === "cluster")
       return r.fulfill({ json: { total: 1, clusters: [{ cluster_key: "abc", rule: "image-alt", title: "Images need a text alternative", sc: ["1.1.1"], occurrences: 40, pages: 12, severity: "critical", sample: { id: "f1", html: "<img>", css: "ul > li > img" } }] } });
+    if (u.searchParams.get("limit") === "100") return r.fulfill({ json: { total: 2, findings: [FINDING, FINDING2] } }); // the Fix Workbench
     return r.fulfill({ json: { total: 1, findings: [FINDING] } });
   });
+  await page.route(`**/api/scans/${SCAN_ID}/pages/p1/screenshot`, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG }));
   await page.route(`**/api/scans/${SCAN_ID}`, (r) => r.fulfill({ json: detail(state.status ?? "SUCCEEDED") }));
   await page.route(`**/api/scans/${SCAN_ID}?*`, (r) => r.fulfill({ json: detail(state.status ?? "SUCCEEDED") }));
 }

@@ -439,6 +439,33 @@ class ScanPage(Base):
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PageScreenshot(Base):
+    """JPEG of the top of a scanned page, in page pixels. Element positions are the findings' ``rect``s; the UI outlines
+    them on this one image instead of us storing a picture per finding. Written once, never edited."""
+
+    __tablename__ = "page_screenshots"
+    __table_args__ = (
+        UniqueConstraint("page_id", name="uq_screenshot_page"),
+        CheckConstraint("size_bytes <= 2000000", name="ck_screenshot_size"),
+        Index("ix_page_screenshots_scan", "scan_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_jobs.id", ondelete="CASCADE"))
+    page_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scan_pages.id", ondelete="CASCADE"))
+    mime: Mapped[str] = mapped_column(String(20), server_default="image/jpeg")
+    content: Mapped[bytes] = mapped_column(deferred=True)
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    page_height: Mapped[int] = mapped_column(Integer)
+    truncated: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ScanFinding(Base):
     __tablename__ = "scan_findings"
     __table_args__ = (

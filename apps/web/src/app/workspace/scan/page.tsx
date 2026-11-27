@@ -159,6 +159,12 @@ function Results({ id }: { id: string }) {
         </>
       )}
 
+      {done && (
+        <p>
+          <NextLink href={`/workspace/scan/workbench?id=${scan.id}`} className="underline">Open the Fix Workbench</NextLink>
+          {" "}to go through the problems one by one, with a screenshot and a checked code fix for each.
+        </p>
+      )}
       {done && <ReportsPanel scanId={scan.id} standard={sm.standard} />}
       {done && <VpatStart scanId={scan.id} standard={sm.standard} />}
 

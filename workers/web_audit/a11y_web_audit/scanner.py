@@ -46,6 +46,8 @@ class ScanOptions:
     respect_robots: bool = True
     politeness_delay_ms: int = 250
     screenshot: bool = False
+    screenshot_quality: int = 60
+    screenshot_max_height: int = 5000
     ports: tuple[int, ...] = (80, 443, 8080, 8443)
 
 
@@ -62,7 +64,8 @@ class PageResult:
     engines: dict = field(default_factory=dict)
     findings: list[Finding] = field(default_factory=list)
     links: list[str] = field(default_factory=list)
-    screenshot: bytes | None = None
+    screenshot: bytes | None = None  # JPEG of the top of the page, page coordinates = pixels
+    screenshot_meta: dict | None = None  # width, height, page_height, truncated
     blocked_requests: list[str] = field(default_factory=list)  # sub-requests the SSRF guard refused
     duration_ms: int = 0
 
@@ -110,6 +113,31 @@ async def _prepare_page(browser: Browser, guard: _Guard):
 
     await ctx.route("**/*", route)
     return ctx, await ctx.new_page()
+
+
+async def _capture(page, res: PageResult, opts: ScanOptions) -> None:
+    """A screenshot is a convenience: any failure here leaves the scan itself untouched."""
+    try:
+        full = await page.evaluate(
+            "() => Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)"
+        )
+        h = max(1, min(int(full), opts.screenshot_max_height))
+        w = VIEWPORT["width"]
+        res.screenshot = await page.screenshot(
+            full_page=True,
+            type="jpeg",
+            quality=opts.screenshot_quality,
+            clip={"x": 0, "y": 0, "width": w, "height": h},
+        )
+        res.screenshot_meta = {
+            "width": w,
+            "height": h,
+            "page_height": int(full),
+            "truncated": int(full) > h,
+        }
+    except PlaywrightError as e:
+        res.screenshot = res.screenshot_meta = None
+        log.warning("screenshot failed url=%s: %s", res.url, str(e)[:160])
 
 
 async def scan_page(
@@ -217,7 +245,7 @@ async def scan_page(
             "() => [...document.querySelectorAll('a[href]')].map(a => a.href)"
         )
         if opts.screenshot:
-            res.screenshot = await page.screenshot(full_page=True, type="png")
+            await _capture(page, res, opts)
     except (PlaywrightError, TimeoutError) as e:
         res.status, res.error_code, res.error_detail = (
             "FAILED",

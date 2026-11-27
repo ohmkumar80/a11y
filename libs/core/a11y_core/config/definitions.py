@@ -294,6 +294,14 @@ class ScanEngines(BaseModel):
     creations_per_minute: int = Field(
         10, ge=1, le=600, description="Scan requests per organisation per minute"
     )
+    screenshots: bool = Field(True, description="Save a screenshot of each scanned page")
+    screenshot_pages: int = Field(
+        25, ge=0, le=200, description="Most pages per scan that keep a screenshot"
+    )
+    screenshot_max_height: int = Field(
+        5000, ge=800, le=12000, description="Tallest part of a page to save, in pixels"
+    )
+    screenshot_quality: int = Field(60, ge=30, le=90, description="JPEG quality (higher = bigger)")
 
     @model_validator(mode="after")
     def _one_engine(self):

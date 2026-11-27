@@ -13,7 +13,7 @@ from a11y_core.rules import get_registry
 from a11y_core.scan_jobs import USAGE_FEATURE, fail_scan
 from a11y_core.settings import get_settings
 from a11y_core.ssrf import BlockedTarget, check_url
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy import text
@@ -240,7 +240,9 @@ async def get_scan(
         pages = (
             await db.execute(
                 text(
-                    "SELECT id, url, final_url, status, error_code, error_detail, title, http_status, engines FROM scan_pages WHERE scan_id=:i ORDER BY scanned_at"
+                    "SELECT p.id, p.url, p.final_url, p.status, p.error_code, p.error_detail, p.title, p.http_status, p.engines, "
+                    "s.width AS shot_w, s.height AS shot_h, s.page_height AS shot_page_h, s.truncated AS shot_trunc "
+                    "FROM scan_pages p LEFT JOIN page_screenshots s ON s.page_id = p.id WHERE p.scan_id=:i ORDER BY p.scanned_at"
                 ),
                 {"i": scan_id},
             )
@@ -281,6 +283,16 @@ async def get_scan(
                 "title": x.title,
                 "http_status": x.http_status,
                 "engines": x.engines,
+                "screenshot": (
+                    {
+                        "width": x.shot_w,
+                        "height": x.shot_h,
+                        "page_height": x.shot_page_h,
+                        "truncated": x.shot_trunc,
+                    }
+                    if x.shot_w
+                    else None
+                ),
             }
             for x in pages
         ],
@@ -412,7 +424,13 @@ async def findings(
                 "engines_covering": r.covering,
                 "agreement": f"{len(r.engines)} of {max(len(r.covering), len(r.engines))} engines",
                 "message": r.message,
-                "element": {"xpath": r.xpath, "css": r.css, "tag": r.tag, "html": r.html},
+                "element": {
+                    "xpath": r.xpath,
+                    "css": r.css,
+                    "tag": r.tag,
+                    "html": r.html,
+                    "rect": r.rect,
+                },
                 "page": {"id": str(r.page_id), "url": r.page_url},
                 "help_url": r.help_url,
                 "cluster_key": r.cluster_key,
@@ -420,6 +438,27 @@ async def findings(
             for r in rows
         ],
     }
+
+
+@router.get("/{scan_id}/pages/{page_id}/screenshot")
+async def page_screenshot(
+    scan_id: uuid.UUID, page_id: uuid.UUID, p: Principal = Depends(current_principal)
+):
+    """The saved picture of one page (top of the page, in page pixels). Private to the organisation."""
+    async with tenant_session(p.org_id) as db:
+        row = (
+            await db.execute(
+                text("SELECT content, mime FROM page_screenshots WHERE scan_id=:s AND page_id=:p"),
+                {"s": scan_id, "p": page_id},
+            )
+        ).first()
+    if row is None:
+        raise _problem(404, "No screenshot was saved for this page.")
+    return Response(
+        bytes(row.content),
+        media_type=row.mime,
+        headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/{scan_id}/summary")

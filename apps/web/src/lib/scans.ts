@@ -7,9 +7,11 @@ export interface ScanRow {
   error_code: string | null; error_detail: string | null; pages_scanned: number; findings_count: number;
   created_at: string; started_at: string | null; finished_at: string | null;
 }
+export interface PageShotMeta { width: number; height: number; page_height: number; truncated: boolean }
+export interface Rect { x: number; y: number; w: number; h: number }
 export interface ScanDetail extends ScanRow {
   engine_versions: Record<string, string>; rules_version: string | null; attempts: number;
-  pages: Array<{ id: string; url: string; status: string; error_detail: string | null; title: string | null }>;
+  pages: Array<{ id: string; url: string; status: string; error_detail: string | null; title: string | null; screenshot?: PageShotMeta | null }>;
   by_kind: Partial<Record<Kind, Partial<Record<Severity, number>>>>;
   summary: Summary;
 }
@@ -22,7 +24,7 @@ export interface Summary {
 export interface Finding {
   id: string; rule: string; title: string; kind: Kind; severity: Severity; confidence: "high" | "medium" | "low" | "review";
   criteria: Array<{ id: string; name: string; level: string; clause: string }>;
-  engines: string[]; agreement: string; message: string; element: { xpath: string; css: string; tag: string; html: string };
+  engines: string[]; agreement: string; message: string; element: { xpath: string; css: string; tag: string; html: string; rect?: Rect | null };
   page: { id: string; url: string }; help_url: string | null;
 }
 export interface Cluster {

@@ -31,6 +31,7 @@ TENANT_TABLES = [
     "reports",
     "vpat_reports",
     "fix_suggestions",
+    "page_screenshots",
 ]
 # Tables that carry organization_id but intentionally also hold platform-wide rows (see policy).
 PLATFORM_AND_TENANT_TABLES = ["setting_versions"]
