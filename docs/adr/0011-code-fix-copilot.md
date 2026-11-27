@@ -35,3 +35,17 @@
 - Fix quality is bounded by what one tag reveals. Capturing a bounded, redacted inner snippet would allow content
   fixes (headings, tables, list structure) and is a later decision because it changes what we store.
 - Escalation tiers and the V2 validator need `AIModel.tier` and the validation-policy setting from 3.13.
+
+## Update (2026-11-28): escalation and the independent reviewer
+- **Escalation.** Two more AI tasks, `code_fix_escalate` and `code_fix_validate`, are routed like every other task in
+  `/admin` (a model per task, with fallbacks). When the light model's two attempts fail, one attempt goes to
+  `code_fix_escalate` with the failed checks in the prompt (rung `standard`). Models now carry a `tier` (Light, Standard,
+  Premium; informational for now, used by the cost views and shadow mode later). If the light route is not configured the
+  stronger route alone can serve the request.
+- **Independent review (V2).** After the checks and the re-scan oracle pass, a second model reads the before and after and
+  answers `pass` or `fail` with reasons. Policy (`ai.code_fix.validation`): `off`; `sample` (a share, default 10%, a quality
+  measure that never blocks); or `always`, which fails closed: with `always`, a fix the reviewer rejects, cannot run, or answers
+  unreadably is not shown (reason `validator_unavailable`). A rejection sends the reviewer's reasons into the repair attempt.
+  Recipes are deterministic and are not reviewed. The reviewer's verdict appears in "What we checked".
+- **Not built:** forcing the reviewer onto a different provider than the author (an admin chooses the routes), the human review
+  queue, and shadow-mode promotion.

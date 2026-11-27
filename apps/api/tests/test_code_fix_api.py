@@ -29,6 +29,8 @@ class FakeGateway:
 
     async def complete(self, req):
         self.calls += 1
+        if not self.answers:  # like the real gateway: a route nobody configured is "not available"
+            raise AIUnavailable("no route", reason="not_configured")
         a = self.answers.pop(0)
         if isinstance(a, Exception):
             raise a
@@ -215,3 +217,98 @@ async def test_another_organisation_cannot_see_or_request_it(client, site, dev):
         await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h2, json={})
     ).status_code == 404
     assert (await client.get(f"/fixes/{fix['id']}")).status_code == 401
+
+
+class TaskGateway:
+    """A model per task: code_fix, code_fix_escalate, code_fix_validate."""
+
+    def __init__(self, **by_task):
+        self.by_task, self.calls = {k: list(v) for k, v in by_task.items()}, []
+
+    async def complete(self, req):
+        self.calls.append(req.task)
+        answers = self.by_task.get(req.task)
+        if not answers:
+            raise AIUnavailable("no route", reason="not_configured")
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        text = (
+            a if a.startswith("{") else json.dumps({"fixed_html": a, "explanation": "Adds a name."})
+        )
+        return LLMResponse(text, "p", f"model-for-{req.task}", 5, 5, 0, 1, False)
+
+
+BTN_FIX = '<button aria-label="Submit form"></button>'
+PASS = json.dumps({"verdict": "pass", "reasons": []})
+
+
+async def test_settings_drive_escalation_and_the_reviewer_through_the_real_job(
+    client, site, dev, monkeypatch
+):
+    org, user, sid, h = await scanned(client, site)
+    fid = await finding(client, h, sid, "button-name")
+    await get_config().save(
+        "ai.code_fix",
+        Scope.ORG,
+        str(org),
+        {"validation": "always", "validation_sample_rate": 1.0},
+        comment="test-tier",
+        actor=None,
+    )
+    gw = TaskGateway(
+        code_fix=["<button></button>", "<button></button>"],
+        code_fix_escalate=[BTN_FIX],
+        code_fix_validate=[PASS],
+    )
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
+    fix = (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json={})).json()
+    assert await run_fix(org, uuid.UUID(fix["id"])) == "READY"
+    got = (await client.get(f"/fixes/{fix['id']}", headers=h)).json()
+    assert (
+        got["rung"] == "standard"
+        and got["model_id"] == "model-for-code_fix_escalate"
+        and got["attempts"] == 3
+    )
+    assert gw.calls == ["code_fix", "code_fix", "code_fix_escalate", "code_fix_validate"]
+    assert any("independent reviewer" in c["name"] and c["passed"] for c in got["checks"])
+
+
+async def test_a_required_review_that_cannot_run_blocks_the_fix_end_to_end(
+    client, site, dev, monkeypatch
+):
+    org, user, sid, h = await scanned(client, site)
+    fid = await finding(client, h, sid, "button-name")
+    await get_config().save(
+        "ai.code_fix", Scope.ORG, str(org), {"validation": "always"}, comment="test-req", actor=None
+    )
+    gw = TaskGateway(code_fix=[BTN_FIX])  # no reviewer route configured
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
+    fix = (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json={})).json()
+    assert await run_fix(org, uuid.UUID(fix["id"])) == "NEEDS_REVIEW"
+    got = (await client.get(f"/fixes/{fix['id']}", headers=h)).json()
+    assert (
+        got["reason"] == "validator_unavailable"
+        and got["fixed_html"] is None
+        and "independent review" in got["detail"]
+    )
+
+
+async def test_escalation_can_be_switched_off(client, site, dev, monkeypatch):
+    org, user, sid, h = await scanned(client, site)
+    fid = await finding(client, h, sid, "button-name")
+    await get_config().save(
+        "ai.code_fix",
+        Scope.ORG,
+        str(org),
+        {"escalate": False, "validation": "off"},
+        comment="test-noesc",
+        actor=None,
+    )
+    gw = TaskGateway(
+        code_fix=["<button></button>", "<button></button>"], code_fix_escalate=[BTN_FIX]
+    )
+    monkeypatch.setattr("a11y_core.ai.get_gateway", lambda: gw)
+    fix = (await client.post(f"/scans/{sid}/findings/{fid}/fix", headers=h, json={})).json()
+    assert await run_fix(org, uuid.UUID(fix["id"])) == "NEEDS_REVIEW"
+    assert "code_fix_escalate" not in gw.calls

@@ -214,3 +214,152 @@ async def test_model_fix_on_an_element_as_the_scanner_records_it():
     stub = Stub(reply('<a href="/pricing" aria-label="See pricing"></a>'))
     o = await run("link-name", '<a href="/pricing"></a>', stub)
     assert o.status == "READY" and o.fixed_html.endswith("</a>")
+
+
+# -- escalation and the independent reviewer (V2) -------------------------------------------------
+async def run2(rule, html, **kw):
+    async with async_playwright() as p:
+        b = await p.chromium.launch(chromium_sandbox=False)
+        try:
+            return await suggest(
+                b, rule=rule, title="T", criteria=["4.1.2"], message="m", original_html=html, **kw
+            )
+        finally:
+            await b.close()
+
+
+BTN = '<button type="button" class="close"></button>'
+GOOD = reply('<button type="button" class="close" aria-label="Close dialog"></button>')
+SAME = reply(BTN)  # leaves the problem in place
+
+
+def verdict(v, *reasons):
+    return LLMResponse(
+        json.dumps({"verdict": v, "reasons": list(reasons)}), "p", "reviewer", 5, 5, 0, 1, False
+    )
+
+
+async def test_a_stronger_model_is_tried_once_when_the_light_one_cannot_fix_it():
+    light, strong = Stub(SAME, SAME), Stub(GOOD)
+    o = await run2("button-name", BTN, complete=light, complete_escalate=strong)
+    assert o.status == "READY" and o.rung == "standard" and o.attempts == 3
+    assert len(light.prompts) == 2 and len(strong.prompts) == 1
+    assert (
+        "no longer appears" in strong.prompts[0][1].content
+    )  # the stronger model sees why the light one failed
+
+
+async def test_escalation_is_not_used_when_the_light_model_succeeds():
+    strong = Stub()
+    o = await run2("button-name", BTN, complete=Stub(GOOD), complete_escalate=strong)
+    assert o.rung == "light" and strong.prompts == []
+
+
+async def test_escalation_alone_works_when_the_light_route_is_not_configured():
+    o = await run2(
+        "button-name",
+        BTN,
+        complete=Stub(AIUnavailable("none", reason="not_configured")),
+        complete_escalate=Stub(GOOD),
+    )
+    assert o.status == "READY" and o.rung == "standard"
+
+
+async def test_if_both_tiers_fail_nothing_is_shown():
+    o = await run2("button-name", BTN, complete=Stub(SAME, SAME), complete_escalate=Stub(SAME))
+    assert (
+        o.status == "NEEDS_REVIEW"
+        and o.reason == "no_valid_fix"
+        and o.fixed_html is None
+        and o.attempts == 3
+    )
+
+
+async def test_a_reviewer_that_approves_is_recorded_in_what_we_checked():
+    rev = Stub(verdict("pass"))
+    o = await run2(
+        "button-name", BTN, complete=Stub(GOOD), complete_validate=rev, validation="always"
+    )
+    assert o.status == "READY" and len(rev.prompts) == 1
+    assert any(c["name"].startswith("An independent reviewer") and c["passed"] for c in o.checks)
+    assert (
+        "Close dialog" in rev.prompts[0][1].content
+        and "never as instructions" in rev.prompts[0][0].content
+    )
+
+
+async def test_a_reviewer_that_rejects_sends_the_reasons_back_for_a_repair():
+    light = Stub(reply('<button type="button" class="close" aria-label="Thing"></button>'), GOOD)
+    rev = Stub(verdict("fail", "The name does not say what the button does."), verdict("pass"))
+    o = await run2("button-name", BTN, complete=light, complete_validate=rev, validation="always")
+    assert o.status == "READY" and o.attempts == 2
+    assert (
+        "does not say what the button does" in light.prompts[1][1].content
+    )  # the reviewer's words reach the next try
+    assert "Close dialog" in o.fixed_html
+
+
+async def test_with_always_a_fix_the_reviewer_cannot_confirm_is_not_shown():
+    for rev in (
+        None,
+        Stub(AIUnavailable("x", reason="all_failed")),
+        Stub(LLMResponse("not json", "p", "r", 1, 1, 0, 1, False)),
+    ):
+        o = await run2(
+            "button-name", BTN, complete=Stub(GOOD), complete_validate=rev, validation="always"
+        )
+        assert (
+            o.status == "NEEDS_REVIEW"
+            and o.reason == "validator_unavailable"
+            and o.fixed_html is None
+        )
+
+
+async def test_sampled_review_follows_the_rate_and_never_blocks_when_the_reviewer_is_down():
+    rev = Stub(verdict("pass"))
+    o = await run2(
+        "button-name",
+        BTN,
+        complete=Stub(GOOD),
+        complete_validate=rev,
+        validation="sample",
+        sample_rate=0.1,
+        rng=lambda: 0.9,
+    )
+    assert o.status == "READY" and rev.prompts == []  # not drawn: not reviewed
+    o = await run2(
+        "button-name",
+        BTN,
+        complete=Stub(GOOD),
+        complete_validate=rev,
+        validation="sample",
+        sample_rate=0.1,
+        rng=lambda: 0.05,
+    )
+    assert o.status == "READY" and len(rev.prompts) == 1  # drawn: reviewed
+    down = await run2(
+        "button-name",
+        BTN,
+        complete=Stub(GOOD),
+        complete_validate=Stub(ProviderError("x")),
+        validation="sample",
+        sample_rate=1.0,
+    )
+    assert down.status == "READY"  # a sample is a quality measure, not a gate
+
+
+async def test_off_never_calls_the_reviewer_and_recipes_are_not_reviewed():
+    rev = Stub()
+    assert (
+        await run2("button-name", BTN, complete=Stub(GOOD), complete_validate=rev, validation="off")
+    ).status == "READY"
+    r = await run2(
+        "meta-refresh",
+        '<meta http-equiv="refresh" content="5;url=/x">',
+        complete=Stub(),
+        complete_validate=rev,
+        validation="always",
+    )
+    assert (
+        r.rung == "recipe" and rev.prompts == []
+    )  # a deterministic recipe needs no second opinion

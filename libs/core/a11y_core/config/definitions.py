@@ -54,6 +54,12 @@ CAPABILITIES = ("text", "vision", "json", "tools")
 # Tasks are code (a feature must exist to use one); which model serves them is data.
 AI_TASKS: dict[str, tuple[str, ...]] = {
     "code_fix": ("text",),
+    "code_fix_escalate": (
+        "text",
+    ),  # a stronger model, tried once when the light one could not produce a valid fix
+    "code_fix_validate": (
+        "text",
+    ),  # an independent reviewer (ideally another provider) that reads the fix
     "vision_audit": ("vision",),
     "alt_text": ("vision",),
     "mathml": ("text",),
@@ -103,6 +109,11 @@ class AIModel(BaseModel):
     input_cost_per_1m: float = Field(0, ge=0, description="USD per million input tokens")
     output_cost_per_1m: float = Field(0, ge=0)
     is_enabled: bool = True
+    tier: Literal["LIGHT", "STANDARD", "PREMIUM"] = Field(
+        "STANDARD",
+        description="How capable and costly this model is. Light: routine work; Standard: component-level fixes; "
+        "Premium: validation and hard reasoning.",
+    )
 
 
 class AIModels(BaseModel):
@@ -329,6 +340,18 @@ class CodeFixPolicy(BaseModel):
     enabled: bool = Field(True, description="Offer code-fix suggestions on findings")
     per_minute: int = Field(
         20, ge=1, le=600, description="Fix requests per organisation per minute"
+    )
+    escalate: bool = Field(
+        True,
+        description="If the light model cannot produce a valid fix, try the stronger `code_fix_escalate` route once",
+    )
+    validation: Literal["off", "sample", "always"] = Field(
+        "sample",
+        description="Independent review of model-written fixes by the `code_fix_validate` route. "
+        "Always = a fix is not shown unless the reviewer approves it.",
+    )
+    validation_sample_rate: float = Field(
+        0.1, ge=0, le=1, description="Share of fixes reviewed when validation is 'sample'"
     )
     use_ai: bool = Field(
         True,

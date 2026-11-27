@@ -255,17 +255,22 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
     gw = get_gateway()
     policy = (await get_config().effective("ai.code_fix", org_id=org_id, plan_id=sub.plan_id)).value
 
-    async def complete(messages):
-        return await gw.complete(
-            LLMRequest(
-                task="code_fix",
-                messages=messages,
-                org_id=org_id,
-                job_id=str(fix_id),
-                plan_id=sub.plan_id,
-                json_mode=True,
+    def caller(task: str):
+        async def call(messages):
+            return await gw.complete(
+                LLMRequest(
+                    task=task,
+                    messages=messages,
+                    org_id=org_id,
+                    job_id=str(fix_id),
+                    plan_id=sub.plan_id,
+                    json_mode=True,
+                )
             )
-        )
+
+        return call
+
+    complete = caller("code_fix")
 
     try:
         async with async_playwright() as p:
@@ -279,6 +284,12 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
                     message=f.message if f else "",
                     original_html=original,
                     complete=complete if policy.use_ai else None,
+                    complete_escalate=caller("code_fix_escalate")
+                    if policy.use_ai and policy.escalate
+                    else None,
+                    complete_validate=caller("code_fix_validate") if policy.use_ai else None,
+                    validation=policy.validation,
+                    sample_rate=policy.validation_sample_rate,
                 )
             finally:
                 await browser.close()
