@@ -51,12 +51,14 @@ These commands apply to the development tree, which contains the application cod
 make up        # builds and starts everything; migrations and demo seed data run automatically
 ```
 
-| Service | URL |
-|---|---|
-| Web app | http://localhost:3000 |
-| API docs | http://localhost:8000/docs |
-| Mailpit (all outgoing email) | http://localhost:8025 |
-| S3-compatible storage | http://localhost:9000 (console :9001) |
+| Service | Default URL | Port setting in `.env` |
+|---|---|---|
+| Web app | http://localhost:3000 | `WEB_PORT` |
+| API docs (Swagger UI) | http://localhost:8000/docs | `API_PORT` |
+| Mailpit (all outgoing email) | http://localhost:8025 | |
+| S3-compatible storage | http://localhost:9000 (console :9001) | `S3_PORT`, `S3_CONSOLE_PORT` |
+
+**Port already in use?** If another app on your machine uses one of these ports, set a different one in `.env` (for example `API_PORT=8010`) and run `make up` again; then use that port in the URL. To check which app answers on a port, open `/openapi.json` there and look at `info.title`: ours is `a11y API`.
 
 Demo login: `admin@demo.example.com` / `demo-passphrase-123` (administrator) or `member@demo.example.com` (standard user). Demo coupon: `DEMO20`. `make reset` wipes all data volumes. Ports can be changed in `.env` (`WEB_PORT`, `API_PORT`, and so on).
 
