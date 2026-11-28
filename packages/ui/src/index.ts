@@ -11,5 +11,6 @@ export { Meter, ProgressBar, type MeterProps, type ProgressBarProps } from "./co
 export { ToastProvider, notify, toasts, type ToastValue } from "./components/Toast";
 export { ErrorSummary, StatusMessage, VisuallyHidden, type FormError } from "./components/Form";
 export { SkipLink } from "./components/Shell";
+export { Card, type CardProps } from "./components/Card";
 export { cn } from "./cn";
 export { Form } from "react-aria-components";

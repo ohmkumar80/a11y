@@ -25,7 +25,7 @@ export interface TextFieldProps extends Omit<AriaTextFieldProps, "className" | "
  */
 export function TextField({ label, description, error, className, placeholder, ...props }: TextFieldProps) {
   return (
-    <AriaTextField {...props} isInvalid={!!error} validationBehavior="aria" className={cn("flex flex-col gap-1", className)}>
+    <AriaTextField {...props} isInvalid={!!error} validationBehavior="aria" className={cn("flex max-w-xl flex-col gap-1", className)}>
       <Label className="font-semibold">{label}</Label>
       {description && (
         <Text slot="description" className="text-sm text-fg-muted">
@@ -34,7 +34,7 @@ export function TextField({ label, description, error, className, placeholder, .
       )}
       <Input
         placeholder={placeholder}
-        className="min-h-11 rounded-md border-2 border-border bg-bg px-3 py-2 text-fg data-[invalid]:border-danger"
+        className="min-h-11 rounded-lg border-2 border-border bg-bg px-3 py-2 text-fg shadow-sm transition-colors hover:border-fg-muted data-[invalid]:border-danger"
       />
       <FieldError className="flex items-start gap-1 text-sm font-medium text-danger">
         <span aria-hidden="true">⚠</span>

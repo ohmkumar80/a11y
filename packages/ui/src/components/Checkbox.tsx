@@ -17,7 +17,7 @@ export function Checkbox({ label, className, ...props }: CheckboxProps) {
         <>
           <span
             aria-hidden="true"
-            className="flex size-6 shrink-0 items-center justify-center rounded border-2 border-border bg-bg font-bold group-data-[selected]:bg-accent group-data-[selected]:text-accent-fg group-data-[focus-visible]:outline-[3px] group-data-[focus-visible]:outline-offset-2 group-data-[focus-visible]:outline-(--a11y-focus)"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md border-2 border-border bg-bg font-bold group-data-[selected]:bg-accent group-data-[selected]:text-accent-fg group-data-[focus-visible]:outline-[3px] group-data-[focus-visible]:outline-offset-2 group-data-[focus-visible]:outline-(--a11y-focus)"
           >
             {isSelected ? "✓" : ""}
           </span>

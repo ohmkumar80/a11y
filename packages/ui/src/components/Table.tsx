@@ -41,7 +41,7 @@ export function Table<T extends object>({ label, columns, rows, rowKey, emptyTex
     // positioned) text inside cells; without it that text escapes the scroller and widens the page.
     // The region is focusable so keyboard users can scroll it.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable regions MUST be focusable so keyboard users can scroll (axe: scrollable-region-focusable)
-    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="relative max-w-full overflow-x-auto">
+    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="relative max-w-full overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg">
     <AriaTable aria-label={label} sortDescriptor={sort.sortDescriptor} onSortChange={sort.onSortChange} className="w-full border-collapse text-left">
       <TableHeader>
         {columns.map((c) => (
@@ -50,7 +50,7 @@ export function Table<T extends object>({ label, columns, rows, rowKey, emptyTex
             id={c.id}
             isRowHeader={c.isRowHeader}
             allowsSorting={c.allowsSorting}
-            className="min-h-11 border-b-2 border-border bg-bg-subtle px-3 py-2 font-semibold"
+            className="min-h-11 border-b-2 border-border-subtle bg-bg-subtle px-4 py-3 text-sm font-semibold"
           >
             {({ sortDirection }) => (
               <span className="inline-flex items-center gap-1">
@@ -65,9 +65,9 @@ export function Table<T extends object>({ label, columns, rows, rowKey, emptyTex
       </TableHeader>
       <TableBody renderEmptyState={() => <p className="p-4 text-fg-muted">{emptyText}</p>}>
         {rows.map((r) => (
-          <Row key={rowKey(r)} id={rowKey(r)} columns={columns} className="border-b border-border-subtle">
+          <Row key={rowKey(r)} id={rowKey(r)} columns={columns} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-subtle">
             {columns.map((c) => (
-              <Cell key={c.id} className="px-3 py-2 [overflow-wrap:anywhere]">{c.render(r)}</Cell>
+              <Cell key={c.id} className="px-4 py-3 [overflow-wrap:anywhere]">{c.render(r)}</Cell>
             ))}
           </Row>
         ))}

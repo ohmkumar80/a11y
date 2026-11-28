@@ -11,9 +11,9 @@ export interface ButtonProps extends Omit<AriaButtonProps, "className"> {
 }
 
 const variants = {
-  primary: "bg-accent text-accent-fg hover:bg-accent-hover border-transparent",
+  primary: "bg-accent text-accent-fg hover:bg-accent-hover border-transparent shadow-sm",
   secondary: "bg-bg text-fg border-border hover:bg-bg-inset",
-  danger: "bg-danger text-bg border-transparent hover:opacity-90",
+  danger: "bg-danger text-bg border-transparent shadow-sm hover:opacity-90",
 } as const;
 
 /** Targets are 44x44 minimum on primary actions (SC 2.5.8 requires 24x24). */
@@ -22,7 +22,7 @@ export function Button({ variant = "primary", className, pendingLabel = "Loading
     <AriaButton
       {...props}
       className={cn(
-        "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md border-2 px-4 py-2 font-semibold",
+        "inline-flex min-h-11 min-w-11 items-center [overflow-wrap:normal] justify-center gap-2 rounded-lg border-2 px-4 py-2 font-semibold transition-colors",
         "aria-disabled:opacity-60 data-[disabled]:opacity-60 data-[pending]:cursor-progress",
         variants[variant],
         className,
