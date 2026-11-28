@@ -34,7 +34,16 @@ async def talk(proxy_port: int, request: bytes) -> bytes:
     await w.drain()
     data = b""
     try:
-        data = await asyncio.wait_for(r.read(65536), 5)
+        # A reply can arrive in several packets (headers, then body): keep reading until the proxy closes, or until it has
+        # been quiet for half a second after the first bytes. A single read() returns only the first packet.
+        while True:
+            try:
+                chunk = await asyncio.wait_for(r.read(65536), 0.5 if data else 5)
+            except TimeoutError:
+                break
+            if not chunk:
+                break
+            data += chunk
     finally:
         w.close()
     return data
