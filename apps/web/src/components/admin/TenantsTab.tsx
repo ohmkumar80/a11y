@@ -23,7 +23,7 @@ export function TenantsTab() {
   const form = useForm();
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="funnel" className="flex flex-col gap-2">
         <h2 id="funnel" className="text-xl font-bold">Trial funnel</h2>
         {funnel.data ? (

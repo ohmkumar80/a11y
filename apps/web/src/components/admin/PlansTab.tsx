@@ -70,7 +70,7 @@ export function PlansTab() {
   const planId = sel === "__new" ? newId : sel;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="plans" className="flex flex-col gap-3">
         <h2 id="plans" className="text-xl font-bold">Plans</h2>
         <Table<Plan>

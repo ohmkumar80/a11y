@@ -62,7 +62,7 @@ export function EmailsTab() {
   const untouched = (d: Override) => d.enabled && !d.subject && !d.intro && !d.action_label && !d.outro;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="a11y-page-body flex flex-col gap-6">
       <p className="max-w-3xl text-fg-muted">
         You can change what each email says, or switch it off. The layout is fixed, so every email keeps its structure, contrast and a plain-text version.
         Changes are versioned and audited like every other setting.

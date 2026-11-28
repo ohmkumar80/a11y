@@ -34,7 +34,7 @@ export function SecurityTab({ onChanged }: { onChanged: () => void }) {
   const production = env === "production";
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="policy" className="flex max-w-2xl flex-col gap-3">
         <h2 id="policy" className="text-xl font-bold">Two-step verification policy</h2>
         <p className="text-fg-muted">Choose who must enter a code from an authenticator app when they sign in. Changes apply to the next sign-in. Everything is recorded in the audit log and can be rolled back in the Settings tab (<code>auth.mfa</code>).</p>

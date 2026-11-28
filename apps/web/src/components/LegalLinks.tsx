@@ -4,7 +4,7 @@ import NextLink from "next/link";
 import { useEffect, useState } from "react";
 import { get } from "@/lib/api";
 
-const navLink = "inline-flex min-h-11 items-center px-3 underline-offset-4 hover:underline";
+const navLink = "inline-flex min-h-11 items-center rounded-lg px-1 underline-offset-4 hover:underline";
 
 /** Footer links to whichever legal pages are published. With none published there is nothing to show, so nothing is. */
 export function LegalLinks() {

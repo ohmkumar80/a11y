@@ -83,9 +83,9 @@ function Ready({ fix }: { fix: Fix }) {
       <p className="text-sm">{RUNG_LABEL[fix.rung ?? ""] ?? "Suggested fix"}{fix.from_cache ? " (reused from an identical element)" : ""}.</p>
       {fix.credit_used && <p className="text-sm">This used one of your AI code fixes for the month.</p>}
       <p className="mt-2 text-sm font-semibold">Before</p>
-      <pre className="overflow-x-auto rounded border border-border p-2"><code>{fix.original_html}</code></pre>
+      <pre className="overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg-inset p-3"><code>{fix.original_html}</code></pre>
       <p className="mt-2 text-sm font-semibold">After</p>
-      <pre className="overflow-x-auto rounded border border-border p-2"><code>{code === "" ? "(remove this tag)" : code}</code></pre>
+      <pre className="overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg-inset p-3"><code>{code === "" ? "(remove this tag)" : code}</code></pre>
       {code !== "" && (
         <Button variant="secondary" onPress={async () => { await navigator.clipboard?.writeText(code); notify({ title: "Fix copied", kind: "success" }); }}>
           Copy fix

@@ -54,7 +54,7 @@ export function CouponsTab() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="coupons" className="flex flex-col gap-3">
         <h2 id="coupons" className="text-xl font-bold">Coupons</h2>
         <Table<Coupon>

@@ -63,14 +63,14 @@ function Workbench({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid max-w-xl gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 rounded-2xl border-2 border-border-subtle bg-bg-subtle p-4 sm:grid-cols-[repeat(2,minmax(0,16rem))]">
         <Select label="Show" value={kind} onChange={(k) => setKind(String(k) as Kind)} options={KINDS.map((k) => ({ id: k, label: KIND_LABEL[k] }))} />
         <Select label="Severity" value={severity} onChange={(k) => setSeverity(String(k))} options={[{ id: "all", label: "All" }, ...SEVERITIES.map((s) => ({ id: s, label: SEVERITY_LABEL[s] }))]} />
       </div>
       <p role="status">{total === null ? "Loading problems." : `${total} ${total === 1 ? "problem" : "problems"}${items.length < total ? `, showing ${items.length}` : ""}.`}</p>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <nav aria-label="Problems to fix" className="flex flex-col gap-2">
+        <nav aria-label="Problems to fix" className="flex flex-col gap-2 self-start rounded-2xl border-2 border-border-subtle bg-bg-subtle p-3">
           {total === 0 && <p>Nothing to fix here.</p>}
           <ul className="flex max-h-[32rem] flex-col gap-1 overflow-auto lg:max-h-[75vh]">
             {items.map((x, i) => (
@@ -80,7 +80,7 @@ function Workbench({ id }: { id: string }) {
                   ref={(el) => { buttons.current[x.id] = el; }}
                   aria-current={x.id === current ? "true" : undefined}
                   onClick={() => select(x)}
-                  className={`w-full rounded border px-3 py-2 text-left ${x.id === current ? "border-2 border-fg bg-surface-raised font-semibold" : "border-border"}`}
+                  className={`w-full rounded-xl border-2 px-3 py-2 text-left transition-colors ${x.id === current ? "border-accent bg-accent-subtle font-semibold" : "border-border-subtle bg-bg hover:border-border"}`}
                 >
                   <span className="block">{SEVERITY_ICON[x.severity]} {SEVERITY_LABEL[x.severity]}: {x.title}</span>
                   <span className="a11y-sr-only">, problem {i + 1} of {total}.</span>
@@ -92,7 +92,7 @@ function Workbench({ id }: { id: string }) {
           {total !== null && items.length < total && <Button variant="secondary" onPress={() => void fetchPage(items.length)}>Show more problems</Button>}
         </nav>
 
-        <section aria-labelledby="wb-h" className="min-w-0">
+        <section aria-labelledby="wb-h" className="min-w-0 rounded-2xl border-2 border-border-subtle bg-bg-subtle p-5 sm:p-6">
           {!f ? (
             <>
               <h2 id="wb-h" className="text-xl font-bold">Choose a problem</h2>
@@ -127,7 +127,7 @@ function Workbench({ id }: { id: string }) {
                   <p>No screenshot was saved for this page. The element&apos;s HTML below shows what is wrong.</p>
                 )}
                 <p className="font-semibold">HTML of the element</p>
-                <pre className="overflow-x-auto rounded border border-border p-2"><code>{f.element.html}</code></pre>
+                <pre className="overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg-inset p-3"><code>{f.element.html}</code></pre>
               </section>
 
               <RuleGuidance key={`g-${f.id}`} rule={f.rule} />

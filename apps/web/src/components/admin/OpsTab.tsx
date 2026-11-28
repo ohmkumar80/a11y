@@ -46,7 +46,7 @@ export function OpsTab() {
   if (!ops.data) return <p role="status">Loading the operations overview.</p>;
   const d = ops.data;
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="ops-status" className="flex flex-col gap-2">
         <h2 id="ops-status" className="text-xl font-bold">{d.status === "ok" ? "✓ " : d.status === "degraded" ? "! " : "✗ "}{STATUS[d.status]}</h2>
         <p>Updated {formatDate(d.generated_at)}. This page only reads; nothing here changes the system. <Button variant="secondary" onPress={() => void ops.reload()}>Refresh</Button></p>

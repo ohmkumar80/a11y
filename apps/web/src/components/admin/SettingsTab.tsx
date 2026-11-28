@@ -47,7 +47,7 @@ export function SettingsTab() {
   useEffect(() => { setLoaded(null); if (ready) void load(); }, [key, scope, scopeId, defs.data]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="a11y-page-body flex flex-col gap-6">
       <p className="max-w-3xl text-fg-muted">Every setting is versioned and audited. A change applies to the next job with no redeploy. Secrets are write-only: once saved they are never shown again.</p>
       <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
         <Select label="Setting" value={key} onChange={(k) => { setKey(k ? String(k) : null); setScope("global"); setScopeId(""); }}

@@ -31,7 +31,7 @@ export function AiTab() {
   const pre = presets.data?.presets[preset];
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="a11y-page-body flex flex-col gap-8">
       <section aria-labelledby="providers" className="flex flex-col gap-3">
         <h2 id="providers" className="text-xl font-bold">AI providers</h2>
         <Table<Provider>
