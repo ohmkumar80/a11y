@@ -67,6 +67,14 @@ async def upload_policy(org_id: uuid.UUID) -> DocumentUploads:
     return (await get_config().effective("documents.uploads", org_id=org_id, plan_id=plan_id)).value
 
 
+async def retention_days(org_id: uuid.UUID) -> int:
+    """How long this organisation's new files are kept, for telling people up front."""
+    async with tenant_session(org_id) as db:
+        plan_id = (await billing.load_subscription(db)).plan_id
+    ret = (await get_config().effective("documents.retention", org_id=org_id, plan_id=plan_id)).value
+    return ret.retention_days
+
+
 async def accept_upload(
     org_id: uuid.UUID, user_id: uuid.UUID | None, filename: str, data: bytes
 ) -> Document:

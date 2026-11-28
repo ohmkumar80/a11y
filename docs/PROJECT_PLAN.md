@@ -1018,7 +1018,7 @@ Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harde
 - Upload safety tests pass: a malicious PDF, a zip bomb and an oversized file are all refused, and no customer file leaves the allowed region or is kept past its retention limit.
 - Human review cost per document is measured, and the plan quotas cover it.
 
-**Status (2026-11-28, in progress on branch `phase-3`).** Slice 1 of the build order, upload safety, is built; the PDF audit (slice 2) is next. Everything an administrator might want to tune is a setting (`documents.uploads`, `documents.safety`, `documents.retention`, the `documents` feature flag), editable in `/admin` at global, plan or organisation scope, plus a read-and-act Documents tab.
+**Status (2026-11-28, in progress on branch `phase-3`).** Slice 1 of the build order, upload safety (including the customer upload screen), is built; the PDF audit (slice 2) is next. Everything an administrator might want to tune is a setting (`documents.uploads`, `documents.safety`, `documents.retention`, the `documents` feature flag), editable in `/admin` at global, plan or organisation scope, plus a read-and-act Documents tab.
 
 | Story | Slice | Status |
 |---|---|---|
@@ -1026,7 +1026,7 @@ Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harde
 | Upload safety: kind decided from the bytes, size and page limits, zip-bomb and unsafe-path checks, password and active-content policy, ClamAV scan that fails closed, hostile files erased at once | 1 | Built. Tested with a fake scanner and against a real ClamAV (EICAR in a .docx is refused and erased; the ADR lists what ClamAV does not catch) |
 | Retention, deletion on request, tombstones, hourly sweep, stuck-upload re-queue | 1 | Built |
 | Admin Documents module: scanner and store health, pipeline counts, refusal reasons, retry files that failed on our side, run the sweep | 1 | Built (API + `/admin` tab, axe in both colour schemes) |
-| Customer upload screen and document list | 1 | Not started (API is ready: `POST /documents`, list, download, delete) |
+| Customer upload screen and document list (`/workspace/documents`): limits and retention explained up front, plain-word statuses, download, delete with confirmation, refreshes while a file is checked | 1 | Built (axe in both colour schemes; Tab and Enter path tested) |
 | PDF audit: veraPDF check, findings, document workbench, page quota (`document_pages`), `/v1/documents` | 2 | Not started |
 | Per-organisation data policy (regions, zero-retention AI use), granular reviewer role, human-review unit cost | 2 to 3 | Not started |
 | PDF remediation with human review, DOCX and PPTX, EPUB3 | 3 to 5 | Not started |

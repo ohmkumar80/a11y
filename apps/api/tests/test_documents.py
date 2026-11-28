@@ -347,10 +347,8 @@ async def test_the_size_limit_is_an_admin_setting_per_organisation(client, store
     big = pdf_bytes() + b"\n%" + b"x" * (2 * 1024 * 1024)
     r = await upload(client, auth(org, user), "big.pdf", big)
     assert r.status_code == 413 and r.json()["code"] == "too_large"
-    assert (await client.get("/documents/policy", headers=auth(org, user))).json()["kinds"][0] == {
-        "kind": "pdf",
-        "max_mb": 1,
-    }
+    pol = (await client.get("/documents/policy", headers=auth(org, user))).json()
+    assert pol["kinds"][0] == {"kind": "pdf", "max_mb": 1} and pol["retention_days"] == 30
     assert (
         await upload(client, auth(other, ouser), "big.pdf", big)
     ).status_code == 202  # others unaffected

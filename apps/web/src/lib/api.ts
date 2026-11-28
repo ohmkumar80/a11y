@@ -59,6 +59,9 @@ async function raw<T>(path: string, init: RequestInit & { json?: unknown }): Pro
 }
 
 export const post = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "POST", json });
+/** Send a file as the raw request body (the documents API reads it in chunks and stops at the size limit). */
+export const postFile = <T = void>(path: string, file: File) =>
+  raw<T>(path, { method: "POST", body: file, headers: { "content-type": "application/octet-stream" } });
 export const get = <T>(path: string) => raw<T>(path, { method: "GET" });
 export const put = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PUT", json });
 export const patch = <T = void>(path: string, json?: unknown) => raw<T>(path, { method: "PATCH", json });

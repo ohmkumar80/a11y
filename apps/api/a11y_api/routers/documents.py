@@ -57,6 +57,7 @@ async def policy(p: Principal = Depends(current_principal)):
         "enabled": up.enabled,
         "kinds": [{"kind": k, "max_mb": getattr(up, f"max_mb_{k}")} for k in up.kinds()],
         "max_pages": up.max_pages,
+        "retention_days": await documents.retention_days(p.org_id),
     }
 
 
