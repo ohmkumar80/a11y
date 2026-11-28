@@ -7,7 +7,7 @@ downloaded or used for anything."""
 
 import uuid
 
-from a11y_core import document_audits, document_fixes, documents
+from a11y_core import document_audits, document_fixes, document_reviews, documents
 from a11y_core.db import tenant_session
 from a11y_core.doc_fix import FixPlan
 from a11y_core.models import (
@@ -16,10 +16,12 @@ from a11y_core.models import (
     DocumentAudit,
     DocumentFinding,
     DocumentFix,
+    DocumentReview,
     DocumentStatus,
 )
 from a11y_core.storage import StorageError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from ..deps import current_principal, ensure_flag
@@ -89,9 +91,28 @@ async def _latest_audits(db, doc_ids: list[uuid.UUID]) -> dict[uuid.UUID, Docume
     return latest
 
 
-def _json(d: Document, audit: DocumentAudit | None = None) -> dict:
+async def _latest_reviews(db, doc_ids: list[uuid.UUID]) -> dict[uuid.UUID, DocumentReview]:
+    if not doc_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(DocumentReview)
+            .where(DocumentReview.document_id.in_(doc_ids))
+            .order_by(DocumentReview.requested_at.desc())
+        )
+    ).scalars()
+    latest: dict[uuid.UUID, DocumentReview] = {}
+    for r in rows:
+        latest.setdefault(r.document_id, r)
+    return latest
+
+
+def _json(
+    d: Document, audit: DocumentAudit | None = None, review: DocumentReview | None = None
+) -> dict:
     return {
         "latest_audit": _audit_json(audit) if audit else None,
+        "latest_review": _review_json(review) if review else None,
         "id": str(d.id),
         "filename": d.filename,
         "kind": d.kind,
@@ -169,8 +190,10 @@ async def list_documents(limit: int = 50, p: Principal = Depends(current_princip
             )
         ).scalars()
         docs = list(rows)
-        latest = await _latest_audits(db, [d.id for d in docs])
-        return [_json(d, latest.get(d.id)) for d in docs]
+        ids = [d.id for d in docs]
+        latest = await _latest_audits(db, ids)
+        reviews = await _latest_reviews(db, ids)
+        return [_json(d, latest.get(d.id), reviews.get(d.id)) for d in docs]
 
 
 async def _get(db, doc_id: uuid.UUID) -> Document:
@@ -185,7 +208,11 @@ async def get_one(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
     await ensure_flag("documents", p)
     async with tenant_session(p.org_id) as db:
         d = await _get(db, doc_id)
-        return _json(d, (await _latest_audits(db, [d.id])).get(d.id))
+        return _json(
+            d,
+            (await _latest_audits(db, [d.id])).get(d.id),
+            (await _latest_reviews(db, [d.id])).get(d.id),
+        )
 
 
 @router.get("/{doc_id}/download")
@@ -366,3 +393,75 @@ async def build_fix(doc_id: uuid.UUID, p: Principal = Depends(current_principal)
         return _fix_json(await document_fixes.start_build(p.org_id, doc_id))
     except document_fixes.FixRefused as r:
         raise _refuse(r) from None
+
+
+# --- asking a person to check (human review) ---------------------------------------------------------------
+
+
+class ReviewIn(BaseModel):
+    note: str | None = Field(None, max_length=1000, description="Anything the reviewer should know")
+    consent: bool = Field(
+        False, description="You agree to a person opening this file (see the consent text)"
+    )
+
+
+def _review_json(r: DocumentReview) -> dict:
+    """What the customer sees. The reviewer is never named; the customer sees only what the review produced."""
+    return {
+        "id": str(r.id),
+        "document_id": str(r.document_id),
+        "status": r.status,
+        "requested_at": r.requested_at,
+        "due_at": r.due_at,
+        "completed_at": r.completed_at,
+        "note": r.note,
+        "outcome_note": r.outcome_note if r.status in ("COMPLETED", "DECLINED") else None,
+        "result_document_id": str(r.result_document_id) if r.result_document_id else None,
+        "pages": r.pages,
+    }
+
+
+def _review_refused(r: document_reviews.ReviewRefused) -> HTTPException:
+    return HTTPException(r.http_status, detail={"detail": r.message, "code": r.code})
+
+
+@router.get("/{doc_id}/reviews")
+async def list_reviews(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
+    await ensure_flag("human_review", p)
+    async with tenant_session(p.org_id) as db:
+        await _get(db, doc_id)
+    return {
+        "consent": {
+            "version": document_reviews.CONSENT_VERSION,
+            "text": document_reviews.CONSENT_TEXT,
+        },
+        "reviews": [_review_json(r) for r in await document_reviews.reviews_for(p.org_id, doc_id)],
+    }
+
+
+@router.post("/{doc_id}/reviews", status_code=status.HTTP_202_ACCEPTED)
+async def request_review(
+    doc_id: uuid.UUID, body: ReviewIn, p: Principal = Depends(current_principal)
+):
+    """Ask a person on our team to check this PDF and, if they can, fix it. Needs your consent, and uses one review from your plan."""
+    await ensure_flag("human_review", p)
+    try:
+        return _review_json(
+            await document_reviews.request_review(
+                p.org_id, p.user_id, doc_id, body.note, body.consent
+            )
+        )
+    except document_reviews.ReviewRefused as r:
+        raise _review_refused(r) from None
+
+
+@router.delete("/{doc_id}/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_review(
+    doc_id: uuid.UUID, review_id: uuid.UUID, p: Principal = Depends(current_principal)
+):
+    await ensure_flag("human_review", p)
+    try:
+        await document_reviews.cancel_review(p.org_id, p.user_id, doc_id, review_id)
+    except document_reviews.ReviewRefused as r:
+        raise _review_refused(r) from None
+    return Response(status_code=204)

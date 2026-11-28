@@ -22,6 +22,8 @@ export const ROUTES: Array<{ path: string; roles: Role[] }> = [
   { path: "/workspace/documents", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/workspace/documents/audit?doc=d1&audit=a1", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/workspace/documents/fix?doc=d1", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
+  { path: "/review", roles: ["REVIEWER", "SUPER_ADMIN"] },
+  { path: "/review/item?id=q9", roles: ["REVIEWER", "SUPER_ADMIN"] },
   { path: "/notifications", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/org", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/ai", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page

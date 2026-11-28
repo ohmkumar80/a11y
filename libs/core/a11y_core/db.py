@@ -84,6 +84,17 @@ async def login_lookup_session(email: str) -> AsyncIterator[AsyncSession]:
 
 
 @asynccontextmanager
+async def reviewer_session(reviewer_id: uuid.UUID) -> AsyncIterator[AsyncSession]:
+    """A session for a platform reviewer (ADR 0023). It sees only the review requests nobody has claimed yet and the ones
+    this reviewer holds, and nothing else: it has no organisation, so every other table returns no rows. To read a document
+    the caller must first prove the review is theirs, then open an ordinary `tenant_session` for that one organisation."""
+    maker = async_sessionmaker(app_engine(), expire_on_commit=False)
+    async with maker() as session, session.begin():
+        await _set(session, "app.reviewer_id", str(reviewer_id))
+        yield session
+
+
+@asynccontextmanager
 async def platform_session(token_hash: str) -> AsyncIterator[AsyncSession]:
     """Pre-authentication session for Super Admin refresh tokens: sees only the row whose hash matches (and, once the
     caller sets it with ``set_platform_family``, that token's family so a replay can revoke all of it)."""

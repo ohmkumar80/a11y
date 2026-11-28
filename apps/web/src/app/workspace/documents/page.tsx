@@ -28,7 +28,7 @@ export default function DocumentsPage() {
     <RequireAuth>
       {(user) => (
         <Page title="Documents" intro="Upload PDF, Word, PowerPoint and EPUB files. Every file is scanned for viruses and checked before anything else happens to it, and is stored encrypted.">
-          {user.role === "SUPER_ADMIN" ? <StatusMessage>Platform administrators do not have documents. Use the Documents tab in the admin area.</StatusMessage> : <Content />}
+          {user.role === "SUPER_ADMIN" || user.role === "REVIEWER" ? <StatusMessage>Platform staff do not have documents of their own. Administrators use the Documents tab in the admin area; reviewers use the review queue.</StatusMessage> : <Content />}
         </Page>
       )}
     </RequireAuth>

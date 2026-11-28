@@ -11,7 +11,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; status: number; pro
 export interface User {
   id: string;
   email: string;
-  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "STANDARD_USER";
+  role: "SUPER_ADMIN" | "REVIEWER" | "COMPANY_ADMIN" | "STANDARD_USER";
   organization_id: string;
   organization_name: string;
   mfa_enabled?: boolean;

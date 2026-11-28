@@ -37,6 +37,24 @@ def require_super_admin(request: Request) -> Principal:
     return p
 
 
+async def require_reviewer(request: Request) -> Principal:
+    """A platform reviewer (or the platform owner). Checked against the database on every request, so switching a reviewer
+    off takes effect at once and not when their access token expires."""
+    from a11y_core.db import admin_engine  # noqa: PLC0415
+    from sqlalchemy import text  # noqa: PLC0415
+
+    p = _decode(request)
+    if p.role not in ("REVIEWER", "SUPER_ADMIN"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Reviewer access required")
+    async with admin_engine().connect() as c:
+        active = (
+            await c.execute(text("SELECT is_active FROM users WHERE id = :i"), {"i": p.user_id})
+        ).scalar()
+    if not active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Reviewer access required")
+    return p
+
+
 async def ensure_flag(name: str, p: Principal) -> None:
     """Refuse cleanly when an administrator has switched a feature off for this organisation or its plan."""
     from a11y_core import billing, flags  # noqa: PLC0415

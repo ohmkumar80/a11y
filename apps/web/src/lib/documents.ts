@@ -11,6 +11,7 @@ export interface DocumentRow {
   ready: boolean;
   latest_audit: AuditRow | null;
   derived_from: string | null;
+  latest_review: ReviewRow | null;
 }
 
 export type AuditStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
@@ -127,3 +128,51 @@ export const LANGUAGES: { id: string; label: string }[] = [
   { id: "gu", label: "Gujarati" }, { id: "kn", label: "Kannada" }, { id: "ml", label: "Malayalam" }, { id: "fr", label: "French" }, { id: "de", label: "German" },
   { id: "es", label: "Spanish" }, { id: "__other", label: "Another language (enter a code)" },
 ];
+
+export type ReviewStatus = "REQUESTED" | "IN_REVIEW" | "COMPLETED" | "DECLINED" | "CANCELLED";
+export interface ReviewRow {
+  id: string;
+  document_id: string;
+  status: ReviewStatus;
+  requested_at: string;
+  due_at: string;
+  completed_at: string | null;
+  note: string | null;
+  outcome_note: string | null;
+  result_document_id: string | null;
+  pages: number;
+}
+export interface ReviewsInfo { consent: { version: string; text: string }; reviews: ReviewRow[] }
+export const reviewActive = (s?: ReviewStatus) => s === "REQUESTED" || s === "IN_REVIEW";
+export const formatDateTime = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+/** What the customer is told, in words. The reviewer is never named. */
+export function reviewText(r: ReviewRow): string {
+  switch (r.status) {
+    case "REQUESTED": return `Waiting for a reviewer. We aim to finish by ${formatDateTime(r.due_at)}.`;
+    case "IN_REVIEW": return "A reviewer is working on this document. You will get an email when they finish.";
+    case "COMPLETED": return `A person has checked this document and made a fixed copy.${r.outcome_note ? ` They say: ${r.outcome_note}` : ""}`;
+    case "DECLINED": return `A person looked at this document but could not improve it. ${r.outcome_note ?? ""}`.trim();
+    default: return "You cancelled this request.";
+  }
+}
+
+export interface QueueItem {
+  id: string;
+  status: "REQUESTED" | "IN_REVIEW";
+  mine: boolean;
+  requested_at: string;
+  due_at: string;
+  overdue: boolean;
+  pages: number;
+  claimed_at: string | null;
+  snapshot: { findings?: number; by_severity?: Record<string, number>; tagged?: boolean | null; figures?: number; headings?: number; image_only_pages?: number };
+}
+export interface ReviewDetail {
+  review: { id: string; status: string; requested_at: string; due_at: string; claimed_at: string; note: string | null; pages: number };
+  document: { id: string; filename: string; page_count: number | null };
+  audit: AuditRow;
+  findings: DocFinding[];
+  structure: FixState["structure"];
+  fix: FixRow | null;
+}

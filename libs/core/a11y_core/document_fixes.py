@@ -74,11 +74,32 @@ async def get_state(org_id: uuid.UUID, doc_id: uuid.UUID) -> dict:
         return {"document": doc, "audit": audit, "fix": fix}
 
 
+async def _reserved_for_review(db, doc_id: uuid.UUID) -> None:
+    """While a reviewer holds a document, the customer cannot change its plan underneath them."""
+    held = (
+        await db.execute(
+            text("SELECT 1 FROM document_reviews WHERE document_id = :d AND status = 'IN_REVIEW'"),
+            {"d": doc_id},
+        )
+    ).first()
+    if held:
+        raise FixRefused(
+            409, "in_review", "A reviewer is working on this document. You will be told when they finish."
+        )
+
+
 async def save_plan(
-    org_id: uuid.UUID, user_id: uuid.UUID | None, doc_id: uuid.UUID, plan: FixPlan
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    doc_id: uuid.UUID,
+    plan: FixPlan,
+    *,
+    by_reviewer: bool = False,
 ) -> DocumentFix:
     async with tenant_session(org_id) as db:
         doc, audit = await _editable(db, doc_id)
+        if not by_reviewer:
+            await _reserved_for_review(db, doc_id)
         if problems := check_against(plan, audit.structure):
             raise FixRefused(422, "invalid_plan", problems[0])
         fix = (
@@ -120,9 +141,15 @@ def enqueue_build(org_id: uuid.UUID, fix_id: uuid.UUID) -> bool:
         return False
 
 
-async def start_build(org_id: uuid.UUID, doc_id: uuid.UUID) -> DocumentFix:
+async def start_build(
+    org_id: uuid.UUID, doc_id: uuid.UUID, *, charge_pages: bool = True, by_reviewer: bool = False
+) -> DocumentFix:
+    """Queue the build. A person's own build reserves the document's pages; a reviewer's build does not, because the
+    customer already paid for the review (ADR 0023)."""
     async with tenant_session(org_id) as db:
         doc, _ = await _editable(db, doc_id)
+        if not by_reviewer:
+            await _reserved_for_review(db, doc_id)
         fix = (
             await db.execute(
                 select(DocumentFix).where(
@@ -150,7 +177,10 @@ async def start_build(org_id: uuid.UUID, doc_id: uuid.UUID) -> DocumentFix:
         fix.pages = max(1, doc.page_count or 1)
         fix.status, fix.updated_at = "QUEUED", datetime.now(UTC)
         await db.flush()
-        await billing.reserve(db, org_id, FEATURE, str(fix.id), fix.pages)  # raises QuotaExceeded
+        if charge_pages:
+            await billing.reserve(
+                db, org_id, FEATURE, str(fix.id), fix.pages
+            )  # raises QuotaExceeded
     enqueue_build(org_id, fix.id)
     return fix
 

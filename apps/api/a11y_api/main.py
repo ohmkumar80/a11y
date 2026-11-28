@@ -18,6 +18,7 @@ from .routers import (
     admin_documents,
     admin_notifications,
     admin_ops,
+    admin_reviews,
     admin_security,
     admin_settings,
     auth,
@@ -32,6 +33,7 @@ from .routers import (
     org_api_keys,
     org_webhooks,
     reports,
+    review,
     rule_guidance,
     scans,
     standards,
@@ -116,6 +118,8 @@ app.include_router(v1.router)
 app.include_router(scans.router)
 app.include_router(documents.router)
 app.include_router(admin_documents.router)
+app.include_router(admin_reviews.router)
+app.include_router(review.router)
 app.include_router(domains.router)
 app.include_router(reports.router)
 

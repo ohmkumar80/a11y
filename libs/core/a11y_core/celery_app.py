@@ -24,6 +24,7 @@ _include = [
     "a11y_core.documents",
     "a11y_core.document_audits",
     "a11y_core.document_fixes",
+    "a11y_core.document_reviews",
 ]
 if importlib.util.find_spec("a11y_web_audit"):
     _include.append("a11y_web_audit.tasks")

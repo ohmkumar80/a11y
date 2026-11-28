@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button, Dialog, DialogTrigger, StatusMessage } from "@a11y/ui";
 import { del, download, post, type Problem } from "@/lib/api";
 import { formatDate } from "@/lib/billing";
-import { DOC_STATUS, KIND_LABEL, auditActive, formatSize, isWaiting, type DocumentRow } from "@/lib/documents";
+import { DOC_STATUS, KIND_LABEL, auditActive, formatSize, isWaiting, reviewActive, reviewText, type DocumentRow } from "@/lib/documents";
 import { useApi } from "@/lib/useApi";
 
 function AuditLine({ d }: { d: DocumentRow }) {
@@ -28,7 +28,7 @@ export function DocumentsList({ refreshKey }: { refreshKey: number }) {
   const { data, error, reload } = useApi<DocumentRow[]>("/documents");
   const [message, setMessage] = useState("");
   const [quota, setQuota] = useState<Problem | null>(null);
-  const waiting = data?.some(isWaiting);
+  const waiting = data?.some((d) => isWaiting(d) || reviewActive(d.latest_review?.status));
 
   useEffect(() => { void reload(); }, [refreshKey, reload]);
   // Refresh quietly while a file is being checked; the table is not a live region (no chatter).
@@ -84,6 +84,7 @@ export function DocumentsList({ refreshKey }: { refreshKey: number }) {
                     {DOC_STATUS[d.status]}
                     {d.reject_detail && <span className="block text-sm text-fg-muted">{d.reject_detail}</span>}
                     {d.latest_audit && <AuditLine d={d} />}
+                    {d.latest_review && <span className="block text-sm text-fg-muted">Human review: {reviewText(d.latest_review)}</span>}
                   </td>
                   <td className="px-4 py-3">{formatDate(d.created_at)}<span className="block text-sm text-fg-muted">Deleted on {formatDate(d.expires_at)}</span></td>
                   <td className="px-4 py-3">

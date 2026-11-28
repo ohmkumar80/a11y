@@ -14,7 +14,7 @@ from a11y_core.config import definitions as _definitions  # noqa: F401
 from a11y_core.config import get_config
 from a11y_core.config.crypto import get_box
 from a11y_core.db import admin_session, login_lookup_session, tenant_session
-from a11y_core.models import AuditLog, Role, User
+from a11y_core.models import PLATFORM_ROLES, AuditLog, Role, User
 from a11y_core.settings import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select, update
@@ -44,7 +44,7 @@ BAD_CODE = "That code is not correct. Check the code in your authenticator app a
 async def policy_for(role: str) -> tuple[mfa.Mode, str]:
     """(mode, issuer) for a role. Production never allows 'off' for platform administrators, whatever is stored."""
     p = (await get_config().effective("auth.mfa")).value
-    if role == Role.SUPER_ADMIN:
+    if role in PLATFORM_ROLES:  # platform staff (administrators and reviewers) share one policy
         mode = (
             "required"
             if (get_settings().env == "production" and p.super_admin == "off")
@@ -308,14 +308,14 @@ async def mfa_status(p: Principal = Depends(_decode)):
         "mode": mode,
         "required": mode == "required",
         "recovery_codes_left": len(user.mfa_recovery or []),
-        "available": user.role in (Role.SUPER_ADMIN, Role.COMPANY_ADMIN),
+        "available": user.role in (*PLATFORM_ROLES, Role.COMPANY_ADMIN),
     }
 
 
 @router.post("/setup/start")
 async def setup_start(p: Principal = Depends(_decode)):
     user = await _me(p)
-    if user.role not in (Role.SUPER_ADMIN, Role.COMPANY_ADMIN):
+    if user.role not in (*PLATFORM_ROLES, Role.COMPANY_ADMIN):
         raise _bad(
             "Two-step verification is available to administrators.",
             field="",

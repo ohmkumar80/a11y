@@ -11,7 +11,7 @@ import { PlanPanel } from "@/components/PlanPanel";
 import { get, post, type User } from "@/lib/api";
 import type { Subscription } from "@/lib/billing";
 
-const ROLE_LABEL = { COMPANY_ADMIN: "Administrator", STANDARD_USER: "Member", SUPER_ADMIN: "Super admin" } as const;
+const ROLE_LABEL = { COMPANY_ADMIN: "Administrator", STANDARD_USER: "Member", SUPER_ADMIN: "Super admin", REVIEWER: "Reviewer" } as const;
 
 function Team({ onInvited }: { onInvited: () => void }) {
   const [users, setUsers] = useState<User[] | null>(null);

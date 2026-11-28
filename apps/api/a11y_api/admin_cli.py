@@ -1,6 +1,8 @@
 """Platform-operator commands.
 
   python -m a11y_api.admin_cli EMAIL                 create a Super Admin
+  python -m a11y_api.admin_cli --create-reviewer EMAIL
+                                                     create a platform reviewer (can also be done in /admin)
   python -m a11y_api.admin_cli --reset-mfa EMAIL     break-glass: clear someone's two-step verification (locked out)
   python -m a11y_api.admin_cli --mfa-super-admin off|optional|required
                                                      break-glass: set the platform-admin MFA policy ("off" is refused
@@ -25,8 +27,9 @@ from sqlalchemy import select, update
 from .security import hash_password, password_problem
 
 
-async def create_super_admin(email: str, password: str) -> bool:
-    """Returns False if the account already exists."""
+async def create_super_admin(email: str, password: str, role: str = Role.SUPER_ADMIN) -> bool:
+    """Create a platform account (no organisation): a Super Admin, or with ``role=Role.REVIEWER`` a reviewer.
+    Returns False if the account already exists."""
     email = email.strip().lower()
     if problem := password_problem(password, email):
         raise ValueError(problem)
@@ -38,7 +41,7 @@ async def create_super_admin(email: str, password: str) -> bool:
                 organization_id=None,
                 email=email,
                 hashed_password=hash_password(password),
-                role=Role.SUPER_ADMIN,
+                role=role,
                 email_verified_at=datetime.now(UTC),
             )
         )
@@ -81,10 +84,10 @@ async def set_super_admin_mfa(mode: str) -> None:
     )
 
 
-async def _main(email: str) -> None:
+async def _main(email: str, role: str = Role.SUPER_ADMIN) -> None:
     password = os.environ.get("A11Y_ADMIN_PASSWORD_INPUT") or getpass.getpass("Password: ")
     try:
-        created = await create_super_admin(email, password)
+        created = await create_super_admin(email, password, role)
     finally:
         await dispose_engines()
     print("created" if created else "already exists")
@@ -103,11 +106,13 @@ async def _run(argv: list[str]) -> None:
         ):
             await set_super_admin_mfa(argv[1])
             print(f"platform-admin MFA policy is now: {argv[1]}")
+        elif argv[:1] == ["--create-reviewer"] and len(argv) == 2:
+            await _main(argv[1], Role.REVIEWER)
         elif len(argv) == 1 and not argv[0].startswith("--"):
             await _main(argv[0])
         else:
             raise SystemExit(
-                "usage: python -m a11y_api.admin_cli EMAIL | --reset-mfa EMAIL | --mfa-super-admin off|optional|required"
+                "usage: python -m a11y_api.admin_cli EMAIL | --create-reviewer EMAIL | --reset-mfa EMAIL | --mfa-super-admin off|optional|required"
             )
     finally:
         await dispose_engines()

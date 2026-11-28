@@ -14,7 +14,7 @@ import { useFlags } from "@/lib/flags";
 function ToAdmin({ user }: { user: User }) {
   // Platform operators have no tenant; their home is /admin.
   const router = useRouter();
-  useEffect(() => { if (user.role === "SUPER_ADMIN") router.replace("/admin"); }, [user, router]);
+  useEffect(() => { if (user.role === "SUPER_ADMIN") router.replace("/admin"); else if (user.role === "REVIEWER") router.replace("/review"); }, [user, router]);
   return null;
 }
 
@@ -36,7 +36,7 @@ export default function WorkspacePage() {
         <>
           <ToAdmin user={user} />
           <Page title="Workspace" intro={`Signed in as ${user.email} · ${user.organization_name}`}>
-            {user.role !== "SUPER_ADMIN" && (
+            {user.role !== "SUPER_ADMIN" && user.role !== "REVIEWER" && (
               <>
                 <NewScanForm canVerify={user.role === "COMPANY_ADMIN"} />
                 <DocumentsLink />

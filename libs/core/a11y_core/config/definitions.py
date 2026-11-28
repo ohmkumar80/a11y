@@ -570,3 +570,39 @@ register(
         tags=("documents", "privacy"),
     )
 )
+
+
+class DocumentReviewPolicy(BaseModel):
+    """Human review of documents (ADR 0023): a customer asks a person on our team to check, and if possible fix, a PDF."""
+
+    enabled: bool = Field(True, description="Customers can ask a person to check a document")
+    sla_hours: int = Field(
+        48, ge=1, le=720, description="Hours within which a requested review should be finished"
+    )
+    claim_timeout_hours: int = Field(
+        8,
+        ge=1,
+        le=72,
+        description="A reviewer who has held a file this long without finishing loses it, and it returns to the queue",
+    )
+    max_open_per_org: int = Field(
+        5, ge=1, le=100, description="Reviews one organisation may have waiting or in progress at once"
+    )
+    reviewer_cost_per_hour: int = Field(
+        0,
+        ge=0,
+        le=1_000_000,
+        description="What an hour of reviewer time costs, in rupees. Used only to report the cost of a review and of a page.",
+    )
+
+
+register(
+    SettingDef(
+        key="documents.review",
+        model=DocumentReviewPolicy,
+        default=DocumentReviewPolicy(),
+        description="Human review of documents: on or off, turnaround target, queue limits and the cost of reviewer time. Override per plan or organisation.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents",),
+    )
+)

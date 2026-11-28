@@ -152,6 +152,27 @@ EVENTS: dict[str, EventDef] = {
             sample={"plan_name": "Trial"},
         ),
         _e(
+            key="document.review_done",
+            label="A person finished checking a document",
+            audience="actor",
+            category="scan",
+            variables={
+                "filename": "The document's name",
+                "outcome": "What the reviewer did, in a sentence",
+                "document_id": "The document's id",
+            },
+            subject="A person has checked {filename}",
+            intro="{outcome}",
+            action_label="Open your documents",
+            action_path="/workspace/documents",
+            outro="You asked for this check from the documents page. Automated and human checks together still do not make a file a guarantee of conformance.",
+            sample={
+                "filename": "annual-report.pdf",
+                "outcome": "A fixed copy is ready to download.",
+                "document_id": "sample-id",
+            },
+        ),
+        _e(
             key="scan.completed",
             label="Scan finished",
             audience="actor",

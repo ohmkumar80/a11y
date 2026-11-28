@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { StatusMessage } from "@a11y/ui";
 import { Page } from "@/components/Page";
 import { RequireAuth } from "@/components/RequireAuth";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import { get } from "@/lib/api";
 import { auditActive, type AuditDetail, type DocFinding } from "@/lib/documents";
 import { formatDate } from "@/lib/billing";
@@ -120,6 +121,7 @@ function Results({ doc, audit }: { doc: string; audit: string }) {
           {a.document.kind === "pdf" && (sm.facts?.tagged || sm.findings) ? (
             <p className="max-w-3xl"><NextLink href={`/workspace/documents/fix?doc=${a.document.id}`} className="inline-flex min-h-11 items-center font-semibold underline">Fix problems in this document</NextLink>: set the title and language, describe images and correct heading levels in a copy.</p>
           ) : null}
+          {a.document.kind === "pdf" && a.status === "SUCCEEDED" && <ReviewPanel docId={a.document.id} />}
           <p className="max-w-3xl">Fixed the file? Upload the new version on the <NextLink href="/workspace/documents" className="underline">documents page</NextLink> and check it again.</p>
         </>
       )}

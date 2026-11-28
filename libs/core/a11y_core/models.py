@@ -35,8 +35,13 @@ class Base(DeclarativeBase):
 
 class Role(enum.StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
+    REVIEWER = "REVIEWER"  # platform staff who check documents customers asked a person to check (ADR 0023)
     COMPANY_ADMIN = "COMPANY_ADMIN"
     STANDARD_USER = "STANDARD_USER"
+
+
+# Roles that belong to the platform, not to a customer organisation: no tenant, sessions kept in platform_sessions.
+PLATFORM_ROLES = frozenset({Role.SUPER_ADMIN, Role.REVIEWER})
 
 
 class TokenKind(enum.StrEnum):
@@ -63,7 +68,7 @@ class User(Base):
     __table_args__ = (
         CheckConstraint(f"role IN ({_values(Role)})", name="ck_users_role"),
         CheckConstraint(
-            "(role = 'SUPER_ADMIN') = (organization_id IS NULL)", name="ck_users_org_role"
+            "(role IN ('SUPER_ADMIN', 'REVIEWER')) = (organization_id IS NULL)", name="ck_users_org_role"
         ),
         # Email is globally unique (one login identity), stored lower-cased by the app.
         Index("uq_users_email", "email", unique=True),
@@ -969,3 +974,39 @@ class DocumentFix(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentReview(Base):
+    """A customer's request that a person check (and if possible fix) one of their PDFs (ADR 0023). The request carries the
+    customer's consent: only a document with an open request can be opened by a reviewer."""
+
+    __tablename__ = "document_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('REQUESTED', 'IN_REVIEW', 'COMPLETED', 'DECLINED', 'CANCELLED')",
+            name="ck_document_review_status",
+        ),
+        Index("ix_document_reviews_doc", "document_id", "requested_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(10), server_default="REQUESTED")
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    consent_version: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str | None] = mapped_column(Text)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    pages: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome_note: Mapped[str | None] = mapped_column(Text)
+    result_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    reported_minutes: Mapped[int | None] = mapped_column(Integer)
+    elapsed_seconds: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
