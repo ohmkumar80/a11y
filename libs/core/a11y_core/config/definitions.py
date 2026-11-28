@@ -473,7 +473,10 @@ class DocumentUploads(BaseModel):
     max_mb_pptx: int = Field(50, ge=1, le=500, description="Largest PowerPoint file, in megabytes")
     max_mb_epub: int = Field(50, ge=1, le=500, description="Largest EPUB, in megabytes")
     max_pages: int = Field(
-        500, ge=1, le=10000, description="Most pages (or slides) in one file; a longer file is refused"
+        500,
+        ge=1,
+        le=10000,
+        description="Most pages (or slides) in one file; a longer file is refused",
     )
     max_files_per_hour: int = Field(
         60, ge=1, le=10000, description="Uploads one organisation may make per hour"
@@ -528,7 +531,10 @@ class DocumentSafety(BaseModel):
         500, ge=1, le=5000, description="Most data a Word, PowerPoint or EPUB file may expand to"
     )
     zip_max_ratio: int = Field(
-        200, ge=2, le=10000, description="Largest allowed expansion of any one item (a 'zip bomb' guard)"
+        200,
+        ge=2,
+        le=10000,
+        description="Largest allowed expansion of any one item (a 'zip bomb' guard)",
     )
     max_attempts: int = Field(
         5, ge=1, le=20, description="How often a check is retried when the scanner is unavailable"
@@ -560,7 +566,10 @@ class DocumentRetention(BaseModel):
         30, ge=1, le=3650, description="Days a customer's files are kept before they are deleted"
     )
     rejected_retention_days: int = Field(
-        3, ge=1, le=90, description="Days a refused or infected file is kept (for support) before deletion"
+        3,
+        ge=1,
+        le=90,
+        description="Days a refused or infected file is kept (for support) before deletion",
     )
     purge_batch: int = Field(200, ge=1, le=5000, description="Most files deleted per hourly sweep")
 
@@ -591,7 +600,10 @@ class DocumentReviewPolicy(BaseModel):
         description="A reviewer who has held a file this long without finishing loses it, and it returns to the queue",
     )
     max_open_per_org: int = Field(
-        5, ge=1, le=100, description="Reviews one organisation may have waiting or in progress at once"
+        5,
+        ge=1,
+        le=100,
+        description="Reviews one organisation may have waiting or in progress at once",
     )
     reviewer_cost_per_hour: int = Field(
         0,
@@ -620,17 +632,34 @@ register(
 
 
 class StorageRegion(BaseModel):
-    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,29}$", description="Short name, for example eu or in")
-    label: str = Field(max_length=80, description="What customers see, for example 'European Union (Frankfurt)'")
-    bucket: str | None = Field(None, max_length=100, description="Storage bucket; empty = the platform's default bucket")
-    aws_region: str | None = Field(None, max_length=40, description="The storage provider's own region name")
-    endpoint_url: str | None = Field(None, max_length=300, description="Only for S3-compatible stores that are not AWS")
-    is_active: bool = Field(True, description="Offered for new files. Switch off instead of deleting a region that holds files")
+    id: str = Field(
+        pattern=r"^[a-z0-9][a-z0-9-]{0,29}$", description="Short name, for example eu or in"
+    )
+    label: str = Field(
+        max_length=80, description="What customers see, for example 'European Union (Frankfurt)'"
+    )
+    bucket: str | None = Field(
+        None, max_length=100, description="Storage bucket; empty = the platform's default bucket"
+    )
+    aws_region: str | None = Field(
+        None, max_length=40, description="The storage provider's own region name"
+    )
+    endpoint_url: str | None = Field(
+        None, max_length=300, description="Only for S3-compatible stores that are not AWS"
+    )
+    is_active: bool = Field(
+        True,
+        description="Offered for new files. Switch off instead of deleting a region that holds files",
+    )
 
 
 class StorageRegions(BaseModel):
     items: list[StorageRegion] = Field(default_factory=list)
-    default_id: str = Field("default", max_length=30, description="Where files go unless the organisation chooses otherwise")
+    default_id: str = Field(
+        "default",
+        max_length=30,
+        description="Where files go unless the organisation chooses otherwise",
+    )
 
     @model_validator(mode="after")
     def _check(self):
@@ -662,11 +691,21 @@ register(
 class DataControls(BaseModel):
     """What an organisation's administrator is allowed to decide for themselves. Set it for everyone, one plan or one organisation."""
 
-    can_choose_region: bool = Field(False, description="May choose where new files are stored (from the active regions)")
-    can_enable_ai: bool = Field(False, description="May allow AI models to process their documents (off by default)")
-    can_set_retention: bool = Field(True, description="May keep files for a shorter time than the plan's default")
-    can_block_human_review: bool = Field(True, description="May forbid people on our team from opening their files")
-    min_retention_days: int = Field(1, ge=1, le=3650, description="The shortest time an organisation may choose to keep files")
+    can_choose_region: bool = Field(
+        False, description="May choose where new files are stored (from the active regions)"
+    )
+    can_enable_ai: bool = Field(
+        False, description="May allow AI models to process their documents (off by default)"
+    )
+    can_set_retention: bool = Field(
+        True, description="May keep files for a shorter time than the plan's default"
+    )
+    can_block_human_review: bool = Field(
+        True, description="May forbid people on our team from opening their files"
+    )
+    min_retention_days: int = Field(
+        1, ge=1, le=3650, description="The shortest time an organisation may choose to keep files"
+    )
 
 
 register(
@@ -684,12 +723,27 @@ register(
 class OrgDataPolicy(BaseModel):
     """An organisation's own choices. Anything the platform has not allowed it to change is ignored, and the page says so."""
 
-    retention_days: int | None = Field(None, ge=1, le=3650, description="Keep files this many days (never longer than the plan allows)")
-    storage_region: str | None = Field(None, max_length=30, description="Where new files are stored")
-    allow_human_review: bool = Field(True, description="People on our team may open files you ask them to check")
+    retention_days: int | None = Field(
+        None,
+        ge=1,
+        le=3650,
+        description="Keep files this many days (never longer than the plan allows)",
+    )
+    storage_region: str | None = Field(
+        None, max_length=30, description="Where new files are stored"
+    )
+    allow_human_review: bool = Field(
+        True, description="People on our team may open files you ask them to check"
+    )
     ai_on_documents: bool = Field(False, description="AI models may process your documents")
-    ai_require_zero_retention: bool = Field(True, description="Only use AI providers that do not keep or train on what they receive")
-    ai_regions: list[str] = Field(default_factory=list, max_length=10, description="Only use AI providers that process in these regions; empty = any")
+    ai_require_zero_retention: bool = Field(
+        True, description="Only use AI providers that do not keep or train on what they receive"
+    )
+    ai_regions: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Only use AI providers that process in these regions; empty = any",
+    )
 
     @model_validator(mode="after")
     def _clean(self):

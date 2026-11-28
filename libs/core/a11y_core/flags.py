@@ -21,7 +21,9 @@ class FeatureFlags(BaseModel):
     vpat: bool = Field(True, description="VPAT drafting and export")
     crawl_scans: bool = Field(True, description="Scanning more than one page (crawl mode)")
     notification_center: bool = Field(True, description="The in-app notification centre")
-    documents: bool = Field(True, description="Document uploads and audits (PDF, Word, PowerPoint, EPUB)")
+    documents: bool = Field(
+        True, description="Document uploads and audits (PDF, Word, PowerPoint, EPUB)"
+    )
     human_review: bool = Field(True, description="Asking a person on our team to check a document")
 
 

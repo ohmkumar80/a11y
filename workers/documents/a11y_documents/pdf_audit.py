@@ -90,9 +90,10 @@ def _facts_and_direct(data: bytes) -> tuple[dict, list[dict]]:
         mark = root.get("/MarkInfo")
         info_title = str(pdf.docinfo.get("/Title", "")).strip() if pdf.docinfo is not None else ""
         if not info_title:  # many tools keep the title only in the XMP metadata
-            with contextlib.suppress(Exception), pdf.open_metadata(
-                set_pikepdf_as_editor=False, update_docinfo=False
-            ) as meta:
+            with (
+                contextlib.suppress(Exception),
+                pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as meta,
+            ):
                 info_title = str(meta.get("dc:title", "") or "").strip()
         facts = {
             "pages": pages,

@@ -104,7 +104,12 @@ def upgrade() -> None:
     op.bulk_insert(
         ents,
         [
-            {"plan_id": p, "feature_key": "document_reviews_monthly", "enabled": True, "limit_value": v}
+            {
+                "plan_id": p,
+                "feature_key": "document_reviews_monthly",
+                "enabled": True,
+                "limit_value": v,
+            }
             for p, v in REVIEWS.items()
         ],
     )

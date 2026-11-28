@@ -51,7 +51,8 @@ def upgrade() -> None:
         sa.Column("started_at", TS),
         sa.Column("finished_at", TS),
         sa.CheckConstraint(
-            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')", name="ck_document_audit_status"
+            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')",
+            name="ck_document_audit_status",
         ),
     )
     op.create_index("ix_document_audits_organization_id", "document_audits", ["organization_id"])
@@ -81,10 +82,13 @@ def upgrade() -> None:
         sa.Column("examples", pg.JSONB, server_default=sa.text("'[]'::jsonb"), nullable=False),
         sa.Column("explained", sa.Boolean, server_default=sa.text("true"), nullable=False),
         sa.CheckConstraint(
-            "severity IN ('critical', 'serious', 'moderate', 'minor')", name="ck_document_finding_severity"
+            "severity IN ('critical', 'serious', 'moderate', 'minor')",
+            name="ck_document_finding_severity",
         ),
     )
-    op.create_index("ix_document_findings_organization_id", "document_findings", ["organization_id"])
+    op.create_index(
+        "ix_document_findings_organization_id", "document_findings", ["organization_id"]
+    )
     op.create_index("ix_document_findings_audit", "document_findings", ["audit_id", "ordinal"])
     for t in ("document_audits", "document_findings"):
         op.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
@@ -108,7 +112,12 @@ def upgrade() -> None:
     op.bulk_insert(
         ents,
         [
-            {"plan_id": p, "feature_key": "document_pages_monthly", "enabled": True, "limit_value": v}
+            {
+                "plan_id": p,
+                "feature_key": "document_pages_monthly",
+                "enabled": True,
+                "limit_value": v,
+            }
             for p, v in PAGES.items()
         ],
     )

@@ -73,7 +73,9 @@ class Settings(BaseSettings):
             if self.mfa_super_admin_default == "off":
                 raise ValueError("MFA_SUPER_ADMIN_DEFAULT=off is not allowed in production")
             if self.s3_access_key.startswith("s3-dev-only"):
-                raise ValueError("S3_ACCESS_KEY / S3_SECRET_KEY must be set to real values in production")
+                raise ValueError(
+                    "S3_ACCESS_KEY / S3_SECRET_KEY must be set to real values in production"
+                )
             if self.scan_dev_allow_hosts:
                 raise ValueError("SCAN_DEV_ALLOW_HOSTS is not allowed in production")
         return self

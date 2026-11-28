@@ -41,7 +41,11 @@ def upgrade() -> None:
             sa.ForeignKey("documents.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("audit_id", pg.UUID(as_uuid=True), sa.ForeignKey("document_audits.id", ondelete="SET NULL")),
+        sa.Column(
+            "audit_id",
+            pg.UUID(as_uuid=True),
+            sa.ForeignKey("document_audits.id", ondelete="SET NULL"),
+        ),
         sa.Column("status", sa.String(10), server_default="DRAFT", nullable=False),
         sa.Column("plan", pg.JSONB, server_default=sa.text("'{}'::jsonb"), nullable=False),
         sa.Column("pages", sa.Integer),
@@ -55,7 +59,8 @@ def upgrade() -> None:
         sa.Column("started_at", TS),
         sa.Column("finished_at", TS),
         sa.CheckConstraint(
-            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')", name="ck_document_fix_status"
+            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')",
+            name="ck_document_fix_status",
         ),
     )
     op.create_index("ix_document_fixes_organization_id", "document_fixes", ["organization_id"])
@@ -78,7 +83,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM usage_reservations WHERE job_id IN (SELECT id::text FROM document_fixes)")
+    op.execute(
+        "DELETE FROM usage_reservations WHERE job_id IN (SELECT id::text FROM document_fixes)"
+    )
     op.drop_table("document_fixes")
     op.drop_column("documents", "derived_from")
     op.drop_column("document_audits", "structure")

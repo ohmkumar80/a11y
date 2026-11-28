@@ -69,6 +69,9 @@ test("the link is left out when the centre is switched off, and for platform adm
 test("the header is the same on every page with the link last before Help", async ({ page }) => {
   await mockApi(page, "STANDARD_USER");
   await page.goto("/workspace");
+  // The Notifications link appears once the signed-in user and the unread count have loaded: wait for it, so a slow machine
+  // does not read the header half-built.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /^Notifications/ })).toBeVisible();
   const links = await page.getByRole("navigation", { name: "Main" }).getByRole("link").allInnerTexts();
   expect(links.at(-1)).toBe("Help"); // SC 3.2.6: help stays in the same last place
   expect(links.some((t) => t.startsWith("Notifications"))).toBe(true);

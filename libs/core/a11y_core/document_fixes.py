@@ -84,7 +84,9 @@ async def _reserved_for_review(db, doc_id: uuid.UUID) -> None:
     ).first()
     if held:
         raise FixRefused(
-            409, "in_review", "A reviewer is working on this document. You will be told when they finish."
+            409,
+            "in_review",
+            "A reviewer is working on this document. You will be told when they finish.",
         )
 
 

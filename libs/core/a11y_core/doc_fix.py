@@ -77,7 +77,9 @@ def check_against(plan: FixPlan, structure: dict) -> list[str]:
     """Problems, in plain words, between a plan and the structure read from the file. Empty list = fine."""
     problems: list[str] = []
     if (plan.alt or plan.heading_levels) and not structure.get("has_structure"):
-        return ["This file has no tags, so image descriptions and heading levels cannot be changed here."]
+        return [
+            "This file has no tags, so image descriptions and heading levels cannot be changed here."
+        ]
     if plan.edit_count() > MAX_EDITS:
         problems.append(
             f"That is more than {MAX_EDITS} changes at once. Apply some first, then continue."

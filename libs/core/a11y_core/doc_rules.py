@@ -41,7 +41,14 @@ def lookup(clause: str, test: int, description: str = "") -> RuleText:
     cat = _catalog()
     if (r := cat["rules"].get(rid)) is not None:
         return RuleText(
-            rid, r["severity"], r["title"], r["why"], r["fix"], tuple(r.get("wcag", [])), bool(r.get("needs_human")), True
+            rid,
+            r["severity"],
+            r["title"],
+            r["why"],
+            r["fix"],
+            tuple(r.get("wcag", [])),
+            bool(r.get("needs_human")),
+            True,
         )
     # Fall back to the longest matching clause prefix: "7.4.2" -> "7.4".
     parts = clause.split(".")

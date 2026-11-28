@@ -68,7 +68,8 @@ class User(Base):
     __table_args__ = (
         CheckConstraint(f"role IN ({_values(Role)})", name="ck_users_role"),
         CheckConstraint(
-            "(role IN ('SUPER_ADMIN', 'REVIEWER')) = (organization_id IS NULL)", name="ck_users_org_role"
+            "(role IN ('SUPER_ADMIN', 'REVIEWER')) = (organization_id IS NULL)",
+            name="ck_users_org_role",
         ),
         # Email is globally unique (one login identity), stored lower-cased by the app.
         Index("uq_users_email", "email", unique=True),
@@ -838,7 +839,9 @@ class DocumentStatus(enum.StrEnum):
     SCANNING = "SCANNING"  # a worker holds it for the virus scan and structural inspection
     CLEAN = "CLEAN"  # passed every check; the only status from which anything may read the file
     REJECTED = "REJECTED"  # the customer's file failed a check (infected, encrypted, too long...)
-    FAILED = "FAILED"  # OUR fault (scanner or store down past its retries); the file stays unreadable
+    FAILED = (
+        "FAILED"  # OUR fault (scanner or store down past its retries); the file stays unreadable
+    )
     DELETED = "DELETED"  # bytes erased (retention or the customer's request); the row remains as a tombstone
 
 
@@ -855,6 +858,7 @@ class Document(Base):
         CheckConstraint("kind IN ('pdf', 'docx', 'pptx', 'epub')", name="ck_document_kind"),
         Index("ix_documents_org_created", "organization_id", "created_at"),
         Index("ix_documents_expiry", "expires_at"),
+        Index("ix_documents_region", "region"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -889,7 +893,8 @@ class DocumentAudit(Base):
     __tablename__ = "document_audits"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')", name="ck_document_audit_status"
+            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')",
+            name="ck_document_audit_status",
         ),
         Index("ix_document_audits_doc", "document_id", "created_at"),
     )
@@ -927,7 +932,9 @@ class DocumentFinding(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"), index=True
     )
-    audit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_audits.id", ondelete="CASCADE"))
+    audit_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_audits.id", ondelete="CASCADE")
+    )
     ordinal: Mapped[int] = mapped_column(Integer)
     rule_id: Mapped[str] = mapped_column(String(60))
     source: Mapped[str] = mapped_column(String(10))
@@ -950,9 +957,17 @@ class DocumentFix(Base):
     __tablename__ = "document_fixes"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')", name="ck_document_fix_status"
+            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')",
+            name="ck_document_fix_status",
         ),
         Index("ix_document_fixes_doc", "document_id", "created_at"),
+        # One fix in progress per document: a draft being edited, or a build that has not finished.
+        Index(
+            "uq_document_fix_active",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('DRAFT', 'QUEUED', 'RUNNING')"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -988,6 +1003,14 @@ class DocumentReview(Base):
             name="ck_document_review_status",
         ),
         Index("ix_document_reviews_doc", "document_id", "requested_at"),
+        Index("ix_document_reviews_queue", "status", "due_at"),
+        # One open review per document.
+        Index(
+            "uq_document_review_active",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('REQUESTED', 'IN_REVIEW')"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -997,7 +1020,9 @@ class DocumentReview(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     status: Mapped[str] = mapped_column(String(10), server_default="REQUESTED")
     requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     consent_version: Mapped[str] = mapped_column(String(20))
     note: Mapped[str | None] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -132,7 +132,9 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
     key = object_key(org_id, new_id)
     blob, wrapped = seal_bytes(out, key)
     retention = await documents.retention_days(org_id)
-    store = await store_for(source_region)  # the copy stays in the region of the file it was made from
+    store = await store_for(
+        source_region
+    )  # the copy stays in the region of the file it was made from
     try:
         await store.put(key, blob)
     except StorageError:

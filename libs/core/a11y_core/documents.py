@@ -106,7 +106,9 @@ async def accept_upload(
     doc_id = uuid.uuid4()
     key = object_key(org_id, doc_id)
     blob, wrapped = seal_bytes(data, key)
-    store = await store_for(eff.region.id)  # the organisation's region: a file never leaves the one it was written to
+    store = await store_for(
+        eff.region.id
+    )  # the organisation's region: a file never leaves the one it was written to
     stored = False
     try:
         async with tenant_session(org_id) as db:
