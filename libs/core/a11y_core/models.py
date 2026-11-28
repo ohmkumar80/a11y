@@ -823,3 +823,54 @@ class EntitlementOverride(Base):
     reason: Mapped[str] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# --- Documents and eBooks (Phase 3; ADR 0020) ----------------------------------------------------------
+
+
+class DocumentStatus(enum.StrEnum):
+    UPLOADED = "UPLOADED"  # stored (encrypted) but nobody has looked at it yet
+    SCANNING = "SCANNING"  # a worker holds it for the virus scan and structural inspection
+    CLEAN = "CLEAN"  # passed every check; the only status from which anything may read the file
+    REJECTED = "REJECTED"  # the customer's file failed a check (infected, encrypted, too long...)
+    FAILED = "FAILED"  # OUR fault (scanner or store down past its retries); the file stays unreadable
+    DELETED = "DELETED"  # bytes erased (retention or the customer's request); the row remains as a tombstone
+
+
+class Document(Base):
+    """A customer file. Bytes live in object storage, encrypted by us; the wrapped data key lives here. Nothing may
+    read the bytes unless ``status = 'CLEAN'`` (enforced in ``a11y_core.documents.load_clean``)."""
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('UPLOADED', 'SCANNING', 'CLEAN', 'REJECTED', 'FAILED', 'DELETED')",
+            name="ck_document_status",
+        ),
+        CheckConstraint("kind IN ('pdf', 'docx', 'pptx', 'epub')", name="ck_document_kind"),
+        Index("ix_documents_org_created", "organization_id", "created_at"),
+        Index("ix_documents_expiry", "expires_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(160))
+    kind: Mapped[str] = mapped_column(String(8))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_key: Mapped[str | None] = mapped_column(String(300))
+    wrapped_key: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), server_default="UPLOADED")
+    reject_code: Mapped[str | None] = mapped_column(String(40))
+    reject_detail: Mapped[str | None] = mapped_column(Text)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    inspection: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_reason: Mapped[str | None] = mapped_column(String(20))

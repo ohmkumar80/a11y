@@ -450,3 +450,123 @@ register(
         tags=("auth", "security"),
     )
 )
+
+
+# --- Documents and eBooks (PROJECT_PLAN Phase 3; ADR 0020) --------------------------------------------------
+# Everything about customer-file handling is an admin setting, so limits can be tightened or relaxed per plan or
+# per organisation without a deploy. The safety knobs are global-only and high-risk.
+
+
+class DocumentUploads(BaseModel):
+    enabled: bool = Field(True, description="Accept document uploads at all (a kill switch)")
+    allow_pdf: bool = Field(True, description="Accept PDF files")
+    allow_docx: bool = Field(True, description="Accept Word (.docx) files")
+    allow_pptx: bool = Field(True, description="Accept PowerPoint (.pptx) files")
+    allow_epub: bool = Field(True, description="Accept EPUB files")
+    max_mb_pdf: int = Field(50, ge=1, le=500, description="Largest PDF, in megabytes")
+    max_mb_docx: int = Field(25, ge=1, le=500, description="Largest Word file, in megabytes")
+    max_mb_pptx: int = Field(50, ge=1, le=500, description="Largest PowerPoint file, in megabytes")
+    max_mb_epub: int = Field(50, ge=1, le=500, description="Largest EPUB, in megabytes")
+    max_pages: int = Field(
+        500, ge=1, le=10000, description="Most pages (or slides) in one file; a longer file is refused"
+    )
+    max_files_per_hour: int = Field(
+        60, ge=1, le=10000, description="Uploads one organisation may make per hour"
+    )
+    max_active_files: int = Field(
+        500, ge=1, le=1000000, description="Files one organisation may keep at once"
+    )
+
+    def kinds(self) -> tuple[str, ...]:
+        return tuple(k for k in ("pdf", "docx", "pptx", "epub") if getattr(self, f"allow_{k}"))
+
+    def max_bytes(self, kind: str) -> int:
+        return int(getattr(self, f"max_mb_{kind}")) * 1024 * 1024
+
+
+register(
+    SettingDef(
+        key="documents.uploads",
+        model=DocumentUploads,
+        default=DocumentUploads(),
+        description="Which document types are accepted, size and page limits, and upload rates. Override per plan or organisation.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents",),
+    )
+)
+
+
+class DocumentSafety(BaseModel):
+    """How untrusted files are checked before anything reads them. Platform-wide on purpose: a customer or plan
+    must not be able to weaken it."""
+
+    malware_scan: Literal["required", "off"] = Field(
+        "required",
+        description="'required': a file is held back until the virus scanner has passed it, and stays held if the "
+        "scanner is down. 'off' is for development only and is refused in production.",
+    )
+    scan_timeout_seconds: int = Field(
+        60, ge=5, le=600, description="How long the virus scanner may take on one file"
+    )
+    reject_encrypted: bool = Field(
+        True, description="Refuse password-protected files (they cannot be audited)"
+    )
+    reject_active_content: bool = Field(
+        True,
+        description="Refuse PDFs that carry scripts or launch actions. Turn off only if customers need to audit "
+        "interactive forms; the file is still virus-scanned.",
+    )
+    zip_max_entries: int = Field(
+        5000, ge=10, le=100000, description="Most items inside a Word, PowerPoint or EPUB file"
+    )
+    zip_max_uncompressed_mb: int = Field(
+        500, ge=1, le=5000, description="Most data a Word, PowerPoint or EPUB file may expand to"
+    )
+    zip_max_ratio: int = Field(
+        200, ge=2, le=10000, description="Largest allowed expansion of any one item (a 'zip bomb' guard)"
+    )
+    max_attempts: int = Field(
+        5, ge=1, le=20, description="How often a check is retried when the scanner is unavailable"
+    )
+
+
+def _safety_guard(new: DocumentSafety, prev: DocumentSafety) -> None:
+    from ..settings import get_settings
+
+    if get_settings().env == "production" and new.malware_scan == "off":
+        raise GuardrailError("The virus scan cannot be switched off in production.")
+
+
+register(
+    SettingDef(
+        key="documents.safety",
+        model=DocumentSafety,
+        default=DocumentSafety(),
+        description="Virus scan, encrypted and active-content policy, and zip-bomb limits for uploaded files.",
+        guard=_safety_guard,
+        high_risk=True,
+        tags=("documents", "security"),
+    )
+)
+
+
+class DocumentRetention(BaseModel):
+    retention_days: int = Field(
+        30, ge=1, le=3650, description="Days a customer's files are kept before they are deleted"
+    )
+    rejected_retention_days: int = Field(
+        3, ge=1, le=90, description="Days a refused or infected file is kept (for support) before deletion"
+    )
+    purge_batch: int = Field(200, ge=1, le=5000, description="Most files deleted per hourly sweep")
+
+
+register(
+    SettingDef(
+        key="documents.retention",
+        model=DocumentRetention,
+        default=DocumentRetention(),
+        description="How long customer files are kept. Set shorter for a plan or organisation with stricter needs.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents", "privacy"),
+    )
+)

@@ -1,6 +1,7 @@
 # ADR 0002: Cloud and object-storage target
 
-- **Status:** Proposed. Needs a decision from the product owner (PROJECT_PLAN open decision 2).
+- **Status:** Partly accepted (2026-11-28). The owner chose the **S3 API** for customer files; see ADR 0020. The choice of
+  cloud for hosting is still open (PROJECT_PLAN open decision 2).
 - **Date:** 2026-11-26
 
 ## Context

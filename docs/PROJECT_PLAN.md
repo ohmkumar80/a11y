@@ -1018,6 +1018,21 @@ Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harde
 - Upload safety tests pass: a malicious PDF, a zip bomb and an oversized file are all refused, and no customer file leaves the allowed region or is kept past its retention limit.
 - Human review cost per document is measured, and the plan quotas cover it.
 
+**Status (2026-11-28, in progress on branch `phase-3`).** Slice 1 of the build order, upload safety, is built; the PDF audit (slice 2) is next. Everything an administrator might want to tune is a setting (`documents.uploads`, `documents.safety`, `documents.retention`, the `documents` feature flag), editable in `/admin` at global, plan or organisation scope, plus a read-and-act Documents tab.
+
+| Story | Slice | Status |
+|---|---|---|
+| Storage layer: S3 API behind a small interface, per-file envelope encryption bound to the object key ([ADR 0020](adr/0020-document-storage-and-upload-safety.md)) | 1 | Built and tested against the real local store |
+| Upload safety: kind decided from the bytes, size and page limits, zip-bomb and unsafe-path checks, password and active-content policy, ClamAV scan that fails closed, hostile files erased at once | 1 | Built. Tested with a fake scanner and against a real ClamAV (EICAR in a .docx is refused and erased; the ADR lists what ClamAV does not catch) |
+| Retention, deletion on request, tombstones, hourly sweep, stuck-upload re-queue | 1 | Built |
+| Admin Documents module: scanner and store health, pipeline counts, refusal reasons, retry files that failed on our side, run the sweep | 1 | Built (API + `/admin` tab, axe in both colour schemes) |
+| Customer upload screen and document list | 1 | Not started (API is ready: `POST /documents`, list, download, delete) |
+| PDF audit: veraPDF check, findings, document workbench, page quota (`document_pages`), `/v1/documents` | 2 | Not started |
+| Per-organisation data policy (regions, zero-retention AI use), granular reviewer role, human-review unit cost | 2 to 3 | Not started |
+| PDF remediation with human review, DOCX and PPTX, EPUB3 | 3 to 5 | Not started |
+
+**Open items found while building slice 1.** (1) The shared `Table` component renders a keyboard grid, so a keyboard user cannot reach a button inside a table cell with the Tab key (focus stops on the row and then leaves the table). This predates Phase 3 and affects, for example, the Runbook buttons in Operations; the new Documents tab avoids it by using a list. The component needs a decision (native table semantics for data tables, or keep the grid and add arrow-key help). (2) The document scan runs in the shared documents worker; the plan's "no network" sandbox is still to do (ADR 0020, known limits).
+
 ### Phase 4: Audio and video
 
 **Scope**

@@ -17,6 +17,14 @@ export const SUBSCRIPTION = {
 };
 
 export const opsState = { healthy: false };
+export const docsState = { healthy: true, rescans: [] as string[], purges: 0 };
+const DOCS_OVERVIEW = {
+  health: { scanner: "ok", storage: "ok" },
+  by_status: { UPLOADED: 1, SCANNING: 0, CLEAN: 12, REJECTED: 3, FAILED: 1, DELETED: 20 },
+  rejections_30d: [{ code: "encrypted", count: 2 }, { code: "malware", count: 1 }],
+  stored_bytes: 73400320, expired_waiting: 4, stuck: 0,
+  failed: [{ id: "doc-f1", organization: "Acme Ltd", kind: "pdf", size_bytes: 2097152, created_at: "2026-11-27T10:00:00Z", attempts: 5, why: "virus scanner unavailable" }],
+};
 export const overrideCalls: string[] = [];
 const RUNBOOK = `# Stuck scans
 
@@ -88,6 +96,9 @@ export async function mockAdminApi(page: Page) {
       return r.fulfill({ json: [{ feature: "urls_monthly", enabled: true, limit_value: 500, expires_at: "2027-01-31T23:59:59Z", reason: "Pilot extension", expired: false }, { feature: "byok_ai", enabled: true, limit_value: null, expires_at: null, reason: "Early access", expired: false }] });
     }
     if (p.startsWith("/admin/ops/runbooks/")) return r.fulfill({ json: { slug: p.split("/").pop(), markdown: RUNBOOK } });
+    if (p === "/admin/documents/overview") return r.fulfill({ json: docsState.healthy ? DOCS_OVERVIEW : { ...DOCS_OVERVIEW, health: { scanner: "down", storage: "ok" }, stuck: 2 } });
+    if (p === "/admin/documents/purge") { docsState.purges += 1; return r.fulfill({ json: { erased: 4, errors: 0 } }); }
+    if (p.startsWith("/admin/documents/") && p.endsWith("/rescan")) { docsState.rescans.push(p.split("/")[3] ?? ""); return r.fulfill({ json: { status: "UPLOADED", queued: true } }); }
     if (p === "/admin/ops") return r.fulfill({ json: opsState.healthy ? OPS_OK : OPS_BAD });
     if (p === "/admin/notifications/preview") {
       const b = r.request().postDataJSON() as { subject: string; action_label: string };

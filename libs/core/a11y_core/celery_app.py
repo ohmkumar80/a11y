@@ -21,11 +21,13 @@ _include = [
     "a11y_core.notify",
     "a11y_core.webhooks",
     "a11y_core.canaries",
+    "a11y_core.documents",
 ]
 if importlib.util.find_spec("a11y_web_audit"):
     _include.append("a11y_web_audit.tasks")
 if importlib.util.find_spec("a11y_documents"):
     _include.append("a11y_documents.tasks")
+    _include.append("a11y_documents.scan_upload")
 
 celery_app = Celery("a11y", broker=get_settings().redis_url, include=_include)
 celery_app.conf.update(
@@ -41,6 +43,7 @@ celery_app.conf.update(
         "docs.*": {"queue": "docs"},
         "billing.*": {"queue": "system"},
         "scans.*": {"queue": "system"},
+        "documents.*": {"queue": "system"},
     },
     task_serializer="json",
     accept_content=["json"],
