@@ -214,6 +214,7 @@ async def erase(db: AsyncSession, doc: Document, reason: str) -> None:
     if doc.storage_key:
         await get_store().delete(doc.storage_key)
     # What was found in the file is derived from it, so it goes with it (findings are deleted by cascade).
+    await db.execute(text("DELETE FROM document_fixes WHERE document_id = :d"), {"d": doc.id})
     await db.execute(text("DELETE FROM document_audits WHERE document_id = :d"), {"d": doc.id})
     doc.storage_key = None
     doc.wrapped_key = None

@@ -29,7 +29,34 @@ export const AUDIT_DETAIL = {
   ],
 };
 
+export const FIX_STATE = {
+  document: { id: "d1", filename: "annual-report.pdf", page_count: 12 },
+  audit_id: "a1",
+  structure: {
+    has_structure: true, title: "", language: "", pages: 12, truncated: false,
+    figures: [{ id: "34-0", editable: true, page: 2, alt: "" }, { id: "40-0", editable: true, page: 5, alt: "Old description of the chart" }],
+    headings: [
+      { id: "27-0", editable: true, page: 1, level: 1, text: "Annual report" },
+      { id: "31-0", editable: true, page: 1, level: 3, text: "Our results" },
+    ],
+  },
+  fix: null as null | Record<string, unknown>,
+};
+export const FIX_READY = {
+  id: "fx1", status: "READY", plan: {}, pages: 12, result_document_id: "copy1", error_code: null, error_detail: null,
+  result: {
+    edits: 4, before: { findings: 4, by_severity: { critical: 0, serious: 2, moderate: 1, minor: 1 } }, after: { findings: 1, by_severity: { critical: 0, serious: 0, moderate: 0, minor: 1 } },
+    resolved: [{ rule_id: "7.2-29", title: "The document language is missing or invalid", severity: "serious" }, { rule_id: "7.3-1", title: "Images have no alternative text", severity: "serious" }, { rule_id: "7.4.2-1", title: "Heading levels are skipped", severity: "moderate" }],
+    remaining: [{ rule_id: "5-1", title: "The PDF does not state that it follows the accessible PDF standard", severity: "minor" }],
+  },
+};
+
 export const docState = {
+  fixState: FIX_STATE as Record<string, unknown>,
+  fixSaved: [] as Record<string, unknown>[],
+  fixBuilds: 0,
+  fixBuildError: null as null | { status: number; json: Record<string, unknown> },
+  fixLoadError: null as null | { status: number; json: Record<string, unknown> },
   auditsStarted: [] as string[],
   auditError: null as null | { status: number; json: Record<string, unknown> },
   auditDetail: AUDIT_DETAIL as Record<string, unknown>,
@@ -51,6 +78,11 @@ export function resetDocs() {
   docState.deleted = [];
   docState.downloads = [];
   docState.uploadError = null;
+  docState.fixState = FIX_STATE;
+  docState.fixSaved = [];
+  docState.fixBuilds = 0;
+  docState.fixBuildError = null;
+  docState.fixLoadError = null;
   docState.auditsStarted = [];
   docState.auditError = null;
   docState.auditDetail = AUDIT_DETAIL;
@@ -60,6 +92,27 @@ resetDocs();
 
 /** A new upload moves UPLOADED -> SCANNING -> CLEAN as the list is polled, like the real checker would. */
 export async function mockDocumentApi(page: Page) {
+  await page.route(/\/api\/documents\/[^/?]+\/fix$/, (r) => {
+    if (r.request().method() === "PUT") {
+      const plan = r.request().postDataJSON() as Record<string, unknown>;
+      docState.fixSaved.push(plan);
+      docState.fixState = { ...docState.fixState, fix: { id: "fx1", status: "DRAFT", plan, pages: null, result: {}, result_document_id: null, error_code: null, error_detail: null } };
+      return r.fulfill({ json: (docState.fixState as { fix: unknown }).fix });
+    }
+    if (docState.fixLoadError) return r.fulfill({ status: docState.fixLoadError.status, json: docState.fixLoadError.json });
+    // a queued build moves to running and then ready as the page polls, like the real worker
+    const fx = (docState.fixState as { fix: { status?: string } | null }).fix;
+    if (fx?.status === "QUEUED") docState.fixState = { ...docState.fixState, fix: { ...fx, status: "RUNNING" } };
+    else if (fx?.status === "RUNNING") docState.fixState = { ...docState.fixState, fix: { ...FIX_READY, plan: (fx as { plan?: unknown }).plan } };
+    return r.fulfill({ json: docState.fixState });
+  });
+  await page.route(/\/api\/documents\/[^/?]+\/fix\/build$/, (r) => {
+    if (docState.fixBuildError) return r.fulfill({ status: docState.fixBuildError.status, json: docState.fixBuildError.json });
+    docState.fixBuilds += 1;
+    const fx = (docState.fixState as { fix: Record<string, unknown> | null }).fix;
+    docState.fixState = { ...docState.fixState, fix: { ...(fx ?? {}), id: "fx1", status: "QUEUED", pages: 12, result: {}, result_document_id: null, error_code: null, error_detail: null } };
+    return r.fulfill({ status: 202, json: (docState.fixState as { fix: unknown }).fix });
+  });
   await page.route(/\/api\/documents\/[^/?]+\/audits$/, (r) => {
     if (docState.auditError) return r.fulfill({ status: docState.auditError.status, json: docState.auditError.json });
     const id = r.request().url().split("/").slice(-2)[0] ?? "";

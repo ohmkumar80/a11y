@@ -874,6 +874,7 @@ class Document(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_reason: Mapped[str | None] = mapped_column(String(20))
+    derived_from: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
 
 
 class DocumentAudit(Base):
@@ -896,6 +897,7 @@ class DocumentAudit(Base):
     status: Mapped[str] = mapped_column(String(10), server_default="QUEUED")
     pages: Mapped[int] = mapped_column(Integer)
     summary: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    structure: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     tool_version: Mapped[str | None] = mapped_column(String(40))
     error_code: Mapped[str | None] = mapped_column(String(40))
     error_detail: Mapped[str | None] = mapped_column(Text)
@@ -934,3 +936,36 @@ class DocumentFinding(Base):
     pages_total: Mapped[int] = mapped_column(Integer, server_default="0")
     examples: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     explained: Mapped[bool] = mapped_column(server_default=text("true"))
+
+
+class DocumentFix(Base):
+    """A guided fix of one PDF: the plan a person is editing, then the build that produces a fixed copy (ADR 0022)."""
+
+    __tablename__ = "document_fixes"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')", name="ck_document_fix_status"
+        ),
+        Index("ix_document_fixes_doc", "document_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    audit_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("document_audits.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(10), server_default="DRAFT")
+    plan: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    pages: Mapped[int | None] = mapped_column(Integer)
+    result_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    result: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

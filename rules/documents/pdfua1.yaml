@@ -4,6 +4,17 @@
 # status: draft = written by us, waiting for an accessibility specialist to review (same policy as rules/content).
 status: draft
 rules:
+  "5-1":
+    severity: minor
+    title: >-
+      The PDF does not state that it follows the accessible PDF standard
+    why: >-
+      PDF/UA files carry a label saying so. Without it, software that looks for accessible PDFs will not treat this one as such. The
+      label is a claim, so it should only be added once the file has really been checked, including by a person.
+    fix: >-
+      After every other problem is fixed and a person has reviewed the file, add the PDF/UA identifier in your PDF editor's
+      accessibility or metadata settings. We do not add it for you, because we cannot know the file is fully accessible.
+    wcag: []
   "6.2-1":
     severity: critical
     title: >-

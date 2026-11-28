@@ -10,6 +10,7 @@ export interface DocumentRow {
   expires_at: string;
   ready: boolean;
   latest_audit: AuditRow | null;
+  derived_from: string | null;
 }
 
 export type AuditStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
@@ -85,3 +86,44 @@ export function formatSize(bytes: number): string {
   if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
+
+export interface FixPlan { title?: string; language?: string; alt?: Record<string, string>; heading_levels?: Record<string, number> }
+export interface FixFinding { rule_id: string; title: string; severity: "critical" | "serious" | "moderate" | "minor" }
+export interface FixResult {
+  edits: number;
+  before: { findings: number; by_severity: Record<string, number> };
+  after: { findings: number; by_severity: Record<string, number> };
+  resolved: FixFinding[];
+  remaining: FixFinding[];
+}
+export interface FixRow {
+  id: string;
+  status: "DRAFT" | "QUEUED" | "RUNNING" | "READY" | "FAILED";
+  plan: FixPlan;
+  pages: number | null;
+  result: Partial<FixResult>;
+  result_document_id: string | null;
+  error_code: string | null;
+  error_detail: string | null;
+}
+export interface FixState {
+  document: { id: string; filename: string; page_count: number | null };
+  audit_id: string;
+  structure: {
+    has_structure: boolean;
+    title: string;
+    language: string;
+    pages: number;
+    figures: { id: string | null; editable: boolean; page: number | null; alt: string }[];
+    headings: { id: string | null; editable: boolean; page: number | null; level: number; text: string }[];
+    truncated: boolean;
+  };
+  fix: FixRow | null;
+}
+export const fixActive = (s?: FixRow["status"]) => s === "QUEUED" || s === "RUNNING";
+export const LANGUAGES: { id: string; label: string }[] = [
+  { id: "keep", label: "Leave as it is" }, { id: "en", label: "English" }, { id: "en-GB", label: "English (UK)" }, { id: "en-IN", label: "English (India)" },
+  { id: "hi", label: "Hindi" }, { id: "ta", label: "Tamil" }, { id: "te", label: "Telugu" }, { id: "bn", label: "Bengali" }, { id: "mr", label: "Marathi" },
+  { id: "gu", label: "Gujarati" }, { id: "kn", label: "Kannada" }, { id: "ml", label: "Malayalam" }, { id: "fr", label: "French" }, { id: "de", label: "German" },
+  { id: "es", label: "Spanish" }, { id: "__other", label: "Another language (enter a code)" },
+];

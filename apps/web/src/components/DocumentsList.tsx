@@ -75,7 +75,10 @@ export function DocumentsList({ refreshKey }: { refreshKey: number }) {
             <tbody>
               {data.map((d) => (
                 <tr key={d.id} className="border-b border-border-subtle last:border-b-0">
-                  <th scope="row" className="px-4 py-3 font-semibold [overflow-wrap:anywhere]">{d.filename}</th>
+                  <th scope="row" className="px-4 py-3 font-semibold [overflow-wrap:anywhere]">
+                    {d.filename}
+                    {d.derived_from && <span className="block text-sm font-normal text-fg-muted">A fixed copy made from another of your documents</span>}
+                  </th>
                   <td className="px-4 py-3">{KIND_LABEL[d.kind] ?? d.kind}, {formatSize(d.size_bytes)}{d.page_count ? `, ${d.page_count} page${d.page_count === 1 ? "" : "s"}` : ""}</td>
                   <td className="px-4 py-3">
                     {DOC_STATUS[d.status]}

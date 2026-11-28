@@ -7,9 +7,17 @@ downloaded or used for anything."""
 
 import uuid
 
-from a11y_core import document_audits, documents
+from a11y_core import document_audits, document_fixes, documents
 from a11y_core.db import tenant_session
-from a11y_core.models import AuditLog, Document, DocumentAudit, DocumentFinding, DocumentStatus
+from a11y_core.doc_fix import FixPlan
+from a11y_core.models import (
+    AuditLog,
+    Document,
+    DocumentAudit,
+    DocumentFinding,
+    DocumentFix,
+    DocumentStatus,
+)
 from a11y_core.storage import StorageError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -96,6 +104,7 @@ def _json(d: Document, audit: DocumentAudit | None = None) -> dict:
         "scanned_at": d.scanned_at,
         "expires_at": d.expires_at,
         "ready": d.status == DocumentStatus.CLEAN,
+        "derived_from": str(d.derived_from) if d.derived_from else None,
     }
 
 
@@ -296,3 +305,64 @@ async def get_audit(
             },
             "findings": [_finding_json(f) for f in findings],
         }
+
+
+# --- guided fix ----------------------------------------------------------------------------------------
+
+
+def _fix_json(f: DocumentFix | None) -> dict | None:
+    if f is None:
+        return None
+    return {
+        "id": str(f.id),
+        "status": f.status,
+        "plan": f.plan,
+        "pages": f.pages,
+        "result": f.result,
+        "result_document_id": str(f.result_document_id) if f.result_document_id else None,
+        "error_code": f.error_code,
+        "error_detail": f.error_detail,
+        "created_at": f.created_at,
+        "finished_at": f.finished_at,
+    }
+
+
+def _refuse(r: document_fixes.FixRefused) -> HTTPException:
+    return HTTPException(r.http_status, detail={"detail": r.message, "code": r.code})
+
+
+@router.get("/{doc_id}/fix")
+async def get_fix(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
+    """What the fix editor needs: the figures and headings that can be changed, the plan in progress, and the latest build."""
+    await ensure_flag("documents", p)
+    try:
+        s = await document_fixes.get_state(p.org_id, doc_id)
+    except document_fixes.FixRefused as r:
+        raise _refuse(r) from None
+    doc, audit, fix = s["document"], s["audit"], s["fix"]
+    return {
+        "document": {"id": str(doc.id), "filename": doc.filename, "page_count": doc.page_count},
+        "audit_id": str(audit.id),
+        "structure": audit.structure,
+        "fix": _fix_json(fix),
+    }
+
+
+@router.put("/{doc_id}/fix")
+async def save_fix(doc_id: uuid.UUID, plan: FixPlan, p: Principal = Depends(current_principal)):
+    """Save the plan being edited. Nothing is changed in the file and nothing is charged until you build."""
+    await ensure_flag("documents", p)
+    try:
+        return _fix_json(await document_fixes.save_plan(p.org_id, p.user_id, doc_id, plan))
+    except document_fixes.FixRefused as r:
+        raise _refuse(r) from None
+
+
+@router.post("/{doc_id}/fix/build", status_code=status.HTTP_202_ACCEPTED)
+async def build_fix(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
+    """Build a fixed COPY and check it again. Uses the document's pages from the plan allowance (given back if we fail)."""
+    await ensure_flag("documents", p)
+    try:
+        return _fix_json(await document_fixes.start_build(p.org_id, doc_id))
+    except document_fixes.FixRefused as r:
+        raise _refuse(r) from None

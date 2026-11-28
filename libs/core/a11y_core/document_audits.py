@@ -113,7 +113,7 @@ async def requeue_stale_audits() -> int:
 
 
 async def sweep_audit_reservations() -> dict[str, int]:
-    """Give back or charge reservations whose audit ended without settling (a crash between the two writes)."""
+    """Give back or charge reservations whose audit or fix ended without settling (a crash between two writes)."""
     async with admin_session(
         actor_user_id=None,
         reason="orphaned audit reservation sweep",
@@ -122,18 +122,22 @@ async def sweep_audit_reservations() -> dict[str, int]:
         rows = (
             await db.execute(
                 text(
-                    "SELECT r.organization_id, r.job_id, a.status AS audit_status, a.error_code "
-                    "FROM usage_reservations r LEFT JOIN document_audits a ON a.id::text = r.job_id "
+                    "SELECT r.organization_id, r.job_id, a.status AS audit_status, a.error_code, f.status AS fix_status "
+                    "FROM usage_reservations r "
+                    "LEFT JOIN document_audits a ON a.id::text = r.job_id "
+                    "LEFT JOIN document_fixes f ON f.id::text = r.job_id "
                     "WHERE r.status = 'RESERVED' AND r.feature_key = :f AND r.created_at < now() - CAST(:age AS interval) "
-                    "AND (a.id IS NULL OR a.status IN ('SUCCEEDED', 'FAILED'))"
+                    "AND ((a.id IS NULL AND f.id IS NULL) OR a.status IN ('SUCCEEDED', 'FAILED') OR f.status IN ('READY', 'FAILED'))"
                 ),
                 {"f": FEATURE, "age": ORPHAN_AFTER},
             )
         ).all()
     out = {"committed": 0, "released": 0}
     for r in rows:
-        keep = r.audit_status == "SUCCEEDED" or (
-            r.audit_status == "FAILED" and r.error_code in CUSTOMER_FAULTS
+        keep = (
+            r.audit_status == "SUCCEEDED"
+            or (r.audit_status == "FAILED" and r.error_code in CUSTOMER_FAULTS)
+            or r.fix_status == "READY"
         )
         async with tenant_session(r.organization_id) as db:
             ok = await (billing.commit_usage if keep else billing.release_usage)(
