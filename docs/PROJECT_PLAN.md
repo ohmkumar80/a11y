@@ -847,6 +847,8 @@ Other cases covered: payments made through Payment Links or bank transfer (the t
 
 Each phase ends with exit criteria, not dates, because timelines depend on team size. Accessibility gates from section 2.6 apply from Phase 0 onward.
 
+**Build order (decided 2026-11-28): Phase 0, Phase 1, Phase 3, Phase 2, Phase 4, Phase 5.** Documents and eBooks (Phase 3) now come before the deep web audit and monetisation work (Phase 2), because documents are the stronger wedge (3.18) and the document tooling is already partly in place. The phase numbers are kept so existing references still work. Four items move forward from Phase 2 and the web backlog into Phase 3; they are listed under Phase 3.
+
 ### Phase 0: Foundations
 
 **Scope**
@@ -952,6 +954,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 
 ### Phase 2: Deep web audit and monetisation
 
+*Runs after Phase 3 (build order above). Its exit criteria are unchanged. Per-organisation data policy moves forward into Phase 3; SSO and SCIM move forward again if a large enterprise deal needs them first.*
+
 **Scope**
 - Authenticated scans (encrypted `storageState`, recorded login scripts).
 - Deterministic keyboard and focus-trap agent, with LLM interpretation of anomalies.
@@ -981,7 +985,22 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 
 ### Phase 3: Documents and eBooks
 
-*Order check (3.18): after design-partner feedback on Phase 1a, decide whether this phase should run before parts of Phase 2.*
+*Decision (2026-11-28): this phase now runs before Phase 2. Confirm with the 5 to 10 prospect interviews in open decision 14 before committing the whole phase.*
+
+**Moved forward into this phase**
+- **Upload safety (3.6):** malware scanning, size and zip-bomb limits, encrypted storage and a retention limit for customer files. This is the first story, because nothing else may accept an upload without it.
+- **Per-organisation data policy** (from Phase 2 configuration): regions, retention, and zero-retention use of AI providers for customer files.
+- **Granular admin roles** (from the 1b backlog): the review console needs a reviewer role that sees only review work.
+- **Unit cost of human review:** extend the unit-cost model (3.18) so each plan's document quota covers the people-time that complex files need.
+
+**Order of work.** Sell sooner by building in this order:
+1. **PDF audit only:** upload, veraPDF check, findings report and a document workbench that shows the problems.
+2. **PDF remediation** with human review for the hard cases, then re-validation.
+3. **DOCX and PPTX.**
+4. **EPUB3**, unless a buyer asks for it earlier.
+
+Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harder than scanning a web page, and a large share of the Matterhorn checkpoints need a person.
+
 
 **Scope** (in order of customer demand)
 1. **PDF:** veraPDF audit → layout analysis (Vision-LLM + `pypdfium2`/`pdfplumber`) → tag tree, title, language, alt text via `pikepdf` → re-validate. A large share of Matterhorn Protocol checkpoints need human judgment, so complex files are routed to HITL.
@@ -996,6 +1015,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 **Exit criteria**
 - Remediated files pass their validators, and SME review confirms reading order on a sample set.
 - HITL turnaround SLA measured.
+- Upload safety tests pass: a malicious PDF, a zip bomb and an oversized file are all refused, and no customer file leaves the allowed region or is kept past its retention limit.
+- Human review cost per document is measured, and the plan quotas cover it.
 
 ### Phase 4: Audio and video
 
@@ -1056,6 +1077,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | 22 | Source licences for the article source pack | Confirm the licence terms of each source (W3C documents, legal texts) in an ADR before building the pack; paraphrase and cite (3.20) |
 | 23 | Refund policy | Window, pro-rata rules, non-refundable items and approval thresholds are set by the business and reviewed by the chartered accountant and legal advisor, then stored as settings (3.21) |
 | 24 | Support scope and timing | A small built-in ticket system in Phase 5 as requested; move earlier if design partners need it; sync to an external helpdesk if volume grows (3.21) |
+| 25 | Build order | Phase 3 (documents and eBooks) runs before Phase 2 (decided 2026-11-28). Revisit after design-partner feedback and the prospect interviews (decision 14) |
 
 ## 6. Top risks
 
@@ -1063,6 +1085,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|
 | Overclaiming compliance (legal/regulatory exposure) | "Automated coverage X/Y" scoring, "Not Evaluated" defaults, human-signed VPATs, careful marketing copy |
 | Our own UI has accessibility defects | CI gates from Phase 0, release AT matrix, disabled-user testing, public statement and feedback loop |
+| PDF remediation is much harder than auditing, and cost more than the plan quotas allow | Sell audit plus guided fix first, route complex files to human review, measure review cost per document, set quotas from that cost (Phase 3) |
 | Scope too broad, delaying revenue | Phase 1 kept to the web audit MVP and split into 1a and 1b; later phases driven by design-partner demand |
 | LLM cost grows with crawl size | Template clustering, response cache, per-tenant budgets, deterministic checks before AI, model tiering and the resolution ladder (3.13), rule content library (3.14) |
 | Hostile inputs (SSRF, malicious files, APKs) | Sandboxed workers, egress controls, domain verification, malware scanning |

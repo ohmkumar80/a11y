@@ -16,6 +16,8 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 
 **Personas.** *Visitor* (someone on the public site), *Member* (a person in a customer organisation), *Org admin* (the company admin of a customer), *Enterprise admin* (an org admin on the Enterprise plan), *Developer* (someone integrating through the API), *Platform admin* (our Super Admin), *Billing admin*, *Content editor / Reviewer / Publisher*, *Support agent*, *Accessibility lead* (our own owner of accessibility), *Ops owner*, *Business owner*.
 
+**Build order (decided 2026-11-28):** Phase 0, 1, then **3**, then 2, 4, 5. The phase numbers did not change; documents and eBooks now come before the deep web audit. Four items move into Phase 3 (upload safety, per-organisation data policy, granular admin roles and human review cost); they are marked below.
+
 **Stages.** 0 = Foundations, 1a = sellable to design partners, 1b = breadth and hardening, 2 to 5 = later phases.
 
 **Definition of done for every UI story** (plan section 2.7): keyboard operable, correct names and roles, no axe violations in light and dark, works at 200% zoom and 320px, drag actions have a single-pointer alternative, targets at least 24 by 24px, live updates announced sensibly, checked with a screen reader.
@@ -30,8 +32,8 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 | Partly | 9 |
 | Not started | 21 |
 | Deferred | 27 |
-| Later | 52 |
-| **Total** | **192** |
+| Later | 55 |
+| **Total** | **195** |
 
 | Epic | Done | Partly | Not started | Deferred | Later |
 |---|---|---|---|---|---|
@@ -52,8 +54,8 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 | E15. Billing with Razorpay (plan 3.16) | 0 | 0 | 0 | 6 | 3 |
 | E16. Security and trust (plan 3.6, 3.18) | 2 | 0 | 1 | 6 | 1 |
 | E17. Knowledge base and Content Agent (plan 3.20) | 0 | 0 | 0 | 0 | 6 |
-| E18. Phase 2: deep web audit and monetisation | 0 | 0 | 0 | 0 | 7 |
-| E19. Phase 3: documents and eBooks | 0 | 0 | 0 | 0 | 5 |
+| E18. Phase 2: deep web audit and monetisation (built after Phase 3) | 0 | 0 | 0 | 0 | 7 |
+| E19. Phase 3: documents and eBooks (built before Phase 2) | 0 | 0 | 0 | 0 | 8 |
 | E20. Phase 4: audio and video | 0 | 0 | 0 | 0 | 5 |
 | E21. Phase 5: mobile, refunds and support | 0 | 0 | 0 | 0 | 7 |
 | E22. Decisions the plan needs (plan section 5) | 4 | 1 | 0 | 5 | 0 |
@@ -151,12 +153,12 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 | US-086 | Platform admin | feature flags per plan or organisation | I can roll features out gradually | 1b | Done | ADR 0016 |
 | US-087 | Platform admin | to set legal page content and see public pages with footer links | legal text lives in settings | 1b | Partly | Mechanism done. No legal text is shipped on purpose; the owner or counsel writes it |
 | US-088 | Platform admin | scan engine settings, including screenshot options | I tune scanning without code | 1a | Done | |
-| US-089 | Platform admin | granular admin roles | each admin gets only the access they need | 1b | Deferred | Needs the owner to decide who may do what |
+| US-089 | Platform admin | granular admin roles | each admin gets only the access they need | 1b | Deferred | Needs the owner to decide who may do what. Also needed by the Phase 3 review console, so it must land before US-242 |
 | US-090 | Platform admin | two-person approval for high-risk changes | one person cannot make a damaging change alone | 1b | Deferred | Same decision as US-089 |
 | US-091 | Platform admin | an editor and preview for report templates | I can edit report wording | 1a | Not started | Plan lists an admin template editor. Email wording is editable (US-132) |
 | US-092 | Platform admin | a payment gateway registry and tax settings | I can change payment setup in the admin | 2 | Later | |
 | US-093 | Platform admin | prompt versioning with evaluation-gated activation and staged rollouts | prompt changes are safe | 2 | Later | |
-| US-094 | Platform admin | per-organisation data policy (regions, zero retention) | enterprise data rules are honoured | 2 | Later | |
+| US-094 | Platform admin | per-organisation data policy (regions, retention, zero-retention AI use) | enterprise data rules are honoured for uploaded files | 3 | Later | Moved forward from Phase 2 |
 
 ## E7. AI gateway, tiering and validation (plan 3.7, 3.11.2, 3.13)
 
@@ -307,7 +309,7 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 | US-219 | Content editor | a Content Agent that plans and drafts articles, checks code samples with our scanner, and refreshes articles | I write faster, with human approval | 2 | Later | Draft-only; a named human publishes |
 | US-220 | Content editor | about 20 reviewed launch articles | the agent has good examples | 2 | Later | Written by people first |
 
-## E18. Phase 2: deep web audit and monetisation
+## E18. Phase 2: deep web audit and monetisation (built after Phase 3)
 
 | ID | As a | I want | So that | Stage | Status | Notes |
 |---|---|---|---|---|---|---|
@@ -319,11 +321,14 @@ This is [PROJECT_PLAN.md](PROJECT_PLAN.md) rewritten as user stories. Each row i
 | US-235 | Platform admin | MRR and ARR, trial conversion, AI cost per tenant and budget caps | I run the business on data | 2 | Later | |
 | US-236 | Org admin | white-label reports with contrast-validated brand colours | reports carry our brand | 2 | Later | |
 
-## E19. Phase 3: documents and eBooks
+## E19. Phase 3: documents and eBooks (built before Phase 2)
 
 | ID | As a | I want | So that | Stage | Status | Notes |
 |---|---|---|---|---|---|---|
-| US-240 | Member | to upload a PDF and get it audited and remediated, then re-validated | my documents are accessible | 3 | Later | veraPDF, layout analysis, tags |
+| US-245 | Platform admin | uploaded files to be scanned for malware, limited in size, protected against zip bombs, stored encrypted and deleted after a retention period | accepting customer files is safe | 3 | Later | First story of Phase 3; nothing else may accept an upload without it. Moved forward |
+| US-246 | Member | to upload a PDF and get a veraPDF-based audit, a findings report and a document workbench that shows the problems | I know what is wrong with my document | 3 | Later | First sellable slice: audit only |
+| US-247 | Business owner | the human review cost per document measured and plan quotas set from it | document plans do not lose money | 3 | Later | Extends US-208 |
+| US-240 | Member | to have my PDF remediated, with complex files sent to human review, then re-validated | my documents become accessible | 3 | Later | Layout analysis, tag tree, alt text; follows US-246 |
 | US-241 | Member | the same for DOCX, PPTX and EPUB3 | all my document types are covered | 3 | Later | |
 | US-242 | SME reviewer | a review console with a queue, assignment, side-by-side review and SLA tracking | people check what AI cannot | 3 | Later | No drag-only actions |
 | US-243 | Member | a document workbench with editable alt text and a reading-order editor with move up and down buttons | I can correct the result | 3 | Later | |
