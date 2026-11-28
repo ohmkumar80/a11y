@@ -114,7 +114,9 @@ async def test_connect_tunnel_carries_bytes_both_ways(origin):
         assert (await r.readuntil(b"\r\n\r\n")).startswith(b"HTTP/1.1 200")
         w.write(b"GET /tunnel HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
         await w.drain()
-        body = await asyncio.wait_for(r.read(65536), 5)
+        # Read until the origin closes (we asked it to): one read() can return only the headers if the body arrives in a
+        # later packet, which a slower network does.
+        body = await asyncio.wait_for(r.read(), 5)
         assert b"path=/tunnel" in body
         w.close()
     finally:
