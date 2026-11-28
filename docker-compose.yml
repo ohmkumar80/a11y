@@ -17,6 +17,11 @@ x-api-env: &api-env
   PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
   PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8010}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  S3_ENDPOINT_URL: http://s3:9000
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY}
+  S3_BUCKET: ${S3_BUCKET:-a11y-dev}
+  CLAMD_HOST: clamav
   SMTP_HOST: mailpit
   SMTP_PORT: "1025"
   MAIL_FROM: ${MAIL_FROM:-no-reply@a11y.local}
@@ -71,6 +76,19 @@ services:
     volumes: [./infra/s3-init.sh:/s3-init.sh:ro]
     entrypoint: ["/bin/sh", "/s3-init.sh"]
     restart: "no"
+
+  # Virus scanner for uploaded documents (ADR 0020). Files are held back until it passes them, and stay held if
+  # it is down, so the API and workers never depend on it being up. The first start downloads the signature
+  # database, which takes a few minutes. Signatures live in a volume so later starts are quick.
+  clamav:
+    image: clamav/clamav-debian:stable  # multi-arch (the plain clamav/clamav image has no arm64 build)
+    volumes: [clamdata:/var/lib/clamav]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
 
   mailpit:
     image: axllent/mailpit:latest
@@ -146,3 +164,4 @@ services:
 volumes:
   pgdata:
   s3data:
+  clamdata:

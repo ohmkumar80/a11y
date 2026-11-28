@@ -13,7 +13,15 @@ from a11y_core.db import (
     set_platform_family,
     tenant_session,
 )
-from a11y_core.models import AuthToken, Organization, PlatformSession, Role, TokenKind, User
+from a11y_core.models import (
+    PLATFORM_ROLES,
+    AuthToken,
+    Organization,
+    PlatformSession,
+    Role,
+    TokenKind,
+    User,
+)
 from a11y_core.settings import get_settings
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
@@ -275,7 +283,7 @@ async def finish_login(
     user: User, response: Response, *, password: str | None = None, mfa_verified: bool = False
 ) -> SessionOut:
     """The final step of signing in, after the password (and any second step) succeeded."""
-    if user.role == Role.SUPER_ADMIN:
+    if user.role in PLATFORM_ROLES:
         # No tenant: the refresh token lives in platform_sessions and its cookie rotates like a tenant one.
         await _start_platform_session(user, response, mfa_verified=mfa_verified)
         access, ttl = issue_access_token(Principal(user.id, None, user.role, user.email))
@@ -311,7 +319,7 @@ async def login(body: LoginIn, response: Response):
     ok = verify_password(body.password, user.hashed_password if user else None)
     if not (ok and user and user.is_active):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
-    if user.role != Role.SUPER_ADMIN:
+    if user.role not in PLATFORM_ROLES:
         if not user.organization_id:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email or password is incorrect.")
         if user.email_verified_at is None:
@@ -343,7 +351,7 @@ def _fail_clearing(
 
 async def _mfa_policy_blocks(user: User, verified: bool) -> bool:
     """True when policy now requires two-step verification but this session never passed it."""
-    if verified or user.role not in (Role.SUPER_ADMIN, Role.COMPANY_ADMIN):
+    if verified or user.role not in (*PLATFORM_ROLES, Role.COMPANY_ADMIN):
         return False
     from .mfa import policy_for  # noqa: PLC0415  (mfa imports finish_login from this module)
 
@@ -389,7 +397,7 @@ async def _platform_refresh(raw: str, response: Response) -> SessionOut | JSONRe
     if (
         user is None
         or not user.is_active
-        or user.role != Role.SUPER_ADMIN
+        or user.role not in PLATFORM_ROLES
         or await _mfa_policy_blocks(user, tok.mfa_verified)
     ):
         async with platform_session(h) as db:  # end this sign-in
@@ -399,7 +407,7 @@ async def _platform_refresh(raw: str, response: Response) -> SessionOut | JSONRe
                 .where(PlatformSession.family_id == tok.family_id)
                 .values(revoked_at=_now())
             )
-        if user is not None and user.is_active and user.role == Role.SUPER_ADMIN:
+        if user is not None and user.is_active and user.role in PLATFORM_ROLES:
             return _fail_clearing(
                 PLATFORM_COOKIE,
                 "Two-step verification is now required. Sign in again.",

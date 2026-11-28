@@ -21,6 +21,7 @@ const FEATURE_LABEL: Record<string, string> = {
   urls_monthly: "Website scans this month",
   ai_code_fixes_monthly: "AI code fixes this month",
   pages_per_scan: "Pages per scan",
+  document_pages_monthly: "Document pages checked this month",
 };
 /** Unknown feature keys (admins can add new ones) fall back to a readable form of the key. */
 export const featureLabel = (k: string) => FEATURE_LABEL[k] ?? k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());

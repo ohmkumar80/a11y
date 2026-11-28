@@ -4,7 +4,10 @@ import openapi from "./openapi-fixture.json" with { type: "json" };
 import { mockApiKeys } from "./apikey-mocks";
 import { mockWebhooks } from "./webhook-mocks";
 import { mockNotifications } from "./notification-mocks";
+import { mockDataPolicy } from "./data-policy-mocks";
+import { mockDocumentApi } from "./document-mocks";
 import { mockReportApi } from "./report-mocks";
+import { mockReviewApi } from "./review-mocks";
 import { mockScanApi } from "./scan-mocks";
 
 const LEGAL_BODY = `# 1. Who we are
@@ -20,7 +23,7 @@ These terms are a **test document** written for the automated tests, not real le
 
 <script>window.__pwned = true</script> and [a bad link](javascript:alert(1)) stay as plain text.`;
 
-export type Role = "ANON" | "COMPANY_ADMIN" | "STANDARD_USER" | "SUPER_ADMIN";
+export type Role = "ANON" | "COMPANY_ADMIN" | "STANDARD_USER" | "SUPER_ADMIN" | "REVIEWER";
 
 const user = (role: Exclude<Role, "ANON">) => ({
   id: "11111111-1111-4111-8111-111111111111",
@@ -40,7 +43,7 @@ export async function mockApi(page: Page, role: Role) {
   await page.route("**/api/org/users", (r) =>
     r.fulfill({ json: [user("COMPANY_ADMIN"), { ...user("STANDARD_USER"), id: "33333333-3333-4333-8333-333333333333", email: "member@example.com" }] }),
   );
-  await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: true, crawl_scans: true, notification_center: true } }));
+  await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: true, crawl_scans: true, notification_center: true, documents: true, human_review: true } }));
   await page.route("**/api/legal", (r) => r.fulfill({ json: [{ slug: "terms", title: "Terms of service" }, { slug: "privacy", title: "Privacy policy" }] }));
   await page.route("**/api/legal/*", (r) => {
     if (r.request().url().endsWith("/privacy")) return r.fulfill({ status: 404, json: { detail: "This page has not been published." } });
@@ -53,6 +56,9 @@ export async function mockApi(page: Page, role: Role) {
   await page.route("**/api/auth/mfa/status", (r) => r.fulfill({ json: { enabled: false, mode: "optional", required: false, recovery_codes_left: 0, available: role === "COMPANY_ADMIN" || role === "SUPER_ADMIN" } }));
   await mockScanApi(page);
   await mockReportApi(page);
+  await mockDocumentApi(page);
+  await mockReviewApi(page);
+  await mockDataPolicy(page);
   await mockApiKeys(page);
   await mockWebhooks(page);
   await mockNotifications(page);

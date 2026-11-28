@@ -1,0 +1,193 @@
+# Plain-language text for PDF/UA-1 (ISO 14289-1) checks reported by veraPDF.
+# Rules are keyed "<clause>-<test>" exactly as veraPDF reports them. Anything not listed falls back to its clause
+# ("clauses" below), and anything not there either gets a generic, honest "not yet explained" entry.
+# status: draft = written by us, waiting for an accessibility specialist to review (same policy as rules/content).
+status: draft
+rules:
+  "5-1":
+    severity: minor
+    title: >-
+      The PDF does not state that it follows the accessible PDF standard
+    why: >-
+      PDF/UA files carry a label saying so. Without it, software that looks for accessible PDFs will not treat this one as such. The
+      label is a claim, so it should only be added once the file has really been checked, including by a person.
+    fix: >-
+      After every other problem is fixed and a person has reviewed the file, add the PDF/UA identifier in your PDF editor's
+      accessibility or metadata settings. We do not add it for you, because we cannot know the file is fully accessible.
+    wcag: []
+  "6.2-1":
+    severity: critical
+    title: >-
+      The PDF is not marked as tagged
+    why: >-
+      Screen readers use the tags in a PDF to know what is a heading, a paragraph or a table. Without the "tagged" marker, assistive technology treats the file as one undifferentiated block, or reads it in the wrong order.
+    fix: >-
+      Re-export from the source document (Word, InDesign or similar) with "Create tagged PDF" or "Accessibility tags" switched on, rather than printing to PDF.
+    wcag: ["1.3.1"]
+  "7.1-11":
+    severity: critical
+    title: >-
+      The PDF has no structure (no tags)
+    why: >-
+      The structure tree is what tells assistive technology the reading order and the role of each piece of content. This file has none, so a screen reader user cannot move by headings or tables and may not be able to read it at all.
+    fix: >-
+      Re-export from the source document with tagging switched on. For a file with no source, add tags with an accessibility tool, then check the reading order by hand.
+    wcag: ["1.3.1", "1.3.2"]
+  "7.1-3":
+    severity: critical
+    needs_human: true
+    title: >-
+      Some content is not tagged
+    why: >-
+      Content that is neither tagged nor marked as decoration is skipped or read out of order by screen readers.
+    fix: >-
+      Tag the content (headings, paragraphs, figures), or mark purely decorative items as artifacts. Then check the reading order.
+    wcag: ["1.3.1"]
+  "7.1-9":
+    severity: serious
+    title: >-
+      The PDF has no document title
+    why: >-
+      The title is what a screen reader announces when the file opens, and what appears in browser tabs and search results. Without it the file is announced by its file name, which is often meaningless.
+    fix: >-
+      Set the Title in the document properties (File, Properties, Description) and save again.
+    wcag: ["2.4.2"]
+  "7.1-10":
+    severity: moderate
+    title: >-
+      The window shows the file name instead of the title
+    why: >-
+      Even with a title set, viewers show the file name unless the file asks them to show the title.
+    fix: >-
+      In the document properties, under Initial View, set "Show: Document Title". Most export tools have an equivalent option.
+    wcag: ["2.4.2"]
+  "7.1-8":
+    severity: minor
+    title: >-
+      The PDF has no XMP metadata
+    why: >-
+      PDF/UA requires standard metadata so that the title and language can be read reliably by software.
+    fix: >-
+      Re-export with PDF/UA or "Archive" options on, or add metadata with your PDF editor.
+    wcag: []
+  "7.2-29":
+    severity: serious
+    title: >-
+      The document language is missing or invalid
+    why: >-
+      A screen reader chooses its voice and pronunciation from the declared language. With no language, it reads in whatever language it was last set to, which can make the text unintelligible.
+    fix: >-
+      Set the document language (for example English or Hindi) in the document properties or in the export settings.
+    wcag: ["3.1.1"]
+  "7.2-34":
+    severity: serious
+    title: >-
+      The language of the text cannot be determined
+    why: >-
+      Without a language, screen readers cannot pick the right voice for the text.
+    fix: >-
+      Set the document language in the document properties, and mark any passages in another language.
+    wcag: ["3.1.1", "3.1.2"]
+  "7.3-1":
+    severity: serious
+    needs_human: true
+    title: >-
+      Images have no alternative text
+    why: >-
+      A screen reader user cannot tell what an image shows unless it has a text description. Charts and diagrams with no description hide their information completely.
+    fix: >-
+      Add alternative text to each meaningful image that says what it shows or what it is for. Mark purely decorative images as artifacts so they are skipped. A person must write the text: it depends on what the image is for.
+    wcag: ["1.1.1"]
+  "7.4.2-1":
+    severity: moderate
+    needs_human: true
+    title: >-
+      Heading levels are skipped or do not start at level 1
+    why: >-
+      Screen reader users move through a document by heading level, like a table of contents. A jump from level 1 to level 3 suggests a missing section and makes the outline confusing.
+    fix: >-
+      Use heading levels in order (1, then 2, then 3) and start with level 1. Fix this in the source document's heading styles, not by changing the appearance.
+    wcag: ["1.3.1", "2.4.6"]
+  "7.21.4.1-1":
+    severity: minor
+    title: >-
+      Some fonts are not embedded
+    why: >-
+      If a font is not stored in the file, a computer without it substitutes another, which can change how text is displayed and how it is read out.
+    fix: >-
+      Re-export with "Embed all fonts" switched on.
+    wcag: []
+# Used when veraPDF reports a rule that is not listed above: the clause says which part of the standard it belongs to.
+clauses:
+  "7.1":
+    severity: serious
+    area: >-
+      General structure and tagging
+    why: >-
+      This is a general rule about how the file is built so that assistive technology can read it.
+  "7.2":
+    severity: serious
+    area: >-
+      Text and language
+    why: >-
+      This is about whether text can be read correctly and in the right language.
+  "7.3":
+    severity: serious
+    area: >-
+      Images and graphics
+    why: >-
+      This is about giving images a text alternative or marking them as decoration.
+  "7.4":
+    severity: moderate
+    area: >-
+      Headings
+    why: >-
+      This is about headings being tagged and used in a sensible order.
+  "7.5":
+    severity: serious
+    area: >-
+      Tables
+    why: >-
+      This is about tables having header cells so that each data cell can be understood.
+  "7.6":
+    severity: moderate
+    area: >-
+      Lists
+    why: >-
+      This is about lists being tagged as lists.
+  "7.9":
+    severity: moderate
+    area: >-
+      Notes and references
+    why: >-
+      This is about footnotes and references being tagged so they can be followed.
+  "7.11":
+    severity: moderate
+    area: >-
+      Embedded files
+    why: >-
+      This is about attachments inside the PDF being accessible too.
+  "7.17":
+    severity: moderate
+    area: >-
+      Navigation
+    why: >-
+      This is about bookmarks and other ways of moving around the file.
+  "7.18":
+    severity: serious
+    area: >-
+      Links, forms and annotations
+    why: >-
+      This is about links and form fields having names a person can understand and use with a keyboard.
+  "7.20":
+    severity: moderate
+    area: >-
+      Embedded graphics objects
+    why: >-
+      This is about reusable graphic objects being tagged correctly.
+  "7.21":
+    severity: minor
+    area: >-
+      Fonts
+    why: >-
+      This is about fonts being stored and described correctly in the file.

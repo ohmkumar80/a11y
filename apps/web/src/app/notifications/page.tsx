@@ -90,7 +90,7 @@ export default function NotificationsPage() {
     <RequireAuth>
       {(user) => (
         <Page title="Notifications" intro="What happened in your organisation, and how we email you about it.">
-          {user.role === "SUPER_ADMIN" ? <StatusMessage>Platform administrators do not have a notification list. Use the <NextLink href="/admin" className="underline">admin console</NextLink>.</StatusMessage> : <Content />}
+          {user.role === "SUPER_ADMIN" || user.role === "REVIEWER" ? <StatusMessage>Platform staff do not have a notification list. Use the <NextLink href="/admin" className="underline">admin console</NextLink>.</StatusMessage> : <Content />}
         </Page>
       )}
     </RequireAuth>

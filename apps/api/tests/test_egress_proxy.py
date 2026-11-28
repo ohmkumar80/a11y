@@ -34,7 +34,16 @@ async def talk(proxy_port: int, request: bytes) -> bytes:
     await w.drain()
     data = b""
     try:
-        data = await asyncio.wait_for(r.read(65536), 5)
+        # A reply can arrive in several packets (headers, then body): keep reading until the proxy closes, or until it has
+        # been quiet for half a second after the first bytes. A single read() returns only the first packet.
+        while True:
+            try:
+                chunk = await asyncio.wait_for(r.read(65536), 0.5 if data else 5)
+            except TimeoutError:
+                break
+            if not chunk:
+                break
+            data += chunk
     finally:
         w.close()
     return data
@@ -114,7 +123,9 @@ async def test_connect_tunnel_carries_bytes_both_ways(origin):
         assert (await r.readuntil(b"\r\n\r\n")).startswith(b"HTTP/1.1 200")
         w.write(b"GET /tunnel HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
         await w.drain()
-        body = await asyncio.wait_for(r.read(65536), 5)
+        # Read until the origin closes (we asked it to): one read() can return only the headers if the body arrives in a
+        # later packet, which a slower network does.
+        body = await asyncio.wait_for(r.read(), 5)
         assert b"path=/tunnel" in body
         w.close()
     finally:

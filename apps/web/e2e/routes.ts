@@ -19,10 +19,16 @@ export const ROUTES: Array<{ path: string; roles: Role[] }> = [
   { path: "/workspace/scan?id=11111111-aaaa-4bbb-8ccc-111111111111", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/workspace/scan/workbench?id=11111111-aaaa-4bbb-8ccc-111111111111", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/workspace/vpat?id=33333333-aaaa-4bbb-8ccc-333333333333", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
+  { path: "/workspace/documents", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
+  { path: "/workspace/documents/audit?doc=d1&audit=a1", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
+  { path: "/workspace/documents/fix?doc=d1", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
+  { path: "/review", roles: ["REVIEWER", "SUPER_ADMIN"] },
+  { path: "/review/item?id=q9", roles: ["REVIEWER", "SUPER_ADMIN"] },
   { path: "/notifications", roles: ["COMPANY_ADMIN", "STANDARD_USER"] },
   { path: "/org", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/ai", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/api", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
+  { path: "/org/data-policy", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/webhooks", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/admin", roles: ["SUPER_ADMIN", "COMPANY_ADMIN"] }, // company admin sees the no-access page
   { path: "/does-not-exist", roles: ["ANON"] },

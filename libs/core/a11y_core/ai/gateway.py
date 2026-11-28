@@ -22,7 +22,7 @@ from sqlalchemy import text
 from ..billing import entitlement, load_subscription
 from ..config import ConfigService, get_config
 from ..config import definitions as _definitions  # noqa: F401
-from ..config.definitions import AI_TASKS, AIModel, AIProvider
+from ..config.definitions import AI_TASKS, DOCUMENT_TASKS, AIModel, AIProvider
 from ..db import tenant_session
 from ..models import AIUsage
 from .adapters import ADAPTERS
@@ -138,6 +138,40 @@ class LLMGateway:
                 out.append((p, m, byok))
         return out
 
+    @staticmethod
+    async def _apply_data_policy(req: LLMRequest, chain: list[Link]) -> list[Link]:
+        """A customer's document may go only to providers the organisation's data policy allows (ADR 0024). Fails CLOSED: no
+        organisation, or no provider that qualifies, means nothing is sent."""
+        from .. import data_policy  # noqa: PLC0415
+
+        if req.org_id is None:
+            raise AIUnavailable(
+                "Customer documents cannot be sent without an organisation.",
+                reason="blocked_by_data_policy",
+            )
+        eff = await data_policy.effective(req.org_id, req.plan_id)
+        if not eff.ai_on_documents:
+            raise AIUnavailable(
+                "This organisation's data policy does not allow AI to process its documents.",
+                reason="blocked_by_data_policy",
+            )
+        ok: list[Link] = []
+        why: list[str] = []
+        for link in chain:
+            problem = data_policy.ai_provider_problem(eff, link[0])
+            if problem:
+                why.append(problem)
+            else:
+                ok.append(link)
+        if not ok:
+            raise AIUnavailable(
+                "No AI provider meets this organisation's data policy: "
+                + "; ".join(dict.fromkeys(why))
+                + ".",
+                reason="blocked_by_data_policy",
+            )
+        return ok
+
     async def complete(self, req: LLMRequest) -> LLMResponse:
         if req.task not in AI_TASKS:
             raise ValueError(f"unknown AI task {req.task!r}")
@@ -199,6 +233,8 @@ class LLMGateway:
         chain = own + platform
         if not chain:
             raise AIUnavailable(f"No eligible model for {req.task}.", reason="no_eligible_model")
+        if req.data_class == "customer_document" or req.task in DOCUMENT_TASKS:
+            chain = await self._apply_data_policy(req, chain)
 
         # "Fell back" = something other than the model the config intended to serve it.
         intended = b.model_order[0] if byok_active else r.primary_model_id

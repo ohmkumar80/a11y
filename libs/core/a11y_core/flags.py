@@ -21,6 +21,10 @@ class FeatureFlags(BaseModel):
     vpat: bool = Field(True, description="VPAT drafting and export")
     crawl_scans: bool = Field(True, description="Scanning more than one page (crawl mode)")
     notification_center: bool = Field(True, description="The in-app notification centre")
+    documents: bool = Field(
+        True, description="Document uploads and audits (PDF, Word, PowerPoint, EPUB)"
+    )
+    human_review: bool = Field(True, description="Asking a person on our team to check a document")
 
 
 FLAG_USES = {
@@ -29,6 +33,8 @@ FLAG_USES = {
     "vpat": "routers/reports.create_vpat, export_vpat",
     "crawl_scans": "routers/scans.create_scan",
     "notification_center": "routers/notifications",
+    "documents": "routers/documents (every endpoint), a11y_core.documents.accept_upload",
+    "human_review": "routers/documents (review endpoints), a11y_core.document_reviews.request_review",
 }
 
 register(

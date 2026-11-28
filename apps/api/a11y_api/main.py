@@ -15,11 +15,14 @@ from sqlalchemy import text
 from .routers import (
     admin_ai,
     admin_billing,
+    admin_documents,
     admin_notifications,
     admin_ops,
+    admin_reviews,
     admin_security,
     admin_settings,
     auth,
+    documents,
     domains,
     fixes,
     legal,
@@ -28,8 +31,10 @@ from .routers import (
     org,
     org_ai,
     org_api_keys,
+    org_data_policy,
     org_webhooks,
     reports,
+    review,
     rule_guidance,
     scans,
     standards,
@@ -109,9 +114,14 @@ app.include_router(legal.router)
 app.include_router(fixes.router)
 app.include_router(me_notifications.router)
 app.include_router(org_api_keys.router)
+app.include_router(org_data_policy.router)
 app.include_router(org_webhooks.router)
 app.include_router(v1.router)
 app.include_router(scans.router)
+app.include_router(documents.router)
+app.include_router(admin_documents.router)
+app.include_router(admin_reviews.router)
+app.include_router(review.router)
 app.include_router(domains.router)
 app.include_router(reports.router)
 

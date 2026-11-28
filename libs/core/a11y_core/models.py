@@ -35,8 +35,13 @@ class Base(DeclarativeBase):
 
 class Role(enum.StrEnum):
     SUPER_ADMIN = "SUPER_ADMIN"
+    REVIEWER = "REVIEWER"  # platform staff who check documents customers asked a person to check (ADR 0023)
     COMPANY_ADMIN = "COMPANY_ADMIN"
     STANDARD_USER = "STANDARD_USER"
+
+
+# Roles that belong to the platform, not to a customer organisation: no tenant, sessions kept in platform_sessions.
+PLATFORM_ROLES = frozenset({Role.SUPER_ADMIN, Role.REVIEWER})
 
 
 class TokenKind(enum.StrEnum):
@@ -63,7 +68,8 @@ class User(Base):
     __table_args__ = (
         CheckConstraint(f"role IN ({_values(Role)})", name="ck_users_role"),
         CheckConstraint(
-            "(role = 'SUPER_ADMIN') = (organization_id IS NULL)", name="ck_users_org_role"
+            "(role IN ('SUPER_ADMIN', 'REVIEWER')) = (organization_id IS NULL)",
+            name="ck_users_org_role",
         ),
         # Email is globally unique (one login identity), stored lower-cased by the app.
         Index("uq_users_email", "email", unique=True),
@@ -823,3 +829,210 @@ class EntitlementOverride(Base):
     reason: Mapped[str] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# --- Documents and eBooks (Phase 3; ADR 0020) ----------------------------------------------------------
+
+
+class DocumentStatus(enum.StrEnum):
+    UPLOADED = "UPLOADED"  # stored (encrypted) but nobody has looked at it yet
+    SCANNING = "SCANNING"  # a worker holds it for the virus scan and structural inspection
+    CLEAN = "CLEAN"  # passed every check; the only status from which anything may read the file
+    REJECTED = "REJECTED"  # the customer's file failed a check (infected, encrypted, too long...)
+    FAILED = (
+        "FAILED"  # OUR fault (scanner or store down past its retries); the file stays unreadable
+    )
+    DELETED = "DELETED"  # bytes erased (retention or the customer's request); the row remains as a tombstone
+
+
+class Document(Base):
+    """A customer file. Bytes live in object storage, encrypted by us; the wrapped data key lives here. Nothing may
+    read the bytes unless ``status = 'CLEAN'`` (enforced in ``a11y_core.documents.load_clean``)."""
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('UPLOADED', 'SCANNING', 'CLEAN', 'REJECTED', 'FAILED', 'DELETED')",
+            name="ck_document_status",
+        ),
+        CheckConstraint("kind IN ('pdf', 'docx', 'pptx', 'epub')", name="ck_document_kind"),
+        Index("ix_documents_org_created", "organization_id", "created_at"),
+        Index("ix_documents_expiry", "expires_at"),
+        Index("ix_documents_region", "region"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(160))
+    kind: Mapped[str] = mapped_column(String(8))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_key: Mapped[str | None] = mapped_column(String(300))
+    wrapped_key: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), server_default="UPLOADED")
+    reject_code: Mapped[str | None] = mapped_column(String(40))
+    reject_detail: Mapped[str | None] = mapped_column(Text)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    inspection: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_reason: Mapped[str | None] = mapped_column(String(20))
+    derived_from: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    region: Mapped[str] = mapped_column(String(30), server_default="default")
+
+
+class DocumentAudit(Base):
+    """One run of the PDF accessibility checks on a document (ADR 0021). Charged in document pages."""
+
+    __tablename__ = "document_audits"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')",
+            name="ck_document_audit_status",
+        ),
+        Index("ix_document_audits_doc", "document_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    standard: Mapped[str] = mapped_column(String(20), server_default="PDF_UA_1")
+    status: Mapped[str] = mapped_column(String(10), server_default="QUEUED")
+    pages: Mapped[int] = mapped_column(Integer)
+    summary: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    structure: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    tool_version: Mapped[str | None] = mapped_column(String(40))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentFinding(Base):
+    __tablename__ = "document_findings"
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('critical', 'serious', 'moderate', 'minor')",
+            name="ck_document_finding_severity",
+        ),
+        Index("ix_document_findings_audit", "audit_id", "ordinal"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    audit_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_audits.id", ondelete="CASCADE")
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    rule_id: Mapped[str] = mapped_column(String(60))
+    source: Mapped[str] = mapped_column(String(10))
+    severity: Mapped[str] = mapped_column(String(10))
+    title: Mapped[str] = mapped_column(Text)
+    explanation: Mapped[str] = mapped_column(Text)
+    how_to_fix: Mapped[str] = mapped_column(Text)
+    wcag: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    needs_human: Mapped[bool] = mapped_column(server_default=text("false"))
+    count: Mapped[int] = mapped_column(Integer, server_default="1")
+    pages: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    pages_total: Mapped[int] = mapped_column(Integer, server_default="0")
+    examples: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    explained: Mapped[bool] = mapped_column(server_default=text("true"))
+
+
+class DocumentFix(Base):
+    """A guided fix of one PDF: the plan a person is editing, then the build that produces a fixed copy (ADR 0022)."""
+
+    __tablename__ = "document_fixes"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT', 'QUEUED', 'RUNNING', 'READY', 'FAILED')",
+            name="ck_document_fix_status",
+        ),
+        Index("ix_document_fixes_doc", "document_id", "created_at"),
+        # One fix in progress per document: a draft being edited, or a build that has not finished.
+        Index(
+            "uq_document_fix_active",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('DRAFT', 'QUEUED', 'RUNNING')"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    audit_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("document_audits.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(10), server_default="DRAFT")
+    plan: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    pages: Mapped[int | None] = mapped_column(Integer)
+    result_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    result: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentReview(Base):
+    """A customer's request that a person check (and if possible fix) one of their PDFs (ADR 0023). The request carries the
+    customer's consent: only a document with an open request can be opened by a reviewer."""
+
+    __tablename__ = "document_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('REQUESTED', 'IN_REVIEW', 'COMPLETED', 'DECLINED', 'CANCELLED')",
+            name="ck_document_review_status",
+        ),
+        Index("ix_document_reviews_doc", "document_id", "requested_at"),
+        Index("ix_document_reviews_queue", "status", "due_at"),
+        # One open review per document.
+        Index(
+            "uq_document_review_active",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status IN ('REQUESTED', 'IN_REVIEW')"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(10), server_default="REQUESTED")
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    consent_version: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str | None] = mapped_column(Text)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    pages: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome_note: Mapped[str | None] = mapped_column(Text)
+    result_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    reported_minutes: Mapped[int | None] = mapped_column(Integer)
+    elapsed_seconds: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

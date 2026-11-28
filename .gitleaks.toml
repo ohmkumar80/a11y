@@ -11,6 +11,10 @@ regexes = [
   # Fake provider keys used as fixtures in apps/api/tests (never valid against any provider).
   '''sk-test-0123[A-Za-z0-9-]*''',
   '''sk-rotated-[A-Za-z0-9-]*''',
+  # Fake passwords used as fixtures in apps/api/tests/test_document_reviews.py (accounts that exist only in the test database).
+  '''a-long-passphrase-123''',
+  '''a-brand-new-passphrase-9''',
+  '''wrong-password-123''',
   # Public development master key (.env.example, docker-compose.yml, libs/core/a11y_core/settings.py).
   # Settings refuses to start with it when ENV=production (see _no_dev_secrets_in_production).
   '''Q2OoEdjRtijE[A-Za-z0-9_=-]+''',

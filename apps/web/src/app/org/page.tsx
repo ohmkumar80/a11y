@@ -11,7 +11,7 @@ import { PlanPanel } from "@/components/PlanPanel";
 import { get, post, type User } from "@/lib/api";
 import type { Subscription } from "@/lib/billing";
 
-const ROLE_LABEL = { COMPANY_ADMIN: "Administrator", STANDARD_USER: "Member", SUPER_ADMIN: "Super admin" } as const;
+const ROLE_LABEL = { COMPANY_ADMIN: "Administrator", STANDARD_USER: "Member", SUPER_ADMIN: "Super admin", REVIEWER: "Reviewer" } as const;
 
 function Team({ onInvited }: { onInvited: () => void }) {
   const [users, setUsers] = useState<User[] | null>(null);
@@ -77,6 +77,10 @@ function OrgContent({ name }: { name: string }) {
   return (
     <Page title="Organisation" intro={name}>
       {sub ? <PlanPanel sub={sub} onChanged={() => void load()} /> : <p role="status">{failed ? "We could not load your plan. Refresh the page to try again." : "Loading your plan."}</p>}
+      <section aria-labelledby="privacy" className="flex flex-col gap-2">
+        <h2 id="privacy" className="text-xl font-bold">Data policy</h2>
+        <p>Choose how long your documents are kept, where they are stored, whether our team may open files you ask them to check, and whether AI may process them. <NextLink href="/org/data-policy" className="underline">Manage your data policy</NextLink>.</p>
+      </section>
       <section aria-labelledby="ai" className="flex flex-col gap-2">
         <h2 id="ai" className="text-xl font-bold">AI provider</h2>
         <p>On the Enterprise plan you can use your own OpenAI, Azure OpenAI or DeepSeek keys. <NextLink href="/org/ai" className="underline">Manage AI provider settings</NextLink>.</p>

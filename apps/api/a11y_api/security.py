@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from a11y_core.models import PLATFORM_ROLES
 from a11y_core.settings import get_settings
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -123,7 +124,7 @@ def decode_access_token(token: str) -> Principal | None:
             options={"require": ["exp", "sub", "org", "role"]},
         )
         org = uuid.UUID(c["org"]) if c["org"] else None
-        if (c["role"] == "SUPER_ADMIN") != (org is None):
+        if (c["role"] in PLATFORM_ROLES) != (org is None):
             return None
         return Principal(uuid.UUID(c["sub"]), org, c["role"], c.get("eml") or None)
     except (jwt.PyJWTError, ValueError):

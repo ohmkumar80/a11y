@@ -17,6 +17,25 @@ export const SUBSCRIPTION = {
 };
 
 export const opsState = { healthy: false };
+export const reviewAdmin = { calls: [] as string[] };
+const REVIEW_OVERVIEW = {
+  waiting: 2, in_review: 1, overdue: 1, finished_30d: 8, delivered_30d: 6, on_time_percent: 88, avg_elapsed_minutes: 95.5, avg_reported_minutes: 34.2,
+  cost_per_hour: 600, cost_per_review: 342, cost_per_page: 18.5,
+  reviewers: [
+    { id: "u1", email: "asha@example.com", role: "REVIEWER", active: true, open: 1, done_30d: 5, mfa: true },
+    { id: "u2", email: "ravi@example.com", role: "REVIEWER", active: false, open: 0, done_30d: 3, mfa: false },
+  ],
+  in_progress: [{ id: "rv7", claimed_at: "2026-11-28T08:00:00Z", due_at: "2026-11-29T08:00:00Z", reviewer: "asha@example.com" }],
+};
+export const docsState = { healthy: true, rescans: [] as string[], purges: 0 };
+const DOCS_OVERVIEW = {
+  health: { scanner: "ok", storage: "ok", regions: { default: "ok", eu: "down" } },
+  by_region: [{ region: "default", files: 10, configured: true }, { region: "eu", files: 3, configured: true }, { region: "old-in", files: 1, configured: false }],
+  by_status: { UPLOADED: 1, SCANNING: 0, CLEAN: 12, REJECTED: 3, FAILED: 1, DELETED: 20 },
+  rejections_30d: [{ code: "encrypted", count: 2 }, { code: "malware", count: 1 }],
+  stored_bytes: 73400320, expired_waiting: 4, stuck: 0,
+  failed: [{ id: "doc-f1", organization: "Acme Ltd", kind: "pdf", size_bytes: 2097152, created_at: "2026-11-27T10:00:00Z", attempts: 5, why: "virus scanner unavailable" }],
+};
 export const overrideCalls: string[] = [];
 const RUNBOOK = `# Stuck scans
 
@@ -88,6 +107,19 @@ export async function mockAdminApi(page: Page) {
       return r.fulfill({ json: [{ feature: "urls_monthly", enabled: true, limit_value: 500, expires_at: "2027-01-31T23:59:59Z", reason: "Pilot extension", expired: false }, { feature: "byok_ai", enabled: true, limit_value: null, expires_at: null, reason: "Early access", expired: false }] });
     }
     if (p.startsWith("/admin/ops/runbooks/")) return r.fulfill({ json: { slug: p.split("/").pop(), markdown: RUNBOOK } });
+    if (p === "/admin/reviews/overview") return r.fulfill({ json: REVIEW_OVERVIEW });
+    if (p === "/admin/reviewers" && r.request().method() === "POST") {
+      const b = r.request().postDataJSON() as { email: string; password: string };
+      reviewAdmin.calls.push(`create:${b.email}`);
+      if (b.password.length < 12) return r.fulfill({ status: 422, json: { detail: "Use at least 12 characters.", field: "password" } });
+      return r.fulfill({ status: 201, json: { id: "u3", email: b.email } });
+    }
+    if (p.startsWith("/admin/reviewers/") && p.endsWith("/active")) { reviewAdmin.calls.push(`active:${p.split("/")[3]}:${(r.request().postDataJSON() as { active: boolean }).active}`); return r.fulfill({ status: 204, body: "" }); }
+    if (p.startsWith("/admin/reviewers/") && p.endsWith("/password")) { reviewAdmin.calls.push(`password:${p.split("/")[3]}`); return r.fulfill({ status: 204, body: "" }); }
+    if (p.startsWith("/admin/reviews/") && p.endsWith("/release")) { reviewAdmin.calls.push(`release:${p.split("/")[3]}`); return r.fulfill({ status: 204, body: "" }); }
+    if (p === "/admin/documents/overview") return r.fulfill({ json: docsState.healthy ? DOCS_OVERVIEW : { ...DOCS_OVERVIEW, health: { scanner: "down", storage: "ok" }, stuck: 2 } });
+    if (p === "/admin/documents/purge") { docsState.purges += 1; return r.fulfill({ json: { erased: 4, errors: 0 } }); }
+    if (p.startsWith("/admin/documents/") && p.endsWith("/rescan")) { docsState.rescans.push(p.split("/")[3] ?? ""); return r.fulfill({ json: { status: "UPLOADED", queued: true } }); }
     if (p === "/admin/ops") return r.fulfill({ json: opsState.healthy ? OPS_OK : OPS_BAD });
     if (p === "/admin/notifications/preview") {
       const b = r.request().postDataJSON() as { subject: string; action_label: string };

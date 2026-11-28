@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     # Where the pinned engine bundles live (packages/engine-bundles/dist).
     engine_bundles_dir: str = ""
 
+    # Object storage for customer files (ADR 0020). Any S3-compatible store; RustFS locally.
+    s3_endpoint_url: str = ""  # empty = the AWS default endpoint
+    s3_access_key: str = "s3-dev-only"
+    s3_secret_key: str = "s3-dev-only-secret"
+    s3_bucket: str = "a11y-dev"
+    s3_region: str = "us-east-1"
+    # ClamAV daemon (clamd). Uploaded files are held back until it has passed them.
+    clamd_host: str = "localhost"
+    clamd_port: int = 3310
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     mail_from: str = "no-reply@a11y.local"
@@ -62,6 +72,10 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET must be set to a real secret in production")
             if self.mfa_super_admin_default == "off":
                 raise ValueError("MFA_SUPER_ADMIN_DEFAULT=off is not allowed in production")
+            if self.s3_access_key.startswith("s3-dev-only"):
+                raise ValueError(
+                    "S3_ACCESS_KEY / S3_SECRET_KEY must be set to real values in production"
+                )
             if self.scan_dev_allow_hosts:
                 raise ValueError("SCAN_DEV_ALLOW_HOSTS is not allowed in production")
         return self

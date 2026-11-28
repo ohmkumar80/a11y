@@ -451,7 +451,7 @@ async def test_the_openapi_document_is_complete_and_only_describes_v1(client):
     )
 
 
-def test_the_reference_page_fixture_matches_the_real_api_description():
+def test_the_reference_page_fixture_matches_the_real_api_description(monkeypatch):
     """The web tests render the reference page from a saved copy of the OpenAPI description. If the API changes, this
     fails until the copy is refreshed, so the page is always tested against what the API really publishes:
         python -c "import json, a11y_api.main as m; from a11y_api.routers.v1 import v1_openapi; \
@@ -459,9 +459,14 @@ json.dump(v1_openapi(m.app), open('../web/e2e/openapi-fixture.json','w'), indent
     import json
     from pathlib import Path
 
+    from a11y_core.settings import get_settings
+
     from a11y_api.main import app
     from a11y_api.routers.v1 import v1_openapi
 
+    # The description names this server by PUBLIC_API_URL. The saved copy is made with it unset (relative), so the
+    # comparison must not depend on whatever address the environment running it happens to set.
+    monkeypatch.setattr(get_settings(), "public_api_url", "")
     saved = json.loads(
         (Path(__file__).resolve().parents[2] / "web/e2e/openapi-fixture.json").read_text()
     )

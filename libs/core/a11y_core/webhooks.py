@@ -40,6 +40,7 @@ EVENTS = {
     "scan.failed": "A scan did not finish",
     "report.ready": "A report is ready to download",
     "report.failed": "A report could not be produced",
+    "review.completed": "A person finished checking a document you asked them to check",
 }
 PING = "ping"  # sent only when an administrator asks for a test
 BACKOFF = (60, 300, 1800, 7200, 21600)  # seconds before attempt 2, 3, ...

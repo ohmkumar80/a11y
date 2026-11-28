@@ -70,6 +70,11 @@ AI_TASKS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Tasks whose input IS a customer's document. The gateway applies the organisation's data policy to these whatever the
+# caller says, so a future feature cannot forget to ask (ADR 0024). Other tasks opt in with `data_class="customer_document"`.
+DOCUMENT_TASKS = frozenset({"doc_layout"})
+
+
 class DataPolicy(BaseModel):
     zero_retention: bool = False
     processing_regions: list[str] = Field(default_factory=list, description="e.g. ['us','eu','in']")
@@ -448,5 +453,311 @@ register(
         guard=_mfa_guard,
         high_risk=True,
         tags=("auth", "security"),
+    )
+)
+
+
+# --- Documents and eBooks (PROJECT_PLAN Phase 3; ADR 0020) --------------------------------------------------
+# Everything about customer-file handling is an admin setting, so limits can be tightened or relaxed per plan or
+# per organisation without a deploy. The safety knobs are global-only and high-risk.
+
+
+class DocumentUploads(BaseModel):
+    enabled: bool = Field(True, description="Accept document uploads at all (a kill switch)")
+    allow_pdf: bool = Field(True, description="Accept PDF files")
+    allow_docx: bool = Field(True, description="Accept Word (.docx) files")
+    allow_pptx: bool = Field(True, description="Accept PowerPoint (.pptx) files")
+    allow_epub: bool = Field(True, description="Accept EPUB files")
+    max_mb_pdf: int = Field(50, ge=1, le=500, description="Largest PDF, in megabytes")
+    max_mb_docx: int = Field(25, ge=1, le=500, description="Largest Word file, in megabytes")
+    max_mb_pptx: int = Field(50, ge=1, le=500, description="Largest PowerPoint file, in megabytes")
+    max_mb_epub: int = Field(50, ge=1, le=500, description="Largest EPUB, in megabytes")
+    max_pages: int = Field(
+        500,
+        ge=1,
+        le=10000,
+        description="Most pages (or slides) in one file; a longer file is refused",
+    )
+    max_files_per_hour: int = Field(
+        60, ge=1, le=10000, description="Uploads one organisation may make per hour"
+    )
+    max_active_files: int = Field(
+        500, ge=1, le=1000000, description="Files one organisation may keep at once"
+    )
+
+    def kinds(self) -> tuple[str, ...]:
+        return tuple(k for k in ("pdf", "docx", "pptx", "epub") if getattr(self, f"allow_{k}"))
+
+    def max_bytes(self, kind: str) -> int:
+        return int(getattr(self, f"max_mb_{kind}")) * 1024 * 1024
+
+
+register(
+    SettingDef(
+        key="documents.uploads",
+        model=DocumentUploads,
+        default=DocumentUploads(),
+        description="Which document types are accepted, size and page limits, and upload rates. Override per plan or organisation.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents",),
+    )
+)
+
+
+class DocumentSafety(BaseModel):
+    """How untrusted files are checked before anything reads them. Platform-wide on purpose: a customer or plan
+    must not be able to weaken it."""
+
+    malware_scan: Literal["required", "off"] = Field(
+        "required",
+        description="'required': a file is held back until the virus scanner has passed it, and stays held if the "
+        "scanner is down. 'off' is for development only and is refused in production.",
+    )
+    scan_timeout_seconds: int = Field(
+        60, ge=5, le=600, description="How long the virus scanner may take on one file"
+    )
+    reject_encrypted: bool = Field(
+        True, description="Refuse password-protected files (they cannot be audited)"
+    )
+    reject_active_content: bool = Field(
+        True,
+        description="Refuse PDFs that carry scripts or launch actions. Turn off only if customers need to audit "
+        "interactive forms; the file is still virus-scanned.",
+    )
+    zip_max_entries: int = Field(
+        5000, ge=10, le=100000, description="Most items inside a Word, PowerPoint or EPUB file"
+    )
+    zip_max_uncompressed_mb: int = Field(
+        500, ge=1, le=5000, description="Most data a Word, PowerPoint or EPUB file may expand to"
+    )
+    zip_max_ratio: int = Field(
+        200,
+        ge=2,
+        le=10000,
+        description="Largest allowed expansion of any one item (a 'zip bomb' guard)",
+    )
+    max_attempts: int = Field(
+        5, ge=1, le=20, description="How often a check is retried when the scanner is unavailable"
+    )
+
+
+def _safety_guard(new: DocumentSafety, prev: DocumentSafety) -> None:
+    from ..settings import get_settings
+
+    if get_settings().env == "production" and new.malware_scan == "off":
+        raise GuardrailError("The virus scan cannot be switched off in production.")
+
+
+register(
+    SettingDef(
+        key="documents.safety",
+        model=DocumentSafety,
+        default=DocumentSafety(),
+        description="Virus scan, encrypted and active-content policy, and zip-bomb limits for uploaded files.",
+        guard=_safety_guard,
+        high_risk=True,
+        tags=("documents", "security"),
+    )
+)
+
+
+class DocumentRetention(BaseModel):
+    retention_days: int = Field(
+        30, ge=1, le=3650, description="Days a customer's files are kept before they are deleted"
+    )
+    rejected_retention_days: int = Field(
+        3,
+        ge=1,
+        le=90,
+        description="Days a refused or infected file is kept (for support) before deletion",
+    )
+    purge_batch: int = Field(200, ge=1, le=5000, description="Most files deleted per hourly sweep")
+
+
+register(
+    SettingDef(
+        key="documents.retention",
+        model=DocumentRetention,
+        default=DocumentRetention(),
+        description="How long customer files are kept. Set shorter for a plan or organisation with stricter needs.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents", "privacy"),
+    )
+)
+
+
+class DocumentReviewPolicy(BaseModel):
+    """Human review of documents (ADR 0023): a customer asks a person on our team to check, and if possible fix, a PDF."""
+
+    enabled: bool = Field(True, description="Customers can ask a person to check a document")
+    sla_hours: int = Field(
+        48, ge=1, le=720, description="Hours within which a requested review should be finished"
+    )
+    claim_timeout_hours: int = Field(
+        8,
+        ge=1,
+        le=72,
+        description="A reviewer who has held a file this long without finishing loses it, and it returns to the queue",
+    )
+    max_open_per_org: int = Field(
+        5,
+        ge=1,
+        le=100,
+        description="Reviews one organisation may have waiting or in progress at once",
+    )
+    reviewer_cost_per_hour: int = Field(
+        0,
+        ge=0,
+        le=1_000_000,
+        description="What an hour of reviewer time costs, in rupees. Used only to report the cost of a review and of a page.",
+    )
+
+
+register(
+    SettingDef(
+        key="documents.review",
+        model=DocumentReviewPolicy,
+        default=DocumentReviewPolicy(),
+        description="Human review of documents: on or off, turnaround target, queue limits and the cost of reviewer time. Override per plan or organisation.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents",),
+    )
+)
+
+
+# --- Data policy (PROJECT_PLAN Phase 3; ADR 0024) ---------------------------------------------------------------------
+# Three layers. The platform decides which REGIONS exist (data.regions). The platform decides, per plan or organisation,
+# which CONTROLS an organisation may use (data.controls). The organisation then sets its own POLICY inside those limits
+# (data.policy, edited by its administrator on /org/data-policy). The strictest answer always wins.
+
+
+class StorageRegion(BaseModel):
+    id: str = Field(
+        pattern=r"^[a-z0-9][a-z0-9-]{0,29}$", description="Short name, for example eu or in"
+    )
+    label: str = Field(
+        max_length=80, description="What customers see, for example 'European Union (Frankfurt)'"
+    )
+    bucket: str | None = Field(
+        None, max_length=100, description="Storage bucket; empty = the platform's default bucket"
+    )
+    aws_region: str | None = Field(
+        None, max_length=40, description="The storage provider's own region name"
+    )
+    endpoint_url: str | None = Field(
+        None, max_length=300, description="Only for S3-compatible stores that are not AWS"
+    )
+    is_active: bool = Field(
+        True,
+        description="Offered for new files. Switch off instead of deleting a region that holds files",
+    )
+
+
+class StorageRegions(BaseModel):
+    items: list[StorageRegion] = Field(default_factory=list)
+    default_id: str = Field(
+        "default",
+        max_length=30,
+        description="Where files go unless the organisation chooses otherwise",
+    )
+
+    @model_validator(mode="after")
+    def _check(self):
+        ids = [r.id for r in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Region ids must be unique.")
+        if self.default_id != "default" and self.default_id not in ids:
+            raise ValueError("The default region must be one of the regions listed.")
+        for r in self.items:
+            if r.id == self.default_id and not r.is_active:
+                raise ValueError("The default region cannot be switched off.")
+        return self
+
+
+register(
+    SettingDef(
+        key="data.regions",
+        model=StorageRegions,
+        default=StorageRegions(),
+        description="Where customer files can be stored. The built-in region 'default' always exists and uses the platform's storage settings. "
+        "Files stay in the region they were uploaded to: never remove a region that holds files, switch it off instead.",
+        scopes=frozenset({Scope.GLOBAL}),
+        high_risk=True,
+        tags=("documents", "privacy"),
+    )
+)
+
+
+class DataControls(BaseModel):
+    """What an organisation's administrator is allowed to decide for themselves. Set it for everyone, one plan or one organisation."""
+
+    can_choose_region: bool = Field(
+        False, description="May choose where new files are stored (from the active regions)"
+    )
+    can_enable_ai: bool = Field(
+        False, description="May allow AI models to process their documents (off by default)"
+    )
+    can_set_retention: bool = Field(
+        True, description="May keep files for a shorter time than the plan's default"
+    )
+    can_block_human_review: bool = Field(
+        True, description="May forbid people on our team from opening their files"
+    )
+    min_retention_days: int = Field(
+        1, ge=1, le=3650, description="The shortest time an organisation may choose to keep files"
+    )
+
+
+register(
+    SettingDef(
+        key="data.controls",
+        model=DataControls,
+        default=DataControls(),
+        description="Which privacy controls an organisation may use: region, AI on documents, shorter retention, blocking human review.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents", "privacy"),
+    )
+)
+
+
+class OrgDataPolicy(BaseModel):
+    """An organisation's own choices. Anything the platform has not allowed it to change is ignored, and the page says so."""
+
+    retention_days: int | None = Field(
+        None,
+        ge=1,
+        le=3650,
+        description="Keep files this many days (never longer than the plan allows)",
+    )
+    storage_region: str | None = Field(
+        None, max_length=30, description="Where new files are stored"
+    )
+    allow_human_review: bool = Field(
+        True, description="People on our team may open files you ask them to check"
+    )
+    ai_on_documents: bool = Field(False, description="AI models may process your documents")
+    ai_require_zero_retention: bool = Field(
+        True, description="Only use AI providers that do not keep or train on what they receive"
+    )
+    ai_regions: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Only use AI providers that process in these regions; empty = any",
+    )
+
+    @model_validator(mode="after")
+    def _clean(self):
+        self.ai_regions = sorted({r.strip().lower() for r in self.ai_regions if r.strip()})
+        return self
+
+
+register(
+    SettingDef(
+        key="data.policy",
+        model=OrgDataPolicy,
+        default=OrgDataPolicy(),
+        description="An organisation's own data choices (retention, region, human review, AI on documents). Normally edited by the organisation's administrator on /org/data-policy.",
+        scopes=frozenset({Scope.ORG}),
+        tags=("documents", "privacy"),
     )
 )

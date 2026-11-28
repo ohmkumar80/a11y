@@ -32,6 +32,8 @@ class FailedRule:
     test: int
     failed_checks: int
     description: str
+    # (location in the file, message) for the first failures veraPDF lists; empty when only a summary was kept.
+    checks: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,7 +71,7 @@ def _docker_image_ready() -> bool:
     return r.returncode == 0
 
 
-def validate_pdf_ua(pdf: bytes) -> PdfUaResult:
+def validate_pdf_ua(pdf: bytes, *, timeout: int = TIMEOUT_S) -> PdfUaResult:
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "file.pdf"
         path.write_bytes(pdf)
@@ -95,7 +97,7 @@ def validate_pdf_ua(pdf: bytes) -> PdfUaResult:
         else:
             raise VeraPdfUnavailable("veraPDF is not installed and Docker is not available")
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, check=False)  # noqa: S603
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)  # noqa: S603
         except subprocess.TimeoutExpired:
             raise VeraPdfUnavailable("veraPDF timed out") from None
     try:
@@ -110,7 +112,16 @@ def validate_pdf_ua(pdf: bytes) -> PdfUaResult:
         compliant=bool(vr["compliant"]),
         passed_rules=int(details["passedRules"]),
         failed=[
-            FailedRule(s["clause"], int(s["testNumber"]), int(s["failedChecks"]), s["description"])
+            FailedRule(
+                s["clause"],
+                int(s["testNumber"]),
+                int(s["failedChecks"]),
+                s["description"],
+                tuple(
+                    (str(c.get("context", "")), str(c.get("errorMessage", "")))
+                    for c in s.get("checks", [])
+                ),
+            )
             for s in details.get("ruleSummaries", [])
         ],
         tool_version=str(

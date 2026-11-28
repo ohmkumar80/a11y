@@ -7,7 +7,9 @@ import { SecurityTab } from "@/components/admin/SecurityTab";
 import { AiTab } from "@/components/admin/AiTab";
 import { EmailsTab } from "@/components/admin/EmailsTab";
 import { CouponsTab } from "@/components/admin/CouponsTab";
+import { DocumentsTab } from "@/components/admin/DocumentsTab";
 import { OpsTab } from "@/components/admin/OpsTab";
+import { ReviewsTab } from "@/components/admin/ReviewsTab";
 import { PlansTab } from "@/components/admin/PlansTab";
 import { SettingsTab } from "@/components/admin/SettingsTab";
 import { TenantsTab } from "@/components/admin/TenantsTab";
@@ -41,6 +43,8 @@ export default function AdminPage() {
               { id: "plans", label: "Plans", content: <PlansTab /> },
               { id: "coupons", label: "Coupons", content: <CouponsTab /> },
               { id: "ai", label: "AI", content: <AiTab /> },
+              { id: "documents", label: "Documents", content: <DocumentsTab /> },
+              { id: "reviews", label: "Reviews", content: <ReviewsTab /> },
               { id: "emails", label: "Emails", content: <EmailsTab /> },
               { id: "ops", label: "Operations", content: <OpsTab /> },
               { id: "security", label: "Security", content: <SecurityTab onChanged={bump} /> },
