@@ -1,0 +1,17 @@
+# Gitleaks configuration. Keeps every default rule and allows only the public placeholder values below.
+# Do NOT add path-wide ignores here: a path entry would hide real secrets added to that file later.
+title = "a11y gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public development placeholders and obviously fake test keys. None of these are real credentials."
+regexes = [
+  # Fake provider keys used as fixtures in apps/api/tests (never valid against any provider).
+  '''sk-test-0123[A-Za-z0-9-]*''',
+  '''sk-rotated-[A-Za-z0-9-]*''',
+  # Public development master key (.env.example, docker-compose.yml, libs/core/a11y_core/settings.py).
+  # Settings refuses to start with it when ENV=production (see _no_dev_secrets_in_production).
+  '''Q2OoEdjRtijE[A-Za-z0-9_=-]+''',
+]
