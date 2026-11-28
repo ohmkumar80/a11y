@@ -1,0 +1,18 @@
+id: table-headers
+status: draft
+summary: Data tables need header cells that are tied to the data cells.
+why: A screen reader reads the column and row headers with each cell, so people know what a number means.
+who:
+- Screen reader users
+steps:
+- Use <th> for header cells, with scope="col" or scope="row".
+- Add a <caption> that names the table.
+- Do not use tables for page layout.
+examples:
+- stack: html
+  before: <table><tr><td>Month</td><td>Sales</td></tr><tr><td>Jan</td><td>10</td></tr></table>
+  after: <table><caption>Sales by month</caption><tr><th scope="col">Month</th><th scope="col">Sales</th></tr><tr><td>Jan</td><td>10</td></tr></table>
+links:
+- title: 1.3.1 Info and Relationships
+  url: https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html
+test: Move through cells with a screen reader; headers should be read.

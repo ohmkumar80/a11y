@@ -1,0 +1,1416 @@
+{
+ "engine_versions": {
+  "axe": "4.14.1",
+  "ibm": "4.0.35",
+  "htmlcs": "2.5.1"
+ },
+ "axe": {
+  "accesskeys": [],
+  "area-alt": [
+   "2.4.4",
+   "4.1.2"
+  ],
+  "aria-allowed-attr": [
+   "4.1.2"
+  ],
+  "aria-allowed-role": [],
+  "aria-braille-equivalent": [
+   "4.1.2"
+  ],
+  "aria-command-name": [
+   "4.1.2"
+  ],
+  "aria-conditional-attr": [
+   "4.1.2"
+  ],
+  "aria-deprecated-role": [
+   "4.1.2"
+  ],
+  "aria-dialog-name": [],
+  "aria-hidden-body": [
+   "1.3.1",
+   "4.1.2"
+  ],
+  "aria-hidden-focus": [
+   "4.1.2"
+  ],
+  "aria-input-field-name": [
+   "4.1.2"
+  ],
+  "aria-meter-name": [
+   "1.1.1"
+  ],
+  "aria-progressbar-name": [
+   "1.1.1"
+  ],
+  "aria-prohibited-attr": [
+   "4.1.2"
+  ],
+  "aria-required-attr": [
+   "4.1.2"
+  ],
+  "aria-required-children": [
+   "1.3.1"
+  ],
+  "aria-required-parent": [
+   "1.3.1"
+  ],
+  "aria-roledescription": [
+   "4.1.2"
+  ],
+  "aria-roles": [
+   "4.1.2"
+  ],
+  "aria-tab-name": [
+   "4.1.2"
+  ],
+  "aria-text": [],
+  "aria-toggle-field-name": [
+   "4.1.2"
+  ],
+  "aria-tooltip-name": [
+   "4.1.2"
+  ],
+  "aria-treeitem-name": [],
+  "aria-valid-attr": [
+   "4.1.2"
+  ],
+  "aria-valid-attr-value": [
+   "4.1.2"
+  ],
+  "audio-caption": [
+   "1.2.1"
+  ],
+  "autocomplete-valid": [
+   "1.3.5"
+  ],
+  "avoid-inline-spacing": [
+   "1.4.12"
+  ],
+  "blink": [
+   "2.2.2"
+  ],
+  "button-name": [
+   "4.1.2"
+  ],
+  "bypass": [
+   "2.4.1"
+  ],
+  "color-contrast": [
+   "1.4.3"
+  ],
+  "color-contrast-enhanced": [
+   "1.4.6"
+  ],
+  "css-orientation-lock": [
+   "1.3.4"
+  ],
+  "definition-list": [
+   "1.3.1"
+  ],
+  "dlitem": [
+   "1.3.1"
+  ],
+  "document-title": [
+   "2.4.2"
+  ],
+  "duplicate-id": [
+   "4.1.1"
+  ],
+  "duplicate-id-active": [
+   "4.1.1"
+  ],
+  "duplicate-id-aria": [
+   "4.1.2"
+  ],
+  "empty-heading": [],
+  "empty-table-header": [],
+  "focus-order-semantics": [],
+  "form-field-multiple-labels": [
+   "3.3.2"
+  ],
+  "frame-focusable-content": [
+   "2.1.1"
+  ],
+  "frame-tested": [],
+  "frame-title": [
+   "4.1.2"
+  ],
+  "frame-title-unique": [
+   "4.1.2"
+  ],
+  "heading-order": [],
+  "hidden-content": [],
+  "html-has-lang": [
+   "3.1.1"
+  ],
+  "html-lang-valid": [
+   "3.1.1"
+  ],
+  "html-xml-lang-mismatch": [
+   "3.1.1"
+  ],
+  "identical-links-same-purpose": [
+   "2.4.9"
+  ],
+  "image-alt": [
+   "1.1.1"
+  ],
+  "image-redundant-alt": [],
+  "input-button-name": [
+   "4.1.2"
+  ],
+  "input-image-alt": [
+   "1.1.1",
+   "4.1.2"
+  ],
+  "label": [
+   "4.1.2"
+  ],
+  "label-content-name-mismatch": [
+   "2.5.3"
+  ],
+  "label-title-only": [],
+  "landmark-banner-is-top-level": [],
+  "landmark-complementary-is-top-level": [],
+  "landmark-contentinfo-is-top-level": [],
+  "landmark-main-is-top-level": [],
+  "landmark-no-duplicate-banner": [],
+  "landmark-no-duplicate-contentinfo": [],
+  "landmark-no-duplicate-main": [],
+  "landmark-one-main": [],
+  "landmark-unique": [],
+  "link-in-text-block": [
+   "1.4.1"
+  ],
+  "link-name": [
+   "2.4.4",
+   "4.1.2"
+  ],
+  "list": [
+   "1.3.1"
+  ],
+  "listitem": [
+   "1.3.1"
+  ],
+  "marquee": [
+   "2.2.2"
+  ],
+  "meta-refresh": [
+   "2.2.1"
+  ],
+  "meta-refresh-no-exceptions": [
+   "2.2.4",
+   "3.2.5"
+  ],
+  "meta-viewport": [
+   "1.4.4"
+  ],
+  "meta-viewport-large": [],
+  "nested-interactive": [
+   "4.1.2"
+  ],
+  "no-autoplay-audio": [
+   "1.4.2"
+  ],
+  "object-alt": [
+   "1.1.1"
+  ],
+  "p-as-heading": [
+   "1.3.1"
+  ],
+  "page-has-heading-one": [],
+  "presentation-role-conflict": [],
+  "region": [],
+  "role-img-alt": [
+   "1.1.1"
+  ],
+  "scope-attr-valid": [],
+  "scrollable-region-focusable": [
+   "2.1.1",
+   "2.1.3"
+  ],
+  "select-name": [
+   "4.1.2"
+  ],
+  "server-side-image-map": [
+   "2.1.1"
+  ],
+  "skip-link": [],
+  "summary-name": [
+   "4.1.2"
+  ],
+  "svg-img-alt": [
+   "1.1.1"
+  ],
+  "tabindex": [],
+  "table-duplicate-name": [],
+  "table-fake-caption": [
+   "1.3.1"
+  ],
+  "target-size": [
+   "2.5.8"
+  ],
+  "td-has-header": [
+   "1.3.1"
+  ],
+  "td-headers-attr": [
+   "1.3.1"
+  ],
+  "th-has-data-cells": [
+   "1.3.1"
+  ],
+  "valid-lang": [
+   "3.1.2"
+  ],
+  "video-caption": [
+   "1.2.2"
+  ]
+ },
+ "ibm": {
+  "a_target_warning": {
+   "sc": [
+    "2.4.4"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "a_text_purpose": {
+   "sc": [
+    "2.4.4",
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "applet_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "application_content_accessible": {
+   "sc": [
+    "1.1.1",
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "area_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_accessiblename_exists": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_activedescendant_tabindex_valid": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_activedescendant_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_application_label_unique": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_application_labelled": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_article_label_unique": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_allowed": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_conflict": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_deprecated": {
+   "sc": [],
+   "level": "RECOMMENDATION"
+  },
+  "aria_attribute_exists": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_redundant": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_attribute_required": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_valid": {
+   "sc": [],
+   "level": "VIOLATION"
+  },
+  "aria_attribute_value_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_banner_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_banner_single": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_child_tabbable": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_child_valid": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_complementary_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_complementary_label_visible": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_complementary_labelled": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_content_in_landmark": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_contentinfo_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_contentinfo_misuse": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_contentinfo_single": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_descendant_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_document_label_unique": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_eventhandler_role_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_form_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_graphic_labelled": {
+   "sc": [],
+   "level": null
+  },
+  "aria_hidden_nontabbable": {
+   "sc": [
+    "1.3.1",
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_id_unique": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_img_labelled": {
+   "sc": [],
+   "level": null
+  },
+  "aria_keyboard_handler_exists": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_landmark_name_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_main_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_main_label_visible": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "aria_navigation_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_parent_required": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_region_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_region_labelled": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_role_allowed": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_role_redundant": {
+   "sc": [],
+   "level": "RECOMMENDATION"
+  },
+  "aria_role_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_search_label_unique": {
+   "sc": [],
+   "level": null
+  },
+  "aria_toolbar_label_unique": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "aria_widget_labelled": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "asciiart_alt_exists": {
+   "sc": [],
+   "level": null
+  },
+  "blink_css_review": {
+   "sc": [
+    "2.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "blink_elem_deprecated": {
+   "sc": [
+    "2.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "blockquote_cite_exists": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "canvas_content_described": {
+   "sc": [
+    "1.1.1",
+    "2.1.1",
+    "4.1.2"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "caption_track_exists": {
+   "sc": [
+    "1.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_active_descendant": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_autocomplete_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_design_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_focusable_elements": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_haspopup_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "combobox_popup_reference": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "debug_paths": {
+   "sc": [],
+   "level": null
+  },
+  "detector_tabbable": {
+   "sc": [],
+   "level": null
+  },
+  "dir_attribute_valid": {
+   "sc": [
+    "1.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "download_keyboard_controllable": {
+   "sc": [
+    "2.1.2"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "draggable_alternative_exists": {
+   "sc": [
+    "2.5.7"
+   ],
+   "level": "VIOLATION"
+  },
+  "element_accesskey_labelled": {
+   "sc": [
+    "3.3.2"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "element_accesskey_unique": {
+   "sc": [],
+   "level": "VIOLATION"
+  },
+  "element_attribute_deprecated": {
+   "sc": [],
+   "level": "RECOMMENDATION"
+  },
+  "element_id_unique": {
+   "sc": [],
+   "level": "VIOLATION"
+  },
+  "element_lang_valid": {
+   "sc": [
+    "3.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "element_mouseevent_keyboard": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "element_orientation_unlocked": {
+   "sc": [
+    "1.3.4"
+   ],
+   "level": "VIOLATION"
+  },
+  "element_scrollable_tabbable": {
+   "sc": [],
+   "level": null
+  },
+  "element_tabbable_role_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "element_tabbable_unobscured": {
+   "sc": [
+    "2.4.11"
+   ],
+   "level": "VIOLATION"
+  },
+  "element_tabbable_visible": {
+   "sc": [
+    "2.4.7"
+   ],
+   "level": "VIOLATION"
+  },
+  "embed_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "emoticons_alt_exists": {
+   "sc": [],
+   "level": null
+  },
+  "error_message_exists": {
+   "sc": [
+    "3.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "fieldset_label_valid": {
+   "sc": [
+    "1.3.1",
+    "3.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "fieldset_legend_valid": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "figure_label_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "form_font_color": {
+   "sc": [
+    "1.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "form_interaction_review": {
+   "sc": [
+    "3.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "form_label_unique": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "form_submit_button_exists": {
+   "sc": [
+    "3.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "form_submit_review": {
+   "sc": [],
+   "level": null
+  },
+  "frame_src_valid": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "frame_title_exists": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "heading_content_exists": {
+   "sc": [
+    "2.4.6"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "heading_markup_misuse": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "html_lang_exists": {
+   "sc": [
+    "3.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "html_lang_valid": {
+   "sc": [
+    "3.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "html_skipnav_exists": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "iframe_interactive_tabbable": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "imagebutton_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "imagemap_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_alt_background": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "img_alt_decorative": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_alt_misuse": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_alt_null": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_alt_redundant": {
+   "sc": [
+    "1.1.1",
+    "2.4.4"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_alt_valid": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_ismap_misuse": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "img_longdesc_misuse": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_autocomplete_valid": {
+   "sc": [
+    "1.3.5"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_checkboxes_grouped": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_fields_grouped": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "input_haspopup_conflict": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_label_after": {
+   "sc": [
+    "3.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_label_before": {
+   "sc": [
+    "3.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_label_exists": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_label_visible": {
+   "sc": [
+    "2.5.3",
+    "3.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_onchange_review": {
+   "sc": [
+    "3.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "input_placeholder_label_visible": {
+   "sc": [],
+   "level": null
+  },
+  "label_content_exists": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "label_name_visible": {
+   "sc": [
+    "2.5.3"
+   ],
+   "level": "VIOLATION"
+  },
+  "label_ref_valid": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "list_children_valid": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "list_markup_review": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "list_structure_proper": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "marquee_elem_avoid": {
+   "sc": [
+    "2.2.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "media_alt_brief": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "media_alt_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "media_audio_transcribed": {
+   "sc": [
+    "1.2.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "media_autostart_controllable": {
+   "sc": [
+    "1.4.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "media_keyboard_controllable": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "media_live_captioned": {
+   "sc": [
+    "1.2.4"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "media_track_available": {
+   "sc": [
+    "1.2.3",
+    "1.2.5"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "meta_redirect_optional": {
+   "sc": [],
+   "level": null
+  },
+  "meta_refresh_delay": {
+   "sc": [
+    "2.2.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "meta_viewport_zoomable": {
+   "sc": [
+    "1.4.4"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "noembed_content_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "object_text_exists": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "page_title_exists": {
+   "sc": [
+    "2.4.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "page_title_valid": {
+   "sc": [
+    "2.4.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "script_focus_blur_review": {
+   "sc": [
+    "2.1.1",
+    "2.4.7",
+    "3.2.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "script_onclick_avoid": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "script_onclick_misuse": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "script_select_review": {
+   "sc": [
+    "3.2.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "select_options_grouped": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "skip_main_described": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "skip_main_exists": {
+   "sc": [
+    "2.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_background_decorative": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_before_after_review": {
+   "sc": [],
+   "level": null
+  },
+  "style_color_misuse": {
+   "sc": [
+    "1.4.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_focus_visible": {
+   "sc": [
+    "2.4.7"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_highcontrast_visible": {
+   "sc": [
+    "1.1.1",
+    "1.3.2",
+    "1.4.11"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_hover_persistent": {
+   "sc": [
+    "1.4.13"
+   ],
+   "level": "VIOLATION"
+  },
+  "style_viewport_resizable": {
+   "sc": [
+    "1.4.4",
+    "1.4.10"
+   ],
+   "level": "VIOLATION"
+  },
+  "svg_graphics_labelled": {
+   "sc": [
+    "1.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_aria_descendants": {
+   "sc": [
+    "4.1.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_caption_empty": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_caption_nested": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_headers_exists": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_headers_ref_valid": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_headers_related": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_layout_linearized": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "RECOMMENDATION"
+  },
+  "table_scope_valid": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_structure_misuse": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "table_summary_redundant": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "target_spacing_sufficient": {
+   "sc": [
+    "2.5.8"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_block_heading": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_contrast_sufficient": {
+   "sc": [
+    "1.4.3"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_quoted_correctly": {
+   "sc": [
+    "1.3.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_sensory_misuse": {
+   "sc": [
+    "1.3.3"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_spacing_valid": {
+   "sc": [
+    "1.4.12"
+   ],
+   "level": "VIOLATION"
+  },
+  "text_whitespace_valid": {
+   "sc": [
+    "1.3.2"
+   ],
+   "level": "VIOLATION"
+  },
+  "widget_tabbable_exists": {
+   "sc": [
+    "2.1.1"
+   ],
+   "level": "VIOLATION"
+  },
+  "widget_tabbable_single": {
+   "sc": [
+    "2.1.1",
+    "2.4.3"
+   ],
+   "level": "VIOLATION"
+  }
+ },
+ "htmlcs_sc": [
+  "1.1.1",
+  "1.2.1",
+  "1.2.2",
+  "1.2.3",
+  "1.2.4",
+  "1.2.5",
+  "1.2.6",
+  "1.2.7",
+  "1.2.8",
+  "1.2.9",
+  "1.3.1",
+  "1.3.2",
+  "1.3.3",
+  "1.3.4",
+  "1.3.5",
+  "1.3.6",
+  "1.4.1",
+  "1.4.10",
+  "1.4.11",
+  "1.4.12",
+  "1.4.13",
+  "1.4.2",
+  "1.4.3",
+  "1.4.4",
+  "1.4.5",
+  "1.4.6",
+  "1.4.7",
+  "1.4.8",
+  "1.4.9",
+  "2.1.1",
+  "2.1.2",
+  "2.1.4",
+  "2.2.1",
+  "2.2.2",
+  "2.2.3",
+  "2.2.4",
+  "2.2.5",
+  "2.2.6",
+  "2.3.1",
+  "2.3.2",
+  "2.3.3",
+  "2.4.1",
+  "2.4.2",
+  "2.4.3",
+  "2.4.4",
+  "2.4.5",
+  "2.4.6",
+  "2.4.7",
+  "2.4.8",
+  "2.4.9",
+  "2.5.1",
+  "2.5.2",
+  "2.5.3",
+  "2.5.4",
+  "2.5.5",
+  "2.5.6",
+  "3.1.1",
+  "3.1.2",
+  "3.1.3",
+  "3.1.4",
+  "3.1.5",
+  "3.1.6",
+  "3.2.1",
+  "3.2.2",
+  "3.2.3",
+  "3.2.4",
+  "3.2.5",
+  "3.3.1",
+  "3.3.2",
+  "3.3.3",
+  "3.3.4",
+  "3.3.5",
+  "3.3.6",
+  "4.1.1",
+  "4.1.2",
+  "4.1.3"
+ ],
+ "automated_sc_coverage": [
+  "1.1.1",
+  "1.2.1",
+  "1.2.2",
+  "1.3.1",
+  "1.3.2",
+  "1.3.3",
+  "1.3.4",
+  "1.3.5",
+  "1.4.1",
+  "1.4.2",
+  "1.4.3",
+  "1.4.4",
+  "1.4.6",
+  "1.4.10",
+  "1.4.11",
+  "1.4.12",
+  "1.4.13",
+  "2.1.1",
+  "2.1.3",
+  "2.2.1",
+  "2.2.2",
+  "2.2.4",
+  "2.4.1",
+  "2.4.2",
+  "2.4.3",
+  "2.4.4",
+  "2.4.7",
+  "2.4.9",
+  "2.4.11",
+  "2.5.3",
+  "2.5.7",
+  "2.5.8",
+  "3.1.1",
+  "3.1.2",
+  "3.2.1",
+  "3.2.2",
+  "3.2.5",
+  "3.3.1",
+  "3.3.2",
+  "4.1.1",
+  "4.1.2"
+ ]
+}

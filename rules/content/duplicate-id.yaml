@@ -1,0 +1,16 @@
+id: duplicate-id
+status: draft
+summary: Each id value must be unique on the page.
+why: Duplicate ids break labels and ARIA references that point at them.
+who:
+- Screen reader users
+steps:
+- Rename one of the duplicates, and update anything that references it.
+examples:
+- stack: html
+  before: <div id="a"></div><div id="a"></div>
+  after: <div id="a"></div><div id="b"></div>
+links: []
+test: Search the page source for repeated ids.
+machine_check: false
+manual_reason: Current engines no longer report duplicate ids (obsolete in WCAG 2.2).

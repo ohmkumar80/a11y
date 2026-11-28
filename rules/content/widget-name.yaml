@@ -1,0 +1,18 @@
+id: widget-name
+status: draft
+summary: Custom controls (made with ARIA roles) need an accessible name.
+why: A custom button, checkbox or slider with no name is announced only by its role.
+who:
+- Screen reader users
+- Voice control users
+steps:
+- Prefer native elements (<button>, <input>) which have names built in.
+- For a custom control, add aria-label or aria-labelledby that points to visible text.
+examples:
+- stack: html
+  before: <div role="button" tabindex="0"></div>
+  after: <div role="button" tabindex="0" aria-label="Open menu"></div>
+links:
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+test: Tab to the control and listen to its announced name.

@@ -1,0 +1,25 @@
+id: image-alt
+status: draft
+summary: Every image that carries information needs a short text description (alt text). Decorative images need an empty alt
+  so screen readers skip them.
+why: A screen reader reads the alt text aloud in place of the image. With no alt text it often reads the file name, or says
+  only "image".
+who:
+- Blind and low-vision people using screen readers
+- People whose images fail to load
+steps:
+- Decide whether the image carries information or is only decoration.
+- If it carries information, write what it conveys in a short phrase, not "image of".
+- If it is decoration, use alt="" so it is skipped.
+- If the image is the only content of a link or button, describe where the link goes or what the button does.
+examples:
+- stack: html
+  before: <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+  after: '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Bar chart: sales rose 20% in 2025">'
+- stack: react
+  before: <img src={logo} />
+  after: <img src={logo} alt="Acme Ltd home" />
+links:
+- title: 1.1.1 Non-text Content
+  url: https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html
+test: 'Move to the image with a screen reader: it should say something useful, or nothing for decoration.'

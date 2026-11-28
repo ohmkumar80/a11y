@@ -1,0 +1,26 @@
+id: form-field-label
+status: draft
+summary: Every form field needs a visible label that is linked to it in the code.
+why: The label is what a screen reader announces when the field gets focus, and clicking it focuses the field. A placeholder
+  alone disappears when you type and is not a reliable label.
+who:
+- Screen reader users
+- Voice control users
+- People with memory or cognitive disabilities
+steps:
+- Add a <label> and connect it with for="id" matching the field's id.
+- Keep the label visible; do not rely on the placeholder.
+- Use aria-label only when a visible label truly cannot be shown.
+examples:
+- stack: html
+  before: <input type="email" name="email" placeholder="Email">
+  after: <label for="email">Email address</label><input id="email" type="email" name="email" autocomplete="email">
+- stack: react
+  before: <input type="email" placeholder="Email" />
+  after: <label htmlFor="email">Email address</label><input id="email" type="email" autoComplete="email" />
+links:
+- title: 3.3.2 Labels or Instructions
+  url: https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions.html
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+test: 'Focus the field with a screen reader: it should read the label.'

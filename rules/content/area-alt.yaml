@@ -1,0 +1,20 @@
+id: area-alt
+status: draft
+summary: Each clickable area of an image map needs alt text that says where it goes.
+why: Without alt text each area is announced as an unnamed link.
+who:
+- Screen reader users
+- Keyboard users who tab through the areas
+steps:
+- Add alt to every <area> element that has an href.
+- Describe the destination, as you would link text.
+examples:
+- stack: html
+  before: <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Floor plan" usemap="#plan"><map name="plan"><area shape="rect"
+    coords="0,0,50,50" href="/kitchen"></map>
+  after: <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Floor plan" usemap="#plan"><map name="plan"><area shape="rect"
+    coords="0,0,50,50" href="/kitchen" alt="Kitchen"></map>
+links:
+- title: 1.1.1 Non-text Content
+  url: https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html
+test: Tab through the areas with a screen reader.

@@ -1,0 +1,20 @@
+id: document-title
+status: draft
+summary: Every page needs a short, descriptive title.
+why: The title is the first thing a screen reader announces and it labels the browser tab, history and bookmarks.
+who:
+- Screen reader users
+- People with many tabs open
+- People with cognitive disabilities
+steps:
+- Put the page's specific topic first, then the site name.
+- Make every page's title different.
+- Make sure the <title> element is not empty.
+examples:
+- stack: html
+  before: <head><title></title></head>
+  after: <head><title>Pricing - Acme Ltd</title></head>
+links:
+- title: 2.4.2 Page Titled
+  url: https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html
+test: Open the page and read the browser tab title.

@@ -1,0 +1,19 @@
+id: frame-title
+status: draft
+summary: Each frame (iframe) needs a title that describes its content.
+why: Screen reader users move between frames by their titles. Without one they have to enter each frame to find out what it
+  is.
+who:
+- Screen reader users
+steps:
+- Add a title attribute that says what the frame contains, such as "Store locator map".
+examples:
+- stack: html
+  before: <iframe src="/map"></iframe>
+  after: <iframe src="/map" title="Store locator map"></iframe>
+links:
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+- title: 2.4.1 Bypass Blocks
+  url: https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html
+test: List frames with a screen reader; each should have a meaningful title.

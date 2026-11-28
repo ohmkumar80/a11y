@@ -1,0 +1,33 @@
+{#- Shared accessible shell for every report. Colours: #1a1a1a on #fff = 17:1; links #0b4f9e on #fff = 8.6:1;
+    severity text never relies on colour (always spelled out). Decoration, if any, must be CSS backgrounds (ADR 0008). -#}
+<!doctype html>
+<html lang="{{ lang|default('en') }}">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{% endblock %}</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm 22mm 18mm;
+    @bottom-center { content: "Page " counter(page) " of " counter(pages); font: 9pt Arial, sans-serif; color: #444; }
+    @top-right { content: "{% block running_head %}{% endblock %}"; font: 9pt Arial, sans-serif; color: #444; } }
+  body { font: 10.5pt/1.5 "Noto Sans", Arial, Helvetica, sans-serif; color: #1a1a1a; }
+  h1 { font-size: 24pt; margin: 0 0 6pt; } h2 { font-size: 16pt; margin: 20pt 0 6pt; break-after: avoid; }
+  h3 { font-size: 12.5pt; margin: 14pt 0 4pt; break-after: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; }
+  th, td { border: 1px solid #555; padding: 3pt 5pt; text-align: left; vertical-align: top; font-size: 9.5pt; overflow-wrap: anywhere; }
+  thead { display: table-header-group; } tr { break-inside: avoid; }
+  table.keep { break-inside: avoid; }
+  caption { text-align: left; font-weight: bold; margin-bottom: 3pt; }
+  pre { background: #f3f3f3; border: 1px solid #bbb; padding: 4pt 6pt; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 8.5pt; margin: 3pt 0; }
+  code { font-family: "Noto Sans Mono", "Courier New", monospace; }
+  a { color: #0b4f9e; }
+  .notice { border: 2px solid #1a1a1a; padding: 6pt 9pt; margin: 10pt 0; }
+  dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 2pt 14pt; } dl.facts dt { font-weight: bold; } dl.facts dd { margin: 0; }
+  /* Bars are decoration drawn with a CSS background (an artifact in the PDF); the number beside them is the information. */
+  .bar { display: inline-block; height: 10pt; background: #1a1a1a; min-width: 1pt; }
+  figure { margin: 8pt 0; break-inside: avoid; } figcaption { font-size: 9pt; }
+</style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

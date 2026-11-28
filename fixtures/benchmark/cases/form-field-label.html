@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: form-field-label</title></head>
+<body>
+<main><h1>form-field-label</h1>
+<form>
+<div><input type="text" name="a" data-bench-expect="form-field-label"></div>
+<div><select name="b" data-bench-expect="form-field-label"><option>One</option></select></div>
+<div><textarea name="c" data-bench-expect="form-field-label"></textarea></div>
+<div><input type="email" name="d" placeholder="Email" data-bench-expect="form-field-label"></div>
+<div><label for="e">First name</label><input id="e" type="text" data-bench-expect="none"></div>
+<div><label>Last name <input type="text" data-bench-expect="none"></label></div>
+<div><input type="text" aria-label="Search" data-bench-expect="none"></div>
+<div><span id="lbl">Postcode</span><input type="text" aria-labelledby="lbl" data-bench-expect="none"></div>
+<div><label for="f">Country</label><select id="f" data-bench-expect="none"><option>India</option></select></div>
+<button type="submit">Send</button>
+</form></main>
+</body>
+</html>

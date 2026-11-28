@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: area-alt</title></head>
+<body>
+<main><h1>area-alt</h1>
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Floor plan" usemap="#plan" width="100" height="100">
+<map name="plan">
+<area shape="rect" coords="0,0,50,50" href="/a" data-bench-expect="area-alt">
+<area shape="rect" coords="50,50,100,100" href="/b" alt="Kitchen" data-bench-expect="none">
+</map></main>
+</body>
+</html>

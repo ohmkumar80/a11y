@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: table-headers</title></head>
+<body>
+<main><h1>table-headers</h1>
+<table data-bench-expect="table-headers"><tbody>
+<tr><td>Jan</td><td>10</td><td>5</td><td>1</td></tr><tr><td>Feb</td><td>12</td><td>6</td><td>2</td></tr><tr><td>Mar</td><td>14</td><td>7</td><td>3</td></tr><tr><td>Apr</td><td>16</td><td>8</td><td>4</td></tr></tbody></table>
+<table data-bench-expect="table-headers"><tr><th id="h1">A</th><th id="h2">B</th></tr><tr><td headers="nope">x</td><td headers="h2">y</td></tr></table>
+<table data-bench-expect="none"><caption>Sales</caption><thead><tr><th scope="col">Month</th><th scope="col">Units</th><th scope="col">Revenue</th></tr></thead>
+<tbody><tr><th scope="row">Jan</th><td>10</td><td>5</td></tr><tr><th scope="row">Feb</th><td>12</td><td>6</td></tr><tr><th scope="row">Mar</th><td>14</td><td>7</td></tr></tbody></table>
+</main>
+</body>
+</html>

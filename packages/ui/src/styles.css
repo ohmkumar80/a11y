@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@source "./components";
+
+@layer base {
+  html {
+    /* SC 2.4.11 Focus Not Obscured: keep focused elements clear of the sticky header. */
+    scroll-padding-top: var(--a11y-sticky-header-height, 5rem);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--a11y-bg);
+    color: var(--a11y-fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  p { text-wrap: pretty; }
+  ::selection { background: var(--a11y-accent); color: var(--a11y-accent-fg); }
+  /* One focus indicator for everything: 3px ring (>= 3:1, SC 2.4.13) + halo that keeps it
+     visible on both light and dark surfaces. */
+  :focus-visible {
+    outline: 3px solid var(--a11y-focus);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--a11y-focus-halo);
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+  /* Programmatic focus targets (headings, main) should not show a ring on mouse use. */
+  [tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+  /* SC 1.4.12 text spacing: never clip text or fix heights on text containers. */
+  p, li, dd, label { overflow-wrap: anywhere; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows High Contrast / forced colours: let the OS palette win, keep every boundary. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight;
+    box-shadow: none;
+  }
+  .a11y-meter-fill, .a11y-progress-fill {
+    background: Highlight !important;
+    forced-color-adjust: none;
+  }
+  .a11y-meter-track, .a11y-progress-track {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* Decorative brand band. Text on it uses only the inverse-* tokens (contrast-gated). The gradient
+   stays within the band's darkest/lightest stops so the worst-case pairing is still checked. */
+.a11y-hero {
+  /* The focus ring must contrast with the band it sits on, so re-point it at the band's own tokens. */
+  --a11y-focus: var(--a11y-inverse-accent);
+  --a11y-focus-halo: var(--a11y-inverse-bg);
+  background-color: var(--a11y-inverse-bg);
+  background-image:
+    radial-gradient(60rem 30rem at 85% -10%, color-mix(in srgb, var(--a11y-inverse-accent) 22%, transparent), transparent 60%),
+    radial-gradient(40rem 24rem at -5% 110%, color-mix(in srgb, var(--a11y-inverse-accent) 14%, transparent), transparent 60%);
+}
+@media (forced-colors: active) {
+  .a11y-hero { background-image: none; border: 2px solid CanvasText; }
+}
+
+/* Page sections become cards. Unlayered on purpose: it must win over a section's own max-w / padding
+   utilities, so every card lines up. Colours are tokens already gated for contrast. */
+.a11y-page-body > section {
+  max-width: none;
+  padding: 1.25rem;
+  border: 2px solid var(--a11y-border-subtle);
+  border-radius: 1rem;
+  background: var(--a11y-bg-subtle);
+}
+@media (min-width: 40rem) {
+  .a11y-page-body > section { padding: 1.5rem; }
+}
+/* Keep running text at a readable line length inside wide cards. */
+.a11y-page-body > section > p { max-width: 72ch; }
+/* A form's submit button is as wide as its label, not the whole card. */
+.a11y-page-body form > button { align-self: flex-start; }
+
+.a11y-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

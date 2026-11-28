@@ -1,0 +1,18 @@
+id: video-caption
+status: draft
+summary: Videos with speech need captions.
+why: Captions let deaf and hard-of-hearing people follow the video, and help anyone watching without sound.
+who:
+- Deaf and hard-of-hearing people
+- People in noisy places or without sound
+steps:
+- Add a captions track with <track kind="captions">.
+- Check captions are accurate and include sound that matters.
+examples:
+- stack: html
+  before: <video controls src="a.mp4"></video>
+  after: <video controls src="a.mp4"><track kind="captions" src="a.vtt" srclang="en" label="English"></video>
+links:
+- title: 1.2.2 Captions (Prerecorded)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/captions-prerecorded.html
+test: Play the video with sound off.

@@ -1,0 +1,20 @@
+id: focus-visible
+status: draft
+summary: Keyboard focus must be visible.
+why: Keyboard users need to see where they are on the page.
+who:
+- Keyboard users
+- People with low vision
+steps:
+- 'Do not remove the outline (outline: none) unless you replace it with another clear indicator.'
+- Make the indicator at least 3 to 1 against its background.
+examples:
+- stack: html
+  before: <style>a:focus{outline:none}</style>
+  after: '<style>a:focus-visible{outline:3px solid #0b4f9e;outline-offset:2px}</style>'
+links:
+- title: 2.4.7 Focus Visible
+  url: https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html
+test: Tab through the page and watch for the focus indicator.
+machine_check: false
+manual_reason: Focus appearance can only be judged by looking at it.

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: button-name</title></head>
+<body>
+<main><h1>button-name</h1>
+<button type="button" data-bench-expect="button-name"></button>
+<button type="button" data-bench-expect="button-name"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></button>
+<input type="button" data-bench-expect="button-name">
+<button type="button" data-bench-expect="none">Save changes</button>
+<button type="button" aria-label="Close dialog" data-bench-expect="none">&times;</button>
+<input type="submit" value="Send" data-bench-expect="none">
+<button type="button" data-bench-expect="none"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Delete item"></button>
+</main>
+</body>
+</html>

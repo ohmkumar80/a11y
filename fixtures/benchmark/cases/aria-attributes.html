@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: aria-attributes</title></head>
+<body>
+<main><h1>aria-attributes</h1>
+<div aria-foo="bar" data-bench-expect="aria-attributes">Unknown ARIA attribute.</div>
+<div role="button" tabindex="0" aria-label="Bold" aria-pressed="maybe" data-bench-expect="aria-attributes"></div>
+<span aria-checked="true" data-bench-expect="aria-attributes">Attribute not allowed on this element.</span>
+<div role="button" tabindex="0" aria-pressed="true" aria-label="Bold" data-bench-expect="none">B</div>
+<div aria-live="polite" data-bench-expect="none">Status</div>
+</main>
+</body>
+</html>

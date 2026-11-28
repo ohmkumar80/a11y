@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Clean article page</title>
+<style>body{font:16px/1.5 Arial,sans-serif;color:#222;background:#fff} a{color:#0b4f9e} .skip{position:absolute;left:-999px} .skip:focus{left:8px}</style></head>
+<body data-bench-expect="none">
+<a class="skip" href="#main">Skip to main content</a>
+<header><nav aria-label="Main"><ul><li><a href="/">Home</a></li><li><a href="/about">About us</a></li><li><a href="/contact">Contact</a></li></ul></nav></header>
+<main id="main">
+<h1>How we test accessibility</h1>
+<p>Automated tools find only part of the problems, so people check the rest.</p>
+<h2>Our process</h2>
+<ol><li>Scan with automated tools.</li><li>Review the results.</li><li>Test with a screen reader.</li></ol>
+<figure><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Diagram of the three-step testing process" width="120" height="60"><figcaption>Figure 1. The testing process.</figcaption></figure>
+<h2>Results</h2>
+<table><caption>Issues by severity</caption><thead><tr><th scope="col">Severity</th><th scope="col">Count</th></tr></thead>
+<tbody><tr><th scope="row">Critical</th><td>3</td></tr><tr><th scope="row">Serious</th><td>7</td></tr></tbody></table>
+<h2>Get in touch</h2>
+<form action="/send" method="post">
+<div><label for="n">Your name</label><input id="n" name="n" type="text" autocomplete="name" required></div>
+<div><label for="e">Email address</label><input id="e" name="e" type="email" autocomplete="email" required></div>
+<div><label for="m">Message</label><textarea id="m" name="m" rows="4"></textarea></div>
+<fieldset><legend>How should we reply?</legend>
+<label><input type="radio" name="r" value="mail" checked> By email</label>
+<label><input type="radio" name="r" value="phone"> By phone</label></fieldset>
+<button type="submit">Send message</button>
+</form>
+<p>Read the <a href="/policy">accessibility policy</a>.</p>
+</main>
+<footer><p>&copy; Example Ltd</p></footer>
+</body></html>

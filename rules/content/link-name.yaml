@@ -1,0 +1,21 @@
+id: link-name
+status: draft
+summary: Every link needs text that makes sense, so people know where it goes.
+why: Screen reader users often browse a list of all links on a page. An empty link, or one that only says "click here", tells
+  them nothing.
+who:
+- Screen reader users
+- Voice control users
+- People with cognitive disabilities
+steps:
+- Write link text that describes the destination.
+- For an image link, put the destination in the image's alt text.
+- Avoid "click here" and "read more" on their own.
+examples:
+- stack: html
+  before: <a href="/pricing"></a>
+  after: <a href="/pricing">See our pricing</a>
+links:
+- title: 2.4.4 Link Purpose (In Context)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context.html
+test: List the page's links with a screen reader; each should make sense alone.

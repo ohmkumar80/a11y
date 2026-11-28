@@ -1,0 +1,19 @@
+id: html-lang
+status: draft
+summary: The page's main language must be set on the <html> element.
+why: Screen readers use it to pick the right voice and pronunciation. Without it, text can be read with the wrong accent or
+  become unintelligible.
+who:
+- Screen reader users
+- People using translation tools
+steps:
+- Add a valid lang attribute to <html>, such as lang="en" or lang="ta".
+- Use the language the page is mostly written in.
+examples:
+- stack: html
+  before: <html>
+  after: <html lang="en">
+links:
+- title: 3.1.1 Language of Page
+  url: https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html
+test: Check the <html> tag in the page source.
