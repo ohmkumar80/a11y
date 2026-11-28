@@ -1,0 +1,18 @@
+id: audio-caption
+status: draft
+summary: Audio needs a transcript.
+why: Deaf and hard-of-hearing people cannot hear audio, so they need the words in text.
+who:
+- Deaf and hard-of-hearing people
+steps:
+- Provide a text transcript next to the audio.
+examples:
+- stack: html
+  before: <audio controls src="a.mp3"></audio>
+  after: <audio controls src="a.mp3"></audio><p><a href="/a-transcript">Read the transcript</a></p>
+links:
+- title: 1.2.1 Audio-only and Video-only (Prerecorded)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/audio-only-and-video-only-prerecorded.html
+test: Check for a transcript link.
+machine_check: false
+manual_reason: Whether a transcript exists and is accurate needs a person.

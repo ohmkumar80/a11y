@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: frame-title</title></head>
+<body>
+<main><h1>frame-title</h1>
+<iframe srcdoc='&lt;!doctype html&gt;&lt;html lang="en"&gt;&lt;head&gt;&lt;title&gt;Inner&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;' data-bench-expect="frame-title"></iframe>
+<iframe srcdoc='&lt;!doctype html&gt;&lt;html lang="en"&gt;&lt;head&gt;&lt;title&gt;Inner&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;' title="Store locator map" data-bench-expect="none"></iframe>
+</main>
+</body>
+</html>

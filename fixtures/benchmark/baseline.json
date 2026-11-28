@@ -1,0 +1,37 @@
+{
+ "engine_versions": {
+  "axe": "4.14.1",
+  "ibm": "4.0.35",
+  "htmlcs": "2.5.1"
+ },
+ "rules_version": "2026-11-27.1",
+ "cases": 33,
+ "expected_defects": 60,
+ "clean_elements": 55,
+ "review_expected": 1,
+ "review_flagged": 1,
+ "recall": {
+  "merged": 1.0,
+  "high_confidence": 0.7667,
+  "axe": 0.8833,
+  "ibm": 0.7833,
+  "htmlcs": 0.4333
+ },
+ "false_positives_on_clean": {
+  "merged": 0,
+  "axe": 0,
+  "ibm": 1,
+  "htmlcs": 0
+ },
+ "strict_precision": 1.0,
+ "unexpected_failures": 0,
+ "govuk": {
+  "pages": 142,
+  "confirmed": 55,
+  "confirmed_recall": 0.3873,
+  "coincidental": 18,
+  "automatable_pages": 92,
+  "automatable_confirmed": 54,
+  "automatable_confirmed_recall": 0.587
+ }
+}

@@ -1,0 +1,20 @@
+id: keyboard-operable
+status: draft
+summary: Everything you can do with a mouse must also work with a keyboard.
+why: People who cannot use a mouse, including many blind and motor-impaired users, rely on the keyboard.
+who:
+- Keyboard users
+- Screen reader users
+- People with motor impairments
+steps:
+- Use real <button> and <a> elements; they work with the keyboard by default.
+- If you must use a custom element, add a role, tabindex="0" and key handlers for Enter and Space.
+- Make scrollable areas focusable.
+examples:
+- stack: html
+  before: <div onclick="go()">Open</div>
+  after: <button type="button" onclick="go()">Open</button>
+links:
+- title: 2.1.1 Keyboard
+  url: https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html
+test: Put the mouse away and complete the task with Tab, Enter and Space.

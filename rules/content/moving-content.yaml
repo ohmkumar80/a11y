@@ -1,0 +1,18 @@
+id: moving-content
+status: draft
+summary: Moving or blinking content needs a way to pause, stop or hide it.
+why: Motion can distract people with attention difficulties and can make text unreadable.
+who:
+- People with cognitive disabilities
+- People with low vision
+steps:
+- Remove <marquee> and <blink>.
+- If motion is needed, give a pause button.
+examples:
+- stack: html
+  before: <marquee>News</marquee>
+  after: <p>News</p>
+links:
+- title: 2.2.2 Pause, Stop, Hide
+  url: https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html
+test: Watch the page for 5 seconds.

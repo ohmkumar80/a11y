@@ -11,7 +11,7 @@ Planning is complete and published here. Application code is in active developme
 | Phase | Scope | State |
 |---|---|---|
 | 0. Foundations | Monorepo, Docker stack, CI accessibility gates, accessible component library, auth, tenant isolation | Built (manual screen-reader smoke test still to do) |
-| 1a. Sellable core | Web scanner, rule registry, reports and VPAT drafts, public API skeleton, Razorpay Payment Links, admin MFA | In progress (SaaS core, settings framework and admin screens built) |
+| 1a. Sellable core | Web scanner, rule registry, reports and VPAT drafts, public API skeleton, Razorpay Payment Links, admin MFA | In progress (SaaS core, settings, admin screens, AI providers incl. enterprise own-key, rule registry, the web scanner with its workspace screens, and accessible reports (PDF, Word, CSV, VPAT with sign-off) built; email templates, billing and the public API to do) |
 | 1b. Breadth and hardening | Full notification catalogue, webhooks, canaries, sampled AI validation, our own ACR | Planned |
 | 2. Deep web audit and monetisation | Authenticated scans, vision audit, monitoring, self-serve billing, SSO/SCIM, CI/CD and Jira/GitHub integrations | Planned |
 | 3. Documents and eBooks | PDF, DOCX, PPTX, EPUB remediation and the human review console | Planned |
@@ -62,11 +62,15 @@ make up        # builds and starts everything; migrations and demo seed data run
 
 **Port already in use?** If another app on your machine uses one of these ports, set a different one in `.env` (for example `API_PORT=8010`) and run `make up` again; then use that port in the URL. To check which app answers on a port, open `/openapi.json` there and look at `info.title`: ours is `a11y API`.
 
-Demo login: `admin@demo.example.com` / `demo-passphrase-123` (administrator) or `member@demo.example.com` (standard user). Demo coupon: `DEMO20`. `make reset` wipes all data volumes. Ports can be changed in `.env` (`WEB_PORT`, `API_PORT`, and so on).
+Demo login: `admin@demo.example.com` / `demo-passphrase-123` (administrator) or `member@demo.example.com` (standard user). Demo coupon: `DEMO20`.
+
+**AI providers:** in `/admin` → AI, use *Quick add* for DeepSeek, Azure OpenAI or OpenAI (key is write-only, then *Test connection*).
+Enterprise organisation admins can use their own keys at `/org/ai`. `make reset` wipes all data volumes. Ports can be changed in `.env` (`WEB_PORT`, `API_PORT`, and so on).
 
 ```sh
 docker compose up -d postgres redis mailpit   # infrastructure only
-make venv && make migrate && make seed        # Python environment, schema, demo data
+make venv && make engines                     # Python env + Chromium, and the pinned scan-engine bundles
+make migrate && make seed                     # schema, demo data
 make test-api                                 # tenant-isolation and auth tests
 pnpm install
 pnpm --filter @a11y/ui storybook              # component workbench with the accessibility panel
@@ -76,15 +80,20 @@ pnpm --filter @a11y/web dev                   # web app (set API_INTERNAL_URL if
 pnpm --filter @a11y/web e2e                   # axe on every route, role and colour scheme
 ```
 
-**Platform admin (Super Admin).** Create a platform operator with `python -m a11y_api.admin_cli you@example.com` (prompts for a password), sign in through `POST /auth/login`, then use the `/admin/*` endpoints and screens. Settings are declared in `libs/core/a11y_core/config/definitions.py`; the design is in the plan (section 3.11) and ADR 0006.
+**Platform admin (Super Admin).** Create a platform operator with `python -m a11y_api.admin_cli you@example.com` (prompts for a password), sign in through the login page (or `POST /auth/login`), then use the `/admin/*` endpoints and screens. Two-step verification for administrators is controlled in `/admin` → Security: development starts with it **off** (`MFA_SUPER_ADMIN_DEFAULT` in `.env`), production refuses that. Locked out? `python -m a11y_api.admin_cli --reset-mfa you@example.com`, or `--mfa-super-admin off`. Settings are declared in `libs/core/a11y_core/config/definitions.py`; the design is in the plan (section 3.11) and ADR 0006.
 
 ### Repository layout
 
 ```text
 apps/web         Next.js App Router: all dashboards and auth
 apps/api         FastAPI + Alembic (RLS migrations)
-libs/core        Models, tenant-scoped DB sessions, settings, Celery wiring
+libs/core        Models, tenant-scoped DB sessions, settings, rule registry, AI gateway, billing, SSRF guard
+workers/web_audit  Browser scanner: three engines in one page, egress proxy, scan job runner
+workers/documents  Accessible reports: PDF/UA (WeasyPrint + veraPDF gate), DOCX, CSV, VPAT; report templates
 packages/ui      React Aria component library, design tokens, Storybook
+packages/engine-bundles  Pinned, hash-checked axe / IBM / HTMLCS browser bundles
+rules/           WCAG criteria, standards mappings, canonical cross-engine rules (SME-reviewed data)
+fixtures/        Known-good and known-bad pages for scanner tests
 infra/           Dockerfiles, Postgres role bootstrap
 docs/            Specification, architecture, plan, ADRs
 ```

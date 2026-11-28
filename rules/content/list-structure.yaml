@@ -1,0 +1,17 @@
+id: list-structure
+status: draft
+summary: Lists must be marked up with real list elements and used correctly.
+why: Screen readers announce "list, 3 items" and let people jump between items. Wrong markup breaks that.
+who:
+- Screen reader users
+steps:
+- Put <li> items directly inside <ul> or <ol>.
+- Do not use <ul> just to indent text.
+examples:
+- stack: html
+  before: <ul><div>Item</div></ul>
+  after: <ul><li>Item</li></ul>
+links:
+- title: 1.3.1 Info and Relationships
+  url: https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html
+test: Navigate by list with a screen reader.

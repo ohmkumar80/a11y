@@ -1,0 +1,322 @@
+# Canonical rules: ONE entry per real-world defect, listing the equivalent rule in each engine, so
+# the same defect found by several engines is reported once with a confidence score.
+#
+#  scope: element   - identity is the element (xpath)
+#  scope: document  - a page-level defect; reported once per page whichever element the engine blames
+#                     (axe/IBM blame <html>, HTML_CodeSniffer blames <title>)
+#  best_practice    - not a WCAG failure by itself (reported separately, never counts as non-conformance)
+#  engine entries   - a rule id, or {id, tags: [element tag names]} when a generic engine rule maps
+#                     to this canonical rule only for those elements. HTML_CodeSniffer ids are the
+#                     technique part of its message code and may end in * (prefix match).
+#
+# Rules not listed here are still reported, as "<engine>:<rule id>", with their own SC; they just
+# cannot be merged across engines. Every axe/IBM id below is verified against
+# rules/engine-catalog.json by tests (pinned engine versions), so engine upgrades cannot silently
+# break this file. Mappings marked `verified: fixture` were also observed to co-fire on the same
+# element in fixtures/pages/bad.html; the rest are curated from engine documentation.
+version: "2026-11-27.1"
+rules:
+  # --- 1.1 text alternatives -------------------------------------------------------------------
+  - id: image-alt
+    title: Images need a text alternative
+    sc: ["1.1.1"]
+    verified: fixture
+    axe: [image-alt, role-img-alt, svg-img-alt, object-alt]
+    ibm: [img_alt_valid, svg_graphics_labelled, object_text_exists]
+    htmlcs: [H37, "H67*"]
+  - id: input-image-alt
+    title: Image buttons need a text alternative
+    sc: ["1.1.1", "4.1.2"]
+    axe: [input-image-alt]
+    ibm:
+      - imagebutton_alt_exists
+      - {id: input_label_exists, tags: ["input:image"]}
+    htmlcs:
+      - "H36*"
+      - {id: "F68*", tags: ["input:image"]}
+      - "H91.InputImage.Name"
+  - id: area-alt
+    title: Image map areas need a text alternative
+    sc: ["1.1.1", "2.4.4"]
+    axe: [area-alt]
+    ibm:
+      - area_alt_exists
+      - {id: a_text_purpose, tags: [area]}
+    htmlcs: ["H24*"]
+  # --- 1.2 media -----------------------------------------------------------------------------------
+  - id: audio-caption
+    title: Audio needs a transcript or captions
+    sc: ["1.2.1"]
+    axe: [audio-caption]
+    ibm: [media_audio_transcribed]
+    htmlcs: ["G158*", "G159*", "G166*"]
+  - id: video-caption
+    title: Video needs captions
+    sc: ["1.2.2"]
+    axe: [video-caption]
+    ibm: [caption_track_exists]
+    htmlcs: ["G87*", "G93*"]
+  # --- 1.3 structure ---------------------------------------------------------------------------------
+  - id: list-structure
+    title: Lists must be marked up correctly
+    sc: ["1.3.1"]
+    verified: fixture
+    axe: [list, listitem, definition-list, dlitem]
+    ibm: [list_structure_proper, list_children_valid]
+    htmlcs: []
+  - id: table-headers
+    title: Data tables need header cells that are associated with their data
+    sc: ["1.3.1"]
+    axe: [td-has-header, th-has-data-cells, td-headers-attr, scope-attr-valid]
+    ibm: [table_headers_exists, table_headers_ref_valid, table_headers_related, table_scope_valid]
+    htmlcs: ["H43*", "H63*"]
+  - id: aria-required-structure
+    title: ARIA roles need their required parent or child roles
+    sc: ["1.3.1"]
+    axe: [aria-required-children, aria-required-parent]
+    ibm: [aria_child_valid, aria_parent_required, aria_descendant_valid]
+    htmlcs: []
+  - id: autocomplete-valid
+    title: Input purpose must be identifiable (autocomplete)
+    sc: ["1.3.5"]
+    axe: [autocomplete-valid]
+    ibm: [input_autocomplete_valid]
+    htmlcs: ["H98*"]
+  - id: orientation-lock
+    title: Content must not be locked to one orientation
+    sc: ["1.3.4"]
+    axe: [css-orientation-lock]
+    ibm: [element_orientation_unlocked]
+    htmlcs: []
+  # --- 1.4 distinguishable -------------------------------------------------------------------------
+  - id: color-contrast
+    title: Text needs sufficient contrast with its background
+    sc: ["1.4.3"]
+    verified: fixture
+    axe: [color-contrast]
+    ibm: [text_contrast_sufficient]
+    htmlcs: ["G18*", "G145*"]
+  - id: color-contrast-enhanced
+    title: Text should meet enhanced (AAA) contrast
+    sc: ["1.4.6"]
+    axe: [color-contrast-enhanced]
+    ibm: []
+    htmlcs: []
+  - id: use-of-color
+    title: Colour must not be the only way to convey information
+    sc: ["1.4.1"]
+    axe: [link-in-text-block]
+    ibm: [style_color_misuse, form_font_color]
+    htmlcs: ["G14*", "G182*"]
+  - id: viewport-zoom
+    title: Zooming and scaling must not be disabled
+    sc: ["1.4.4"]
+    scope: document
+    axe: [meta-viewport]
+    ibm: [meta_viewport_zoomable]
+    htmlcs: ["G142*"]
+  - id: text-spacing
+    title: Content must tolerate user text-spacing changes
+    sc: ["1.4.12"]
+    axe: [avoid-inline-spacing]
+    ibm: [text_spacing_valid]
+    htmlcs: []
+  # --- 2.1 / 2.2 operable --------------------------------------------------------------------------
+  - id: keyboard-operable
+    title: Functionality must be operable by keyboard
+    sc: ["2.1.1", "2.1.3"]
+    verified: fixture
+    axe: [scrollable-region-focusable, frame-focusable-content, server-side-image-map]
+    ibm: [element_mouseevent_keyboard, script_onclick_misuse, widget_tabbable_exists, aria_keyboard_handler_exists, aria_child_tabbable, aria_eventhandler_role_valid]
+    htmlcs: ["G90*", "SCR20*"]
+  - id: meta-refresh
+    title: Pages must not refresh or redirect on a timer
+    sc: ["2.2.1"]
+    scope: document
+    axe: [meta-refresh]
+    ibm: [meta_refresh_delay]
+    htmlcs: ["F40*", "F41*"]
+  - id: meta-refresh-no-exceptions
+    title: Pages must not refresh or redirect on a timer (no exceptions, AAA)
+    sc: ["2.2.4", "3.2.5"]
+    scope: document
+    axe: [meta-refresh-no-exceptions]
+    ibm: []
+    htmlcs: []
+  - id: moving-content
+    title: Moving or blinking content needs a pause control
+    sc: ["2.2.2"]
+    axe: [blink, marquee]
+    ibm: [blink_css_review, blink_elem_deprecated, marquee_elem_avoid]
+    htmlcs: ["F4*", "F47*"]
+  # --- 2.4 navigable ---------------------------------------------------------------------------------
+  - id: bypass-blocks
+    title: Pages need a way to skip repeated blocks
+    sc: ["2.4.1"]
+    scope: document
+    axe: [bypass]
+    ibm: [skip_main_exists, html_skipnav_exists, skip_main_described]
+    htmlcs: ["G1*", "G123*", "G124*", "H69*"]
+  - id: document-title
+    title: Pages need a descriptive title
+    sc: ["2.4.2"]
+    scope: document
+    verified: fixture
+    axe: [document-title]
+    ibm: [page_title_exists, page_title_valid]
+    htmlcs: ["H25*"]
+  - id: link-name
+    title: Links need discernible text
+    sc: ["2.4.4", "4.1.2"]
+    verified: fixture
+    axe: [link-name]
+    ibm: [a_text_purpose]
+    htmlcs: ["H30*", "H91.A.*"]
+  - id: empty-heading
+    title: Headings must not be empty
+    sc: ["2.4.6"]
+    axe: [empty-heading]
+    ibm: [heading_content_exists]
+    htmlcs: ["H42.2"]
+  - id: focus-visible
+    title: Keyboard focus must be visible
+    sc: ["2.4.7"]
+    axe: []
+    ibm: [style_focus_visible, element_tabbable_visible]
+    htmlcs: ["G149*", "G165*", "G195*"]
+  - id: identical-links
+    title: Identical link text should lead to the same purpose
+    sc: ["2.4.9"]
+    axe: [identical-links-same-purpose]
+    ibm: []
+    htmlcs: []
+  - id: label-in-name
+    title: Visible label text must be part of the accessible name
+    sc: ["2.5.3", "3.3.2"]
+    axe: [label-content-name-mismatch]
+    ibm: [label_name_visible, input_label_visible]
+    htmlcs: ["F96*"]
+  - id: target-size
+    title: Targets need a minimum size or spacing
+    sc: ["2.5.8"]
+    axe: [target-size]
+    ibm: [target_spacing_sufficient]
+    htmlcs: []
+  # --- 3 understandable ---------------------------------------------------------------------------
+  - id: html-lang
+    title: The page language must be set and valid
+    sc: ["3.1.1"]
+    scope: document
+    verified: fixture
+    axe: [html-has-lang, html-lang-valid, html-xml-lang-mismatch]
+    ibm: [html_lang_exists, html_lang_valid]
+    htmlcs: ["H57*"]
+  - id: valid-lang
+    title: Language changes inside the page must be marked correctly
+    sc: ["3.1.2"]
+    axe: [valid-lang]
+    ibm: [element_lang_valid]
+    htmlcs: ["H58*"]
+  - id: form-field-label
+    title: Form fields need a label
+    sc: ["1.3.1", "3.3.2", "4.1.2"]
+    verified: fixture
+    axe: [label, select-name, label-title-only]
+    ibm:
+      - {id: input_label_exists, tags: [input, select, textarea]}
+    htmlcs: ["F68*", "H91.Input*.Name", "H91.Select.Name", "H91.Textarea.Name"]
+  - id: multiple-labels
+    title: Form fields should not have several conflicting labels
+    sc: ["3.3.2"]
+    axe: [form-field-multiple-labels]
+    ibm: []
+    htmlcs: []
+  - id: error-message
+    title: Input errors must be identified in text
+    sc: ["3.3.1"]
+    axe: []
+    ibm: [error_message_exists]
+    htmlcs: ["G83*", "G84*", "G85*"]
+  # --- 4.1 robust ---------------------------------------------------------------------------------
+  - id: button-name
+    title: Buttons need discernible text
+    sc: ["4.1.2"]
+    verified: fixture
+    axe: [button-name, input-button-name, summary-name]
+    ibm:
+      - {id: input_label_exists, tags: [button, "input:button", "input:submit", "input:reset"]}
+    htmlcs:
+      - "H91.Button.Name"
+      - "H91.InputButton.Name"
+      - "H91.Summary.Name"
+      - {id: "F68*", tags: ["input:button", "input:submit", "input:reset"]}
+  - id: widget-name
+    title: Custom controls (ARIA widgets) need an accessible name
+    sc: ["4.1.2"]
+    verified: fixture
+    axe: [aria-command-name, aria-input-field-name, aria-toggle-field-name, aria-tab-name, aria-tooltip-name]
+    ibm:
+      - aria_widget_labelled
+      - aria_accessiblename_exists
+      - {id: input_label_exists, tags: [div, span, li, td, p]}
+    htmlcs: ["H91.Div.Name", "H91.Span.Name"]
+  - id: progress-meter-name
+    title: Progress bars and meters need an accessible name
+    sc: ["1.1.1"]
+    axe: [aria-meter-name, aria-progressbar-name]
+    ibm: []
+    htmlcs: []
+  - id: frame-title
+    title: Frames need a title
+    sc: ["4.1.2", "2.4.1"]
+    verified: fixture
+    axe: [frame-title, frame-title-unique]
+    ibm: [frame_title_exists]
+    htmlcs: ["H64*"]
+  - id: aria-attributes
+    title: ARIA attributes must be valid and allowed
+    sc: ["4.1.2"]
+    axe: [aria-valid-attr, aria-valid-attr-value, aria-allowed-attr, aria-required-attr, aria-prohibited-attr, aria-conditional-attr]
+    ibm: [aria_attribute_allowed, aria_attribute_required, aria_attribute_value_valid, aria_attribute_valid, aria_attribute_conflict, aria_activedescendant_valid]
+    htmlcs: []
+  - id: aria-roles
+    title: ARIA roles must be valid
+    sc: ["4.1.2"]
+    axe: [aria-roles, aria-deprecated-role]
+    ibm: [aria_role_valid, aria_role_allowed]
+    htmlcs: []
+  - id: aria-hidden-focus
+    title: Hidden content must not be focusable
+    sc: ["4.1.2"]
+    axe: [aria-hidden-focus]
+    ibm: [aria_hidden_nontabbable]
+    htmlcs: []
+  - id: nested-interactive
+    title: Interactive controls must not be nested
+    sc: ["4.1.2"]
+    axe: [nested-interactive]
+    ibm: []
+    htmlcs: []
+  - id: duplicate-id
+    title: IDs must be unique
+    sc: ["4.1.1"]
+    best_practice: true      # 4.1.1 Parsing was removed in WCAG 2.2; duplicate IDs only matter when they break ARIA references
+    axe: [duplicate-id, duplicate-id-active, duplicate-id-aria]
+    ibm: [aria_id_unique]
+    htmlcs: ["F77*"]
+  # --- best practices (not WCAG failures) ---------------------------------------------------------
+  - id: heading-order
+    title: Heading levels should only increase by one
+    sc: []
+    best_practice: true
+    axe: [heading-order]
+    ibm: []
+    htmlcs: []
+  - id: landmarks
+    title: Content should be inside landmarks, with one main landmark
+    sc: []
+    best_practice: true
+    scope: document
+    axe: [landmark-one-main, region, landmark-no-duplicate-main, landmark-main-is-top-level]
+    ibm: [aria_content_in_landmark]
+    htmlcs: []

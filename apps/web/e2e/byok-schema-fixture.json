@@ -1,0 +1,258 @@
+{
+ "$defs": {
+  "AIModel": {
+   "properties": {
+    "id": {
+     "pattern": "^[a-z0-9][a-z0-9_.-]{0,59}$",
+     "title": "Id",
+     "type": "string"
+    },
+    "provider_id": {
+     "title": "Provider Id",
+     "type": "string"
+    },
+    "model_name": {
+     "description": "The provider's own model/deployment name",
+     "maxLength": 200,
+     "title": "Model Name",
+     "type": "string"
+    },
+    "capabilities": {
+     "items": {
+      "enum": [
+       "text",
+       "vision",
+       "json",
+       "tools"
+      ],
+      "type": "string"
+     },
+     "title": "Capabilities",
+     "type": "array"
+    },
+    "context_window": {
+     "default": 8192,
+     "minimum": 1,
+     "title": "Context Window",
+     "type": "integer"
+    },
+    "input_cost_per_1m": {
+     "default": 0,
+     "description": "USD per million input tokens",
+     "minimum": 0,
+     "title": "Input Cost Per 1M",
+     "type": "number"
+    },
+    "output_cost_per_1m": {
+     "default": 0,
+     "minimum": 0,
+     "title": "Output Cost Per 1M",
+     "type": "number"
+    },
+    "is_enabled": {
+     "default": true,
+     "title": "Is Enabled",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "id",
+    "provider_id",
+    "model_name"
+   ],
+   "title": "AIModel",
+   "type": "object"
+  },
+  "AIProvider": {
+   "properties": {
+    "id": {
+     "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$",
+     "title": "Id",
+     "type": "string"
+    },
+    "type": {
+     "enum": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "bedrock",
+      "gemini",
+      "deepseek",
+      "mistral",
+      "groq",
+      "openai_compatible",
+      "fake"
+     ],
+     "title": "Type",
+     "type": "string"
+    },
+    "display_name": {
+     "maxLength": 100,
+     "title": "Display Name",
+     "type": "string"
+    },
+    "base_url": {
+     "anyOf": [
+      {
+       "maxLength": 500,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Base Url"
+    },
+    "region": {
+     "anyOf": [
+      {
+       "maxLength": 50,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Region"
+    },
+    "api_key": {
+     "$ref": "#/$defs/Secret"
+    },
+    "options": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Options",
+     "type": "object"
+    },
+    "data_policy": {
+     "$ref": "#/$defs/DataPolicy"
+    },
+    "is_enabled": {
+     "default": true,
+     "title": "Is Enabled",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "id",
+    "type",
+    "display_name"
+   ],
+   "title": "AIProvider",
+   "type": "object"
+  },
+  "DataPolicy": {
+   "properties": {
+    "zero_retention": {
+     "default": false,
+     "title": "Zero Retention",
+     "type": "boolean"
+    },
+    "processing_regions": {
+     "description": "e.g. ['us','eu','in']",
+     "items": {
+      "type": "string"
+     },
+     "title": "Processing Regions",
+     "type": "array"
+    },
+    "gov_approved": {
+     "default": false,
+     "title": "Gov Approved",
+     "type": "boolean"
+    }
+   },
+   "title": "DataPolicy",
+   "type": "object"
+  },
+  "Secret": {
+   "additionalProperties": false,
+   "description": "Write-only credential.\n\nClients send ``{\"$secret\": true, \"plaintext\": \"...\"}`` to set or replace it, or\n``{\"$secret\": true}`` to keep the stored one. The store keeps only ``ct`` (ciphertext) and\n``hint`` (last 4 characters). The API returns ``set`` and ``hint`` - never ``ct``/plaintext.",
+   "properties": {
+    "$secret": {
+     "const": true,
+     "default": true,
+     "title": "$Secret",
+     "type": "boolean"
+    },
+    "plaintext": {
+     "anyOf": [
+      {
+       "maxLength": 4096,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Plaintext"
+    }
+   },
+   "title": "Secret",
+   "type": "object"
+  }
+ },
+ "properties": {
+  "enabled": {
+   "default": false,
+   "description": "Use this organisation's own AI accounts.",
+   "title": "Enabled",
+   "type": "boolean"
+  },
+  "providers": {
+   "items": {
+    "$ref": "#/$defs/AIProvider"
+   },
+   "maxItems": 3,
+   "title": "Providers",
+   "type": "array"
+  },
+  "models": {
+   "items": {
+    "$ref": "#/$defs/AIModel"
+   },
+   "maxItems": 10,
+   "title": "Models",
+   "type": "array"
+  },
+  "model_order": {
+   "description": "Model ids to try, in order. Models that cannot do a task are skipped for it.",
+   "items": {
+    "type": "string"
+   },
+   "maxItems": 5,
+   "title": "Model Order",
+   "type": "array"
+  },
+  "only_tasks": {
+   "description": "Use your own accounts only for these tasks. Empty = all tasks.",
+   "items": {
+    "enum": [
+     "code_fix",
+     "vision_audit",
+     "alt_text",
+     "mathml",
+     "ad_script",
+     "vpat_narrative",
+     "focus_anomaly",
+     "doc_layout"
+    ],
+    "type": "string"
+   },
+   "title": "Only Tasks",
+   "type": "array"
+  },
+  "fallback_to_platform": {
+   "default": false,
+   "description": "If your accounts fail, fall back to the platform's AI (counts toward platform usage).",
+   "title": "Fallback To Platform",
+   "type": "boolean"
+  }
+ },
+ "title": "ByokConfig",
+ "type": "object"
+}

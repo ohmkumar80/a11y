@@ -1,0 +1,20 @@
+id: text-spacing
+status: draft
+summary: The page must still work when people increase text spacing.
+why: People with dyslexia or low vision often override line and letter spacing.
+who:
+- People with dyslexia
+- People with low vision
+steps:
+- Do not fix heights on text containers.
+- Let containers grow with their text.
+examples:
+- stack: html
+  before: <p style="height:20px;overflow:hidden">Text that may be clipped</p>
+  after: <p style="min-height:20px">Text that grows</p>
+links:
+- title: 1.4.12 Text Spacing
+  url: https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html
+test: Apply a text-spacing bookmarklet and check nothing is clipped.
+machine_check: false
+manual_reason: Needs the text-spacing override applied in a real browser.

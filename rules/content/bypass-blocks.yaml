@@ -1,0 +1,18 @@
+id: bypass-blocks
+status: draft
+summary: Give keyboard users a way to skip repeated content such as the navigation.
+why: Without it, a keyboard user must tab through every menu link on every page.
+who:
+- Keyboard users
+- Screen reader users
+steps:
+- Add a "Skip to main content" link as the first focusable element.
+- Use landmarks (<header>, <nav>, <main>) and headings.
+examples:
+- stack: html
+  before: <body><nav>...</nav><main id="main">...</main></body>
+  after: <body><a href="#main">Skip to main content</a><nav>...</nav><main id="main">...</main></body>
+links:
+- title: 2.4.1 Bypass Blocks
+  url: https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html
+test: Press Tab once on page load.

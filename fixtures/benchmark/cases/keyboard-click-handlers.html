@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: keyboard-click-handlers</title></head>
+<body>
+<main><h1>keyboard-click-handlers</h1>
+<div onclick="go()" data-bench-expect="keyboard-operable">Click me (not keyboard operable)</div>
+<span onclick="go()" data-bench-expect="keyboard-operable">Also click only</span>
+<button type="button" onclick="go()" data-bench-expect="none">Real button</button>
+<a href="/x" onclick="go()" data-bench-expect="none">Real link</a>
+</main>
+</body>
+</html>

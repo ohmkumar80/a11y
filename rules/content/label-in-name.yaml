@@ -1,0 +1,18 @@
+id: label-in-name
+status: draft
+summary: A control's accessible name must include its visible label text.
+why: Voice-control users say what they see on the button. If the accessible name differs, the command fails.
+who:
+- Voice control users
+- Screen reader users
+steps:
+- Start the accessible name with the visible text.
+- Prefer no aria-label at all when the visible text is enough.
+examples:
+- stack: html
+  before: <button aria-label="Submit order">Buy</button>
+  after: <button aria-label="Buy now">Buy</button>
+links:
+- title: 2.5.3 Label in Name
+  url: https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html
+test: Say the visible label to a voice-control tool.

@@ -1,0 +1,18 @@
+id: target-size
+status: draft
+summary: Buttons and links need a target of at least 24 by 24 CSS pixels, or enough space around them.
+why: Tiny targets are hard to hit for people with tremors, large fingers or a mouse that is hard to control.
+who:
+- People with motor impairments
+- Touch-screen users
+steps:
+- Give small controls a minimum size of 24px (44px is better).
+- Or add spacing so a 24px circle around each target does not touch another target.
+examples:
+- stack: html
+  before: <a href="/a" style="display:inline-block;width:12px;height:12px">a</a><a href="/b" style="display:inline-block;width:12px;height:12px">b</a>
+  after: <a href="/a" style="display:inline-block;width:24px;height:24px">a</a> <a href="/b" style="display:inline-block;width:24px;height:24px">b</a>
+links:
+- title: 2.5.8 Target Size (Minimum)
+  url: https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
+test: Measure the target in the browser tools.

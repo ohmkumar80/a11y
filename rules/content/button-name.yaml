@@ -1,0 +1,22 @@
+id: button-name
+status: draft
+summary: Every button needs a name that says what it does, as visible text or an accessible label.
+why: Buttons with no name are announced only as "button", so people cannot tell what they do.
+who:
+- Screen reader users
+- Voice control users
+steps:
+- Put visible text in the button where you can.
+- For an icon-only button, add aria-label with the action, such as "Close".
+- Hide the icon itself from screen readers (aria-hidden="true").
+examples:
+- stack: html
+  before: <button type="button"></button>
+  after: <button type="button">Save changes</button>
+- stack: react
+  before: <button onClick={close}><CloseIcon /></button>
+  after: <button onClick={close} aria-label="Close"><CloseIcon aria-hidden="true" /></button>
+links:
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+test: Tab to the button; a screen reader should announce a clear name.

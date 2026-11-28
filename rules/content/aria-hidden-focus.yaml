@@ -1,0 +1,17 @@
+id: aria-hidden-focus
+status: draft
+summary: Content hidden from screen readers must not be reachable by keyboard.
+why: Focus lands on something the screen reader will not describe, which is confusing.
+who:
+- Keyboard and screen reader users
+steps:
+- Do not put focusable elements inside aria-hidden="true".
+- If something should be hidden, also make it unfocusable (tabindex="-1" or the hidden attribute).
+examples:
+- stack: html
+  before: <div aria-hidden="true"><button>Go</button></div>
+  after: <div aria-hidden="true"><button tabindex="-1">Go</button></div>
+links:
+- title: 4.1.2 Name, Role, Value
+  url: https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html
+test: Tab through the page; focus should never land on hidden content.

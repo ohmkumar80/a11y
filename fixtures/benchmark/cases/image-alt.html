@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Benchmark: image-alt</title></head>
+<body>
+<main><h1>image-alt</h1>
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-bench-expect="image-alt">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="20" height="20" data-bench-expect="image-alt">
+<svg role="img" width="20" height="20" data-bench-expect="image-alt"><rect width="20" height="20"/></svg>
+<div role="img" data-bench-expect="image-alt"></div>
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Bar chart of monthly sales" data-bench-expect="none">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="" data-bench-expect="none">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="" role="presentation" data-bench-expect="none">
+<svg role="img" aria-label="Company logo" width="20" height="20" data-bench-expect="none"><rect width="20" height="20"/></svg>
+<svg aria-hidden="true" width="20" height="20" data-bench-expect="none"><rect width="20" height="20"/></svg>
+</main>
+</body>
+</html>

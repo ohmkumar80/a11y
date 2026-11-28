@@ -1,0 +1,25 @@
+{
+  "reviewed": "2026-11-27",
+  "reviewer": "AI-assisted review (Claude): compared each reported rule with the test's failure description. NOT an accessibility specialist's review; an IAAP-certified SME should re-check before these numbers are quoted outside the team.",
+  "meaning": "Detections where the reported rule is unrelated to the planted failure (the engine flagged something else on the page). They are excluded from the confirmed counts.",
+  "coincidental_prefixes": [
+    "content-content-is-not-in-correct-reading-order",
+    "content-content-is-not-organised-into-well-defined-groups",
+    "forms-error-messages-no-suggestion-for-corrections",
+    "forms-errors-are-not-identified",
+    "forms-errors-identified-by-colour-only",
+    "forms-field-hint-not-associated-with-input",
+    "forms-form-control-that-changes-context-without-warning",
+    "forms-left-aligned-form-labels-with-too-much-white-space",
+    "forms-non-unique-field-label-found",
+    "frames-iframe-title-attribute-does-not-describe",
+    "html-article-element-used-to-mark-up",
+    "keyboard-access-dropdown-navigation-only-the-top-level",
+    "keyboard-access-keyboard-trap",
+    "language-of-content-html-element-has-lang-attribute-set-to-wrong-language",
+    "links-uninformative-link-text",
+    "multimedia-flashing-content-doesnt-have-warning",
+    "page-layout-wide-page-forces-users-to-scroll-horizontally",
+    "page-title-inappropriate-page-title"
+  ]
+}

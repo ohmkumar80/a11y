@@ -1,0 +1,17 @@
+id: aria-required-structure
+status: draft
+summary: ARIA roles must be inside (or contain) the roles they need, such as a menu containing menu items.
+why: A role with the wrong surroundings breaks how assistive technology describes and navigates it.
+who:
+- Screen reader users
+steps:
+- Check the ARIA pattern for the widget and add the required child or parent roles.
+- If a native element would do, use it instead.
+examples:
+- stack: html
+  before: <div role="menu"><div>Item</div></div>
+  after: <div role="menu"><div role="menuitem" tabindex="0">Item</div></div>
+links:
+- title: 1.3.1 Info and Relationships
+  url: https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html
+test: Check with an ARIA validator and a screen reader.

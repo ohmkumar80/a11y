@@ -1,0 +1,18 @@
+id: input-image-alt
+status: draft
+summary: An image used as a submit button needs alt text that says what the button does.
+why: The alt text is the button's name. Without it a screen reader user hears "button" with no purpose.
+who:
+- Screen reader users
+- Voice control users, who say the button's name
+steps:
+- Add an alt attribute that names the action, such as "Search".
+- Describe the action, not the picture.
+examples:
+- stack: html
+  before: <input type="image" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+  after: <input type="image" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Search">
+links:
+- title: 1.1.1 Non-text Content
+  url: https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html
+test: Tab to the button with a screen reader; it should announce its action.
