@@ -111,7 +111,7 @@ export function DocumentsTab() {
           // A list, not a table: buttons inside a data grid cannot be reached with the Tab key, and retrying must be keyboard friendly.
           <ul aria-label="Files we could not check" className="flex max-w-3xl flex-col gap-3">
             {d.failed.map((f) => (
-              <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border-subtle p-3">
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 border border-border p-3">
                 <span>
                   <strong>{f.organization}</strong>: {f.kind.toUpperCase()}, {mb(f.size_bytes)}, uploaded {formatDate(f.created_at)}
                   <span className="block text-sm text-fg-muted">Why: {f.why ?? "unknown"}. Checked {f.attempts} time{f.attempts === 1 ? "" : "s"}.</span>

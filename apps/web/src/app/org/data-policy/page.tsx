@@ -58,7 +58,7 @@ function Content() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="now" className="flex max-w-3xl flex-col gap-2 rounded-xl border-2 border-border-subtle p-4">
+      <section aria-labelledby="now" className="flex max-w-3xl flex-col gap-2 border border-border p-4">
         <h2 id="now" className="text-xl font-bold">What is in force now</h2>
         <dl className="grid grid-cols-[1fr_max-content] gap-x-6 gap-y-1">
           <div className="contents"><dt>Files are kept for</dt><dd className="font-semibold">{e.retention_days} days (your plan allows up to {e.retention_ceiling})</dd></div>
@@ -118,7 +118,7 @@ function Content() {
         <div><Button type="submit" isPending={busy} pendingLabel="Saving">Save the policy</Button></div>
       </form>
 
-      <section aria-labelledby="erase" className="flex max-w-3xl flex-col gap-3 rounded-xl border-2 border-border-subtle p-4">
+      <section aria-labelledby="erase" className="flex max-w-3xl flex-col gap-3 border border-border p-4">
         <h2 id="erase" className="text-xl font-bold">Delete everything</h2>
         <p>Erase every document and fixed copy you have stored, in every region, now. The files and their encryption keys are removed and the results of their checks go with them. This cannot be undone.</p>
         <DialogTrigger>

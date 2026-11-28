@@ -10,7 +10,7 @@ async function audit(page: import("@playwright/test").Page, what: string) {
 async function open(page: import("@playwright/test").Page) {
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Documents" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Documents", exact: true }).click();
 }
 
 for (const scheme of ["light", "dark"] as const) {

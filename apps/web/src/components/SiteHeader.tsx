@@ -4,54 +4,47 @@ import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@a11y/ui";
 import { LegalLinks } from "./LegalLinks";
-import { NotificationsLink } from "./NotificationsLink";
+import { LogoMark } from "./Logo";
 import { useAuth } from "./AuthProvider";
 
+export { LogoMark } from "./Logo";
+
 const navLink =
-  "inline-flex min-h-11 items-center rounded-lg px-3 font-medium underline-offset-4 hover:bg-bg-subtle hover:underline aria-[current=page]:bg-accent-subtle aria-[current=page]:font-bold aria-[current=page]:text-accent aria-[current=page]:underline";
+  "inline-flex min-h-11 items-center px-3 font-semibold underline-offset-[6px] decoration-2 hover:underline aria-[current=page]:underline aria-[current=page]:decoration-accent aria-[current=page]:decoration-4";
 
-/** Decorative mark: the name beside it carries the meaning, so it is hidden from assistive tech. */
-export function LogoMark({ className = "size-8" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className={className}>
-      <rect width="32" height="32" rx="9" className="fill-accent" />
-      <path d="M9 16.5l4.5 4.5L23 11.5" fill="none" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" className="stroke-accent-fg" />
-    </svg>
-  );
-}
-
+/** Header for public pages (home, sign-in, help, legal). Signed-in work happens in the side-navigation shell. */
 export function SiteHeader() {
   const { user, logout } = useAuth();
   const path = usePathname();
   const cur = (href: string) => (path === href || path.startsWith(`${href}/`) ? ("page" as const) : undefined);
 
-  // Header is NOT sticky: nothing may obscure focused content (SC 2.4.11).
+  // Not sticky: nothing may obscure focused content (SC 2.4.11).
   return (
-    <header className="border-b-2 border-border-subtle bg-bg">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2">
-        <NextLink href="/" className="inline-flex min-h-11 items-center gap-2.5 rounded-lg pr-2 text-xl font-extrabold tracking-tight">
+    <header className="border-b-2 border-fg bg-bg">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 sm:px-8">
+        <NextLink href="/" className="inline-flex min-h-11 items-center gap-3 pr-2 font-sans text-2xl font-bold tracking-tight">
           <LogoMark />
           a11y
         </NextLink>
-        <nav aria-label="Main" className="flex flex-wrap items-center gap-1">
-          {user?.role === "SUPER_ADMIN" && <NextLink href="/admin" aria-current={cur("/admin")} className={navLink}>Admin</NextLink>}
-          {(user?.role === "REVIEWER" || user?.role === "SUPER_ADMIN") && <NextLink href="/review" aria-current={cur("/review")} className={navLink}>Review queue</NextLink>}
-          {user && user.role !== "REVIEWER" && <NextLink href="/workspace" aria-current={cur("/workspace")} className={navLink}>Workspace</NextLink>}
-          {user?.role === "COMPANY_ADMIN" && <NextLink href="/org" aria-current={cur("/org")} className={navLink}>Organisation</NextLink>}
-          {user && user.role !== "SUPER_ADMIN" && user.role !== "REVIEWER" && <NotificationsLink />}
+        <nav aria-label="Main" className="flex flex-wrap items-center gap-x-1 gap-y-1">
+          {user && <NextLink href="/workspace" aria-current={cur("/workspace")} className={navLink}>Workspace</NextLink>}
+          <NextLink href="/developers" aria-current={cur("/developers")} className={navLink}>Developers</NextLink>
           {/* Help is always last in the nav on every page (SC 3.2.6 Consistent Help). */}
           <NextLink href="/help" aria-current={cur("/help")} className={navLink}>Help</NextLink>
           {user === null && (
-            <NextLink
-              href="/login"
-              aria-current={cur("/login")}
-              className="ml-1 inline-flex min-h-11 items-center rounded-lg border-2 border-border px-4 font-semibold hover:bg-bg-inset aria-[current=page]:border-accent aria-[current=page]:text-accent"
-            >
-              Log in
-            </NextLink>
+            <>
+              <NextLink href="/login" aria-current={cur("/login")} className={navLink}>Log in</NextLink>
+              <NextLink
+                href="/signup"
+                aria-current={cur("/signup")}
+                className="ml-2 inline-flex min-h-11 items-center border-2 border-fg bg-accent px-4 font-bold text-accent-fg shadow-glow transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:bg-accent-hover hover:shadow-lift"
+              >
+                Start free trial
+              </NextLink>
+            </>
           )}
           {user && (
-            <Button variant="secondary" onPress={() => void logout().then(() => (location.href = "/login"))}>
+            <Button variant="secondary" className="ml-2" onPress={() => void logout().then(() => (location.href = "/login"))}>
               Log out
             </Button>
           )}
@@ -61,37 +54,49 @@ export function SiteHeader() {
   );
 }
 
-const footLink = "inline-flex min-h-11 items-center rounded-lg px-1 underline-offset-4 hover:underline";
+const footLink = "inline-flex min-h-11 items-center text-inverse-muted underline-offset-4 hover:text-inverse-fg hover:underline";
+
+export function FooterLinks({ className = "", linkClassName = footLink }: { className?: string; linkClassName?: string }) {
+  return (
+    <nav aria-label="Footer" className={className}>
+      <NextLink href="/accessibility" className={linkClassName}>Accessibility statement</NextLink>
+      <NextLink href="/developers" className={linkClassName}>Developers</NextLink>
+      <NextLink href="/help" className={linkClassName}>Help and contact</NextLink>
+      <LegalLinks linkClassName={linkClassName} />
+    </nav>
+  );
+}
+
+export function PoweredBy({ className = "", paper = false }: { className?: string; paper?: boolean }) {
+  return (
+    <p className={`flex justify-end text-right text-sm ${paper ? "text-fg-muted" : "text-inverse-muted"} ${className}`}>
+      <span>
+        Powered by{" "}
+        <a href="https://www.9th-direction.com" className={`font-bold underline underline-offset-4 ${paper ? "text-fg hover:text-accent" : "text-inverse-fg hover:text-inverse-accent"}`}>
+          9th Direction Technology Solutions Private Limited
+        </a>
+      </span>
+    </p>
+  );
+}
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t-2 border-border-subtle bg-bg-subtle">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex max-w-sm flex-col gap-2">
-          <p className="inline-flex items-center gap-2.5 text-lg font-extrabold tracking-tight">
-            <LogoMark className="size-7" />
+    <footer className="a11y-ink">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr]">
+        <div className="flex max-w-md flex-col gap-4">
+          <p className="inline-flex items-center gap-3 font-sans text-3xl font-bold tracking-tight">
+            <LogoMark onInk />
             a11y
           </p>
-          <p className="text-sm text-fg-muted">
+          <p className="text-inverse-muted">
             Accessibility audits you can act on. Automated findings are drafts until a person reviews and signs them off.
           </p>
         </div>
-        <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 sm:flex-1 sm:justify-end">
-          <NextLink href="/accessibility" className={footLink}>Accessibility statement</NextLink>
-          <NextLink href="/developers" className={footLink}>Developers</NextLink>
-          <NextLink href="/help" className={footLink}>Help and contact</NextLink>
-          <LegalLinks />
-        </nav>
+        <FooterLinks className="flex flex-col sm:grid sm:grid-cols-2 sm:content-start sm:gap-x-8" />
       </div>
-      <div className="border-t-2 border-border-subtle">
-        <p className="mx-auto flex max-w-6xl justify-end px-4 py-3 text-right text-sm text-fg-muted">
-          <span>
-            Powered by{" "}
-            <a href="https://www.9th-direction.com" className="font-semibold text-accent underline underline-offset-4 hover:text-accent-hover">
-              9th Direction Technology Solutions Private Limited
-            </a>
-          </span>
-        </p>
+      <div className="border-t border-inverse-border/50">
+        <PoweredBy className="mx-auto max-w-7xl px-4 py-4 sm:px-8" />
       </div>
     </footer>
   );

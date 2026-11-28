@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { SkipLink, ToastProvider } from "@a11y/ui";
 import { AuthProvider } from "@/components/AuthProvider";
-import { MainContainer } from "@/components/MainContainer";
+import { Chrome } from "@/components/Chrome";
 import { RouteAnnouncer } from "@/components/RouteAnnouncer";
-import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
+import { TipsProvider } from "@/components/Tip";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,14 +18,14 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen flex-col">
+      <body>
         <SkipLink />
         <AuthProvider>
-          <SiteHeader />
-          <MainContainer>{children}</MainContainer>
-          <SiteFooter />
-          <RouteAnnouncer />
-          <ToastProvider />
+          <TipsProvider>
+            <Chrome>{children}</Chrome>
+            <RouteAnnouncer />
+            <ToastProvider />
+          </TipsProvider>
         </AuthProvider>
       </body>
     </html>

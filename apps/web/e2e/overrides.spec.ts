@@ -13,7 +13,7 @@ for (const scheme of ["light", "dark"] as const) {
     overrideCalls.length = 0;
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "SUPER_ADMIN");
-    await page.goto("/admin");
+    await page.goto("/admin?tab=tenants");
     await page.getByRole("button", { name: /Exceptions for Acme Ltd/ }).click();
     const dialog = page.getByRole("dialog", { name: "Exceptions for Acme Ltd" });
     const table = dialog.getByRole("grid", { name: "Exceptions for this organisation" });
@@ -47,8 +47,8 @@ for (const scheme of ["light", "dark"] as const) {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "SUPER_ADMIN");
-    await page.goto("/admin");
-    await page.getByRole("tab", { name: "Coupons" }).click();
+    await page.goto("/admin?tab=tenants");
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Coupons", exact: true }).click();
     const camps = page.getByRole("grid", { name: "Coupon campaigns" });
     await expect(camps.getByRole("row", { name: /Partner webinar/ })).toContainText("25");
     await expect(camps.getByRole("row", { name: /Old promo/ }).getByRole("button")).toHaveCount(0); // nothing left to switch off
@@ -75,8 +75,8 @@ for (const scheme of ["light", "dark"] as const) {
 
 test("a duplicate campaign name is explained next to the field", async ({ page }) => {
   await mockApi(page, "SUPER_ADMIN");
-  await page.goto("/admin");
-  await page.getByRole("tab", { name: "Coupons" }).click();
+  await page.goto("/admin?tab=tenants");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Coupons", exact: true }).click();
   await page.getByRole("textbox", { name: "Campaign", exact: true }).fill("Duplicate");
   await page.getByRole("textbox", { name: "Prefix", exact: true }).fill("DUP");
   await page.getByRole("button", { name: "Create codes" }).click();

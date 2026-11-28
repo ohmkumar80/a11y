@@ -12,7 +12,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "SUPER_ADMIN");
     await page.goto("/admin");
-    await page.getByRole("tab", { name: "Emails" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Emails", exact: true }).click();
     await expect(page.getByRole("grid", { name: "Emails the platform sends" }).getByRole("row", { name: /Scan finished/ })).toBeVisible();
     await expect(page.getByRole("grid", { name: /Recent emails/ }).getByRole("row", { name: /Monthly scan limit reached/ })).toBeVisible(); // delivery log
     await expect(page.getByText(/Failed: ConnectionError: smtp down/)).toBeVisible();
@@ -36,7 +36,7 @@ for (const scheme of ["light", "dark"] as const) {
 test("a bad placeholder is explained, not saved", async ({ page }) => {
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Emails" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Emails", exact: true }).click();
   await page.getByRole("button", { name: /Edit Scan finished/ }).click();
   await page.getByLabel("Subject").fill("Hi {nope}");
   await page.getByRole("button", { name: "Preview this draft" }).click();
@@ -46,7 +46,7 @@ test("a bad placeholder is explained, not saved", async ({ page }) => {
 test("a required email cannot be switched off, and a test goes to the admin", async ({ page }) => {
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Emails" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Emails", exact: true }).click();
   await page.getByRole("button", { name: /Edit Reset password/ }).click();
   await expect(page.getByRole("checkbox", { name: /Send this email \(always on/ })).toBeDisabled();
   await page.getByRole("button", { name: /Send a test to me.*Scan finished/ }).click();
@@ -61,7 +61,7 @@ test("saving requires a reason and publishes the whole list through the settings
     return r.fulfill({ json: { key: "notify.templates", source: "default", version: null, value: { items: [] } } });
   });
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Emails" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Emails", exact: true }).click();
   await page.getByRole("button", { name: /Edit Scan finished/ }).click();
   await page.getByLabel("Subject").fill("All done: {url}");
   await page.getByLabel("Why are you changing it?").fill("Friendlier wording");

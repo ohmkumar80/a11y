@@ -47,7 +47,7 @@ export function PageShot({ scanId, pageId, pageUrl, shot, rect, whole }: {
   if (src === null) return <p>We could not load the screenshot. The element&apos;s HTML below still shows what is wrong.</p>;
 
   const image = (
-    <div className="relative w-full overflow-hidden rounded-xl border-2 border-border-subtle" style={{ aspectRatio: `${box.cw} / ${box.ch}` }}>
+    <div className="relative w-full overflow-hidden border border-border" style={{ aspectRatio: `${box.cw} / ${box.ch}` }}>
       <img
         src={src}
         alt={`Screenshot of ${pageUrl}${whole || vis !== "ok" ? "" : ", zoomed in on the element with the problem, which is outlined"}.`}

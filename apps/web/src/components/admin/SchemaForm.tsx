@@ -119,7 +119,7 @@ function Field({ schema: raw, root, value, onChange, label, id, nested }: FieldP
     ));
     if (!nested) return <div className="flex flex-col gap-4">{body}</div>;
     return (
-      <fieldset className="flex flex-col gap-4 rounded-md border-2 border-border-subtle p-4">
+      <fieldset className="flex flex-col gap-4 border border-border p-4">
         <legend className="px-1 font-semibold">{label}</legend>
         {body}
       </fieldset>
@@ -162,7 +162,7 @@ function Field({ schema: raw, root, value, onChange, label, id, nested }: FieldP
       const { schema: itemSchema } = resolve(items, root);
       if (itemSchema.properties) {
         return (
-          <fieldset className="flex flex-col gap-4 rounded-md border-2 border-border-subtle p-4">
+          <fieldset className="flex flex-col gap-4 border border-border p-4">
             <legend className="px-1 font-semibold">{label}</legend>
             {description && <p className="text-sm text-fg-muted">{description}</p>}
             {list.length === 0 && <p className="text-fg-muted">None yet.</p>}

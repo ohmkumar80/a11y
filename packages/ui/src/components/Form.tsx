@@ -20,7 +20,7 @@ export function ErrorSummary({ errors, title = "There is a problem" }: { errors:
   }, [errors]);
   if (!errors.length) return null;
   return (
-    <div ref={ref} tabIndex={-1} role="alert" className="rounded-xl border-2 border-danger bg-danger-bg p-4 text-danger-fg">
+    <div ref={ref} tabIndex={-1} role="alert" className="rounded-lg border-2 border-danger bg-danger-bg p-4 text-danger-fg">
       <h2 className="text-lg font-bold">{title}</h2>
       <ul className="mt-2 list-disc pl-5">
         {errors.map((e, i) => (
@@ -53,7 +53,7 @@ export function VisuallyHidden({ children, className }: { children: React.ReactN
 /** Banner for non-field messages (e.g. "check your email"). Polite, not a focus thief. */
 export function StatusMessage({ children, kind = "info" }: { children: React.ReactNode; kind?: "info" | "success" }) {
   return (
-    <div role="status" className={cn("rounded-xl border-2 p-3", kind === "success" ? "border-success bg-success-bg text-success-fg" : "border-border-subtle bg-bg-subtle")}>
+    <div role="status" className={cn("rounded-lg border-2 p-3.5", kind === "success" ? "border-success bg-success-bg text-success-fg" : "border-border-subtle bg-bg-subtle")}>
       {children}
     </div>
   );

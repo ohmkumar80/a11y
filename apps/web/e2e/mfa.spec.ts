@@ -122,7 +122,7 @@ test("admin Security tab: change the policy, with a reason; off shows a warning 
   });
   await page.goto("/admin");
   await expect(page.getByText(/Two-step verification is OFF/)).toHaveCount(0);
-  await page.getByRole("tab", { name: "Security" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Security", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Two-step verification policy" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save policy" })).toBeDisabled(); // nothing changed yet
   await audit(page, "security tab");
@@ -142,7 +142,7 @@ test("the off banner is shown on every admin tab, not just Security", async ({ p
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
   await expect(page.getByText(/Two-step verification is OFF/)).toBeVisible();
-  await page.getByRole("tab", { name: "Plans" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Plans", exact: true }).click();
   await expect(page.getByText(/Two-step verification is OFF/)).toBeVisible();
   await audit(page, "banner on plans tab");
 });

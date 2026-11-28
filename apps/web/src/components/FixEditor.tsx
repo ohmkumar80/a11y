@@ -112,7 +112,7 @@ export function FixEditor({ load: loadState, base, variant, downloadCopy, onStat
       <p className="max-w-3xl text-fg-muted">{reviewer ? "Page previews are not available yet: open the original to find an image by its page number." : "You can describe images and change heading levels because this file has tags. Page previews are not available yet: to find an image, open the original and look at the page shown."}</p>
 
       {(building || done || fix?.status === "FAILED") && (
-        <section aria-labelledby="result" className="flex max-w-3xl flex-col gap-3 rounded-xl border-2 border-border-subtle p-4">
+        <section aria-labelledby="result" className="flex max-w-3xl flex-col gap-3 border border-border p-4">
           <h2 id="result" className="text-xl font-bold">{building ? "Building your fixed copy" : done ? "Your fixed copy is ready" : "The fixed copy could not be made"}</h2>
           {building && <p role="status">Working on it.</p>}
           {fix?.status === "FAILED" && <p>{fix.error_detail}</p>}

@@ -22,7 +22,7 @@ function pagesText(f: DocFinding) {
 
 function Finding({ f }: { f: DocFinding }) {
   return (
-    <article aria-labelledby={`f-${f.id}`} className="flex flex-col gap-2 rounded-xl border-2 border-border-subtle p-4">
+    <article aria-labelledby={`f-${f.id}`} className="flex flex-col gap-2 border border-border p-4">
       <h3 id={`f-${f.id}`} className="text-lg font-bold">
         <span aria-hidden="true">{SEVERITY_ICON[f.severity]} </span>{f.title}
       </h3>
@@ -86,7 +86,7 @@ function Results({ doc, audit }: { doc: string; audit: string }) {
 
       {a.status === "SUCCEEDED" && sm.by_severity && (
         <>
-          <section aria-labelledby="summary" className="flex max-w-3xl flex-col gap-3 rounded-xl border-2 border-border-subtle p-4">
+          <section aria-labelledby="summary" className="flex max-w-3xl flex-col gap-3 border border-border p-4">
             <h2 id="summary" className="text-xl font-bold">
               {sm.verdict === "no_automated_problems" ? "The automated checks found no problems" : `${sm.findings} thing${sm.findings === 1 ? "" : "s"} to fix`}
             </h2>

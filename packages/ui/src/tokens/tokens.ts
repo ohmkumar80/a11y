@@ -8,47 +8,50 @@ export type Theme = "light" | "dark";
 
 export const colors = {
   light: {
-    bg: "#ffffff",
-    "bg-subtle": "#f6f7fb",
-    "bg-inset": "#e9edf5",
-    fg: "#0b1220",
-    "fg-muted": "#475467",
-    border: "#667085", // component boundaries: >= 3:1 on bg (SC 1.4.11)
-    "border-subtle": "#dde3ee", // decorative only
-    accent: "#4338ca",
-    "accent-fg": "#ffffff",
-    "accent-hover": "#3730a3",
-    "accent-subtle": "#eef0fd", // tinted surface for selected / highlighted items
-    focus: "#4338ca",
-    "focus-halo": "#ffffff", // second ring so focus shows on dark AND light surfaces
+    bg: "#fbf9f3", // paper
+    "bg-subtle": "#f3efe4",
+    "bg-inset": "#e8e2d1",
+    fg: "#16130e", // ink
+    "fg-muted": "#58524a",
+    border: "#6c6558", // component boundaries: >= 3:1 on bg (SC 1.4.11)
+    "border-subtle": "#d8d0bd", // decorative rules only
+    accent: "#b93c0c", // signal: actions, current page, marks
+    "accent-fg": "#fffaf2",
+    "accent-hover": "#962f09",
+    "accent-subtle": "#fbe8da", // tinted surface for selected / highlighted items
+    "accent-2": "#0f6a58", // "checked" green: passes, verified, done
+    focus: "#16130e",
+    "focus-halo": "#fbf9f3", // second ring so focus shows on dark AND light surfaces
     danger: "#b3261e",
-    "danger-bg": "#fdecea",
+    "danger-bg": "#fbe7e3",
     "danger-fg": "#8c1d18",
     success: "#1b6e3a",
-    "success-bg": "#e8f5ec",
+    "success-bg": "#e4f2e8",
     "success-fg": "#14532b",
     "warning-fg": "#7a4b00",
-    "warning-bg": "#fff4e0",
-    "inverse-bg": "#14123f", // dark brand band (hero, call to action)
-    "inverse-fg": "#ffffff",
-    "inverse-muted": "#c9cdf0",
-    "inverse-accent": "#b6c0ff",
-    "inverse-border": "#7f86c9",
+    "warning-bg": "#fff1d6",
+    "inverse-bg": "#16130e", // ink surfaces (side navigation, footer, call to action)
+    "inverse-fg": "#fbf9f3",
+    "inverse-muted": "#cdc6b5",
+    "inverse-accent": "#ff9d6b",
+    "inverse-accent-2": "#7fe3c4",
+    "inverse-border": "#8f8776",
   },
   dark: {
-    bg: "#0b0f1a",
-    "bg-subtle": "#121827",
-    "bg-inset": "#1a2133",
-    fg: "#eef1f8",
-    "fg-muted": "#a9b3c7",
-    border: "#8190a8",
-    "border-subtle": "#2a3449",
-    accent: "#a5b4fc",
-    "accent-fg": "#0b0f1a",
-    "accent-hover": "#c7d2fe",
-    "accent-subtle": "#1c2142",
-    focus: "#c7d2fe",
-    "focus-halo": "#0b0f1a",
+    bg: "#13110d",
+    "bg-subtle": "#1c1914",
+    "bg-inset": "#27231c",
+    fg: "#f4efe3",
+    "fg-muted": "#b9b1a0",
+    border: "#948b7a",
+    "border-subtle": "#3a352b",
+    accent: "#ff9d6b",
+    "accent-fg": "#16130e",
+    "accent-hover": "#ffb48c",
+    "accent-subtle": "#3a2418",
+    "accent-2": "#7fe3c4",
+    focus: "#ffb48c",
+    "focus-halo": "#13110d",
     danger: "#ff8a80",
     "danger-bg": "#3a1512",
     "danger-fg": "#ffb4ab",
@@ -57,11 +60,12 @@ export const colors = {
     "success-fg": "#a6e8bb",
     "warning-fg": "#ffcc80",
     "warning-bg": "#3a2800",
-    "inverse-bg": "#1a1850",
-    "inverse-fg": "#ffffff",
-    "inverse-muted": "#c9cdf0",
-    "inverse-accent": "#b6c0ff",
-    "inverse-border": "#8b92d4",
+    "inverse-bg": "#0b0907",
+    "inverse-fg": "#f4efe3",
+    "inverse-muted": "#cdc6b5",
+    "inverse-accent": "#ff9d6b",
+    "inverse-accent-2": "#7fe3c4",
+    "inverse-border": "#948b7a",
   },
 } as const;
 
@@ -98,4 +102,7 @@ export const requiredPairs: ReadonlyArray<[ColorToken, ColorToken, number, strin
   ["inverse-accent", "inverse-bg", 4.5, "eyebrow text and links on the brand band"],
   ["inverse-border", "inverse-bg", 3, "outlines on the brand band (SC 1.4.11)"],
   ["inverse-bg", "inverse-fg", 4.5, "label of a white button on the brand band"],
+  ["accent-2", "bg", 4.5, "secondary brand colour as text or icon on the page"],
+  ["accent-2", "bg-subtle", 4.5, "secondary brand colour on panels"],
+  ["inverse-accent-2", "inverse-bg", 4.5, "secondary brand colour on the brand band"],
 ];
