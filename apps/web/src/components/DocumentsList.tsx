@@ -63,12 +63,12 @@ export function DocumentsList({ refreshKey }: { refreshKey: number }) {
       {quota && <p><NextLink href="/org" className="underline">See your plan</NextLink> to check more pages.</p>}
       {error ? <StatusMessage>{error.detail}</StatusMessage> : !data ? <p role="status">Loading your documents.</p> : data.length === 0 ? <p>No documents yet. Upload one above.</p> : (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be focusable so keyboard users can scroll it (axe: scrollable-region-focusable)
-        <div role="region" aria-label="Your documents (scrollable)" tabIndex={0} className="relative max-w-full overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg">
+        <div role="region" aria-label="Your documents (scrollable)" tabIndex={0} className="relative max-w-full overflow-x-auto border border-border bg-bg">
           <table className="w-full border-collapse text-left" aria-labelledby="your-docs">
             <thead>
               <tr>
                 {["File", "Type and size", "Status", "Added", "Actions"].map((h) => (
-                  <th key={h} scope="col" className="min-h-11 border-b-2 border-border-subtle bg-bg-subtle px-4 py-3 text-sm font-semibold">{h}</th>
+                  <th key={h} scope="col" className="min-h-11 border-b-2 border-fg bg-bg-subtle px-4 py-3 text-sm font-semibold">{h}</th>
                 ))}
               </tr>
             </thead>

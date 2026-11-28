@@ -33,7 +33,7 @@ export function ToastProvider() {
   return (
     <ToastRegion queue={toasts} aria-label="Notifications" className="fixed bottom-4 right-4 z-40 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
       {({ toast }) => (
-        <Toast toast={toast} className={cn("flex items-start gap-3 rounded-xl border-2 p-3 shadow-lg", kindStyles[toast.content.kind ?? "info"])}>
+        <Toast toast={toast} className={cn("flex items-start gap-3 rounded-lg border-2 p-3.5 shadow-lift", kindStyles[toast.content.kind ?? "info"])}>
           <span aria-hidden="true" className="mt-0.5">{icons[toast.content.kind ?? "info"]}</span>
           <ToastContent className="flex flex-1 flex-col">
             <Text slot="title" className="font-semibold">{toast.content.title}</Text>

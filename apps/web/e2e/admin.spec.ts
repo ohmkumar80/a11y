@@ -15,26 +15,26 @@ for (const scheme of ["light", "dark"] as const) {
   test(`axe: every admin tab, including generated settings forms (${scheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "SUPER_ADMIN");
-    await page.goto("/admin");
+    await page.goto("/admin?tab=tenants");
     await expect(page.getByRole("heading", { level: 1, name: "Admin" })).toBeVisible();
     await expect(page.getByRole("row", { name: /Acme Ltd/ })).toBeVisible();
     await audit(page, "organisations tab");
 
-    await page.getByRole("tab", { name: "Plans" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Plans", exact: true }).click();
     await expect(page.getByRole("row", { name: /Growth/ })).toBeVisible();
     await audit(page, "plans tab");
 
-    await page.getByRole("tab", { name: "Coupons" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Coupons", exact: true }).click();
     await expect(page.getByRole("row", { name: /WELCOME20/ })).toBeVisible();
     await audit(page, "coupons tab");
 
-    await page.getByRole("tab", { name: "AI", exact: true }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "AI", exact: true }).click();
     await expect(page.getByRole("row", { name: /DeepSeek/ })).toBeVisible();
     await page.getByRole("button", { name: "Test connection for DeepSeek" }).click();
     await expect(page.getByText(/Connected in 120 ms/)).toBeVisible();
     await audit(page, "ai tab");
 
-    await page.getByRole("tab", { name: "Settings" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Settings", exact: true }).click();
     for (const key of ["billing.trial", "ai.providers"]) {
       await page.getByRole("button", { name: /Setting$/ }).click();
       await page.getByRole("option", { name: new RegExp(key.replace(".", "\\.")) }).click();
@@ -59,14 +59,18 @@ test("org page shows seats, quota meters and the plan; meters are named and valu
   await audit(page, "org plan panel");
 });
 
-test("admin tabs are keyboard operable", async ({ page }) => {
+test("admin areas are reachable from the side navigation by keyboard, and focus moves to the new area", async ({ page }) => {
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Organisations" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Plans" })).toBeFocused();
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(nav.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("link", { name: "Plans", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("tab", { name: "Plans", selected: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("group", { name: "Plans area" })).toBeFocused();
+  // Help stays last in the navigation (SC 3.2.6).
+  const links = await nav.getByRole("link").allInnerTexts();
+  expect(links.at(-1)).toBe("Help");
 });
 
 test("a never-set setting shows its built-in defaults in the form (not empty values)", async ({ page }) => {
@@ -76,7 +80,7 @@ test("a never-set setting shows its built-in defaults in the form (not empty val
     r.fulfill({ json: { key: "billing.trial", source: "default", version: null, value: { length_days: 14, plan_id: "TRIAL", grace_days: 0, after_expiry: "LOCKED_READ_ONLY", reminder_days_before: [3, 1] } } }),
   );
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Settings" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: /Setting$/ }).click();
   await page.getByRole("option", { name: /billing\.trial/ }).click();
   await expect(page.getByText("Current value comes from: default")).toBeVisible();

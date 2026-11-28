@@ -13,12 +13,14 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "COMPANY_ADMIN");
     await page.goto("/workspace");
-    await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Start a scan" })).toBeVisible();
     await expect(page.getByRole("row", { name: /shop\.example\.com/ })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: /WCAG 2\.2 Level AA: Reference standard/ })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: /ADA Title III.*Benchmark \(not a legal requirement\)/ })).not.toBeChecked();
+    // Standards are grouped by what they mean; the reference group is open because it holds the default choice.
+    await expect(page.getByRole("checkbox", { name: /WCAG 2\.2 Level AA/ })).toBeChecked();
+    await page.getByText("Benchmarks", { exact: true }).click();
+    await expect(page.getByRole("checkbox", { name: /ADA Title III/ })).not.toBeChecked();
     await audit(page, "workspace");
-    await page.getByLabel("Scan", { exact: true }).click();
+    await page.getByLabel("How far to scan", { exact: true }).click();
     await page.getByRole("option", { name: /pages it links to/ }).click();
     await expect(page.getByLabel("Most pages to scan")).toBeVisible();
     await audit(page, "workspace crawl mode");
@@ -103,7 +105,7 @@ test("quota and verification errors offer a next step", async ({ page }) => {
 test("standard member can scan but does not see site verification", async ({ page }) => {
   await mockApi(page, "STANDARD_USER");
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start a scan" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Verified sites" })).toHaveCount(0);
 });
 
@@ -170,7 +172,7 @@ test("features an administrator switched off are not offered", async ({ page }) 
   await mockApi(page, "COMPANY_ADMIN");
   await page.route("**/api/org/flags", (r) => r.fulfill({ json: { public_api: true, webhooks: true, vpat: false, crawl_scans: false, notification_center: true } }));
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start a scan" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Scan/ }).filter({ hasText: "This page only" })).toHaveCount(0); // no crawl choice
   await page.goto(`/workspace/scan?id=${SCAN_ID}`);
   await expect(page.getByRole("heading", { level: 2, name: "Summary" })).toBeVisible();

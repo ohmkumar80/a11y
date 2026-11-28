@@ -28,9 +28,9 @@ export function RuleGuidance({ rule }: { rule: string }) {
         <div key={e.stack} className="mt-3">
           <h4 className="font-semibold">Example in {STACK[e.stack]}</h4>
           <p className="text-sm">Before (fails)</p>
-          <pre className="overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg-inset p-3"><code>{e.before}</code></pre>
+          <pre className="overflow-x-auto border border-border bg-bg-inset p-3"><code>{e.before}</code></pre>
           <p className="text-sm">After (fixed)</p>
-          <pre className="overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg-inset p-3"><code>{e.after}</code></pre>
+          <pre className="overflow-x-auto border border-border bg-bg-inset p-3"><code>{e.after}</code></pre>
         </div>
       ))}
       {data.how_to_check && <p className="mt-3"><span className="font-semibold">How to check: </span>{data.how_to_check}</p>}

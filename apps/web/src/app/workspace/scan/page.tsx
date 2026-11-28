@@ -8,6 +8,7 @@ import { FindingDetails } from "@/components/FindingDetails";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { VpatStart } from "@/components/VpatStart";
 import { Page } from "@/components/Page";
+import { SeverityBadge, severityStat } from "@/components/SeverityBadge";
 import { RequireAuth } from "@/components/RequireAuth";
 import { get } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -18,6 +19,16 @@ import {
 
 const PAGE_SIZE = 25;
 const SEVERITIES: Severity[] = ["critical", "serious", "moderate", "minor"];
+
+function Stat({ label, value, note, tone = "border-fg bg-bg text-fg" }: { label: string; value: number; note?: string; tone?: string }) {
+  return (
+    <div className={`flex flex-col gap-1 border-2 p-4 ${tone}`}>
+      <dd className="order-1 font-display text-5xl font-semibold leading-none">{value}</dd>
+      <dt className="order-2 text-sm font-medium">{label}</dt>
+      {note && <dd className="order-3 text-sm [overflow-wrap:anywhere]">{note}</dd>}
+    </div>
+  );
+}
 
 function Results({ id }: { id: string }) {
   const [scan, setScan] = useState<ScanDetail | null>(null);
@@ -68,10 +79,10 @@ function Results({ id }: { id: string }) {
   const total = (k: Kind) => Object.values(counts[k] ?? {}).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <p className="[overflow-wrap:anywhere]"><span className="font-semibold">Address:</span> {scan.url}</p>
-        <p><span className="font-semibold">Status:</span> {STATUS_LABEL[scan.status]}{scan.mode === "crawl" ? `, up to ${scan.max_pages} pages` : ""}</p>
+    <div className="a11y-stack flex flex-col gap-8">
+      <div className="a11y-boxed flex flex-col gap-1.5 p-5 sm:p-6">
+        <p className="[overflow-wrap:anywhere] text-lg"><span className="font-semibold">Address:</span> {scan.url}</p>
+        <p><span className="font-semibold">Status:</span> <span className="ml-1 inline-flex border-[1.5px] border-fg bg-accent-subtle px-2 py-0.5 text-sm font-bold">{STATUS_LABEL[scan.status]}</span>{scan.mode === "crawl" ? `, up to ${scan.max_pages} pages` : ""}</p>
         <p className="text-sm text-fg-muted">Engines: {Object.entries(scan.engine_versions).map(([k, v]) => `${k} ${v}`).join(", ") || "not started"}. Rules {scan.rules_version ?? ""}.</p>
       </div>
 
@@ -95,17 +106,17 @@ function Results({ id }: { id: string }) {
                 options={scan.standards.map((s) => ({ id: s, label: allStandards.data?.standards.find((x) => x.id === s)?.label ?? s.replace(/_/g, " ") }))} />
             </div>
             <p><span className="font-semibold">{sm.label}</span>. {LEGAL_LABEL[sm.legal_status] ?? sm.legal_status}.{sm.review_status === "draft" ? " The mapping of this standard is awaiting expert review." : ""}</p>
-            <dl className="grid max-w-xl grid-cols-[1fr_max-content] gap-x-6 gap-y-1">
-              <dt>Criteria with an automated failure</dt><dd className="font-semibold">{sm.failed.length}{sm.failed.length ? `: ${sm.failed.join(", ")}` : ""}</dd>
-              <dt>Criteria with items to review</dt><dd className="font-semibold">{sm.needs_review.length}</dd>
-              <dt>Automated tests found no issue</dt><dd className="font-semibold">{sm.no_issues_found.length}</dd>
-              <dt>Criteria automation cannot test</dt><dd className="font-semibold">{sm.not_tested.length}</dd>
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat label="Criteria with an automated failure" value={sm.failed.length} note={sm.failed.length ? sm.failed.join(", ") : undefined} />
+              <Stat label="Criteria with items to review" value={sm.needs_review.length} />
+              <Stat label="Automated tests found no issue" value={sm.no_issues_found.length} />
+              <Stat label="Criteria automation cannot test" value={sm.not_tested.length} />
             </dl>
             <p className="max-w-2xl">Automated checks exist for {sm.automated_coverage.tested} of {sm.automated_coverage.total} criteria. {sm.disclaimer} A criterion with no automated issue still needs a person to check it.</p>
-            <dl className="grid max-w-md grid-cols-[1fr_max-content] gap-x-6 gap-y-1">
-              {SEVERITIES.map((s) => <div key={s} className="contents"><dt>{SEVERITY_ICON[s]} {SEVERITY_LABEL[s]} failures</dt><dd className="font-semibold">{counts.violation?.[s] ?? 0}</dd></div>)}
-              <dt>Items to review</dt><dd className="font-semibold">{total("needs_review")}</dd>
-              <dt>Best practices</dt><dd className="font-semibold">{total("best_practice")}</dd>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {SEVERITIES.map((s) => <Stat key={s} tone={severityStat(s)} label={`${SEVERITY_ICON[s]} ${SEVERITY_LABEL[s]} failures`} value={counts.violation?.[s] ?? 0} />)}
+              <Stat label="Items to review" value={total("needs_review")} />
+              <Stat label="Best practices" value={total("best_practice")} />
             </dl>
           </section>
 
@@ -125,7 +136,7 @@ function Results({ id }: { id: string }) {
                 rowKey={(c) => c.cluster_key}
                 emptyText="Nothing to show with these filters."
                 columns={[
-                  { id: "sev", header: "Severity", render: (c) => `${SEVERITY_ICON[c.severity]} ${SEVERITY_LABEL[c.severity]}` },
+                  { id: "sev", header: "Severity", render: (c) => <SeverityBadge severity={c.severity} /> },
                   { id: "title", header: "Problem", isRowHeader: true, render: (c) => c.title },
                   { id: "sc", header: "Criteria", render: (c) => (c.sc.length ? c.sc.join(", ") : "Best practice") },
                   { id: "n", header: "Occurrences", render: (c) => `${c.occurrences} on ${c.pages} ${c.pages === 1 ? "page" : "pages"}` },
@@ -139,7 +150,7 @@ function Results({ id }: { id: string }) {
                 rowKey={(f) => f.id}
                 emptyText="Nothing to show with these filters."
                 columns={[
-                  { id: "sev", header: "Severity", render: (f) => `${SEVERITY_ICON[f.severity]} ${SEVERITY_LABEL[f.severity]}` },
+                  { id: "sev", header: "Severity", render: (f) => <SeverityBadge severity={f.severity} /> },
                   { id: "title", header: "Problem", isRowHeader: true, render: (f) => f.title },
                   { id: "sc", header: "Criteria", render: (f) => (f.criteria.length ? f.criteria.map((c) => c.clause).join(", ") : "Best practice") },
                   { id: "conf", header: "Confidence", render: (f) => `${CONFIDENCE_LABEL[f.confidence].split(":")[0]} (${f.agreement})` },
@@ -160,8 +171,8 @@ function Results({ id }: { id: string }) {
       )}
 
       {done && (
-        <p>
-          <NextLink href={`/workspace/scan/workbench?id=${scan.id}`} className="underline">Open the Fix Workbench</NextLink>
+        <p className="a11y-note text-lg">
+          <NextLink href={`/workspace/scan/workbench?id=${scan.id}`} className="font-bold underline underline-offset-4 hover:text-accent">Open the Fix Workbench</NextLink>
           {" "}to go through the problems one by one, with a screenshot and a checked code fix for each.
         </p>
       )}

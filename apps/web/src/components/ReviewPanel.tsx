@@ -49,7 +49,7 @@ export function ReviewPanel({ docId }: { docId: string }) {
   }
 
   return (
-    <section aria-labelledby="human-review" className="flex max-w-3xl flex-col gap-3 rounded-xl border-2 border-border-subtle p-4">
+    <section aria-labelledby="human-review" className="flex max-w-3xl flex-col gap-3 border border-border p-4">
       <h2 id="human-review" className="text-xl font-bold">Ask a person to check this</h2>
       <p>Some problems need a person: describing a chart, or judging the reading order. A reviewer on our team can look at the file, fix what they can in a copy, and tell you what is left. It uses one review from your plan.</p>
       <div role="status" className="min-h-6">{message}</div>

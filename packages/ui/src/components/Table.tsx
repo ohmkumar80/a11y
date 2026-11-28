@@ -41,8 +41,8 @@ export function Table<T extends object>({ label, columns, rows, rowKey, emptyTex
     // positioned) text inside cells; without it that text escapes the scroller and widens the page.
     // The region is focusable so keyboard users can scroll it.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable regions MUST be focusable so keyboard users can scroll (axe: scrollable-region-focusable)
-    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="relative max-w-full overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg">
-    <AriaTable aria-label={label} sortDescriptor={sort.sortDescriptor} onSortChange={sort.onSortChange} className="w-full border-collapse text-left">
+    <div role="region" aria-label={`${label} (scrollable)`} tabIndex={0} className="relative max-w-full overflow-x-auto border-y-2 border-fg bg-bg">
+    <AriaTable aria-label={label} sortDescriptor={sort.sortDescriptor} onSortChange={sort.onSortChange} className="w-full min-w-[34rem] border-collapse text-left">
       <TableHeader>
         {columns.map((c) => (
           <Column
@@ -50,7 +50,7 @@ export function Table<T extends object>({ label, columns, rows, rowKey, emptyTex
             id={c.id}
             isRowHeader={c.isRowHeader}
             allowsSorting={c.allowsSorting}
-            className="min-h-11 border-b-2 border-border-subtle bg-bg-subtle px-4 py-3 text-sm font-semibold"
+            className="min-h-11 border-b-2 border-fg bg-bg-subtle px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-fg-muted"
           >
             {({ sortDirection }) => (
               <span className="inline-flex items-center gap-1">

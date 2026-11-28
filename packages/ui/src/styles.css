@@ -2,28 +2,51 @@
 @import "./tokens.css";
 @source "./components";
 
+/* Typefaces are self-hosted by the app (see apps/web globals.css); the stacks below fall back to system fonts.
+   Body text is Atkinson Hyperlegible, drawn by the Braille Institute so that look-alike letters are easy to tell apart. */
+@theme {
+  --font-sans: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: "Atkinson Hyperlegible Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Sharp, printed-page corners. Pills (rounded-full) are kept only for small counters. */
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
+  --radius-4xl: 10px;
+  /* Flat surfaces. Depth comes from a hard offset, like a printed card, never from a blur. */
+  --shadow-soft: 0 1px 0 var(--a11y-border-subtle);
+  --shadow-lift: 4px 4px 0 var(--a11y-fg);
+  --shadow-glow: 2px 2px 0 var(--a11y-fg);
+}
+
 @layer base {
   html {
-    /* SC 2.4.11 Focus Not Obscured: keep focused elements clear of the sticky header. */
-    scroll-padding-top: var(--a11y-sticky-header-height, 5rem);
+    /* SC 2.4.11 Focus Not Obscured: nothing on the page is sticky over content. */
+    scroll-padding-top: 1rem;
     -webkit-text-size-adjust: 100%;
   }
   body {
     background: var(--a11y-bg);
     color: var(--a11y-fg);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 1rem;
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   h1, h2, h3 {
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
     text-wrap: balance;
   }
   p { text-wrap: pretty; }
-  ::selection { background: var(--a11y-accent); color: var(--a11y-accent-fg); }
+  code, pre, kbd, samp { font-family: var(--font-mono); font-size: 0.92em; }
+  ::selection { background: var(--a11y-fg); color: var(--a11y-bg); }
   /* One focus indicator for everything: 3px ring (>= 3:1, SC 2.4.13) + halo that keeps it
      visible on both light and dark surfaces. */
   :focus-visible {
@@ -31,14 +54,9 @@
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--a11y-focus-halo);
   }
-  :focus:not(:focus-visible) {
-    outline: none;
-  }
+  :focus:not(:focus-visible) { outline: none; }
   /* Programmatic focus targets (headings, main) should not show a ring on mouse use. */
-  [tabindex="-1"]:focus:not(:focus-visible) {
-    outline: none;
-    box-shadow: none;
-  }
+  [tabindex="-1"]:focus:not(:focus-visible) { outline: none; box-shadow: none; }
   /* SC 1.4.12 text spacing: never clip text or fix heights on text containers. */
   p, li, dd, label { overflow-wrap: anywhere; }
 }
@@ -54,50 +72,102 @@
 
 /* Windows High Contrast / forced colours: let the OS palette win, keep every boundary. */
 @media (forced-colors: active) {
-  :focus-visible {
-    outline: 3px solid Highlight;
-    box-shadow: none;
-  }
-  .a11y-meter-fill, .a11y-progress-fill {
-    background: Highlight !important;
-    forced-color-adjust: none;
-  }
-  .a11y-meter-track, .a11y-progress-track {
-    border: 1px solid CanvasText;
-  }
+  :focus-visible { outline: 3px solid Highlight; box-shadow: none; }
+  .a11y-meter-fill, .a11y-progress-fill { background: Highlight !important; forced-color-adjust: none; }
+  .a11y-meter-track, .a11y-progress-track { border: 1px solid CanvasText; }
 }
 
-/* Decorative brand band. Text on it uses only the inverse-* tokens (contrast-gated). The gradient
-   stays within the band's darkest/lightest stops so the worst-case pairing is still checked. */
-.a11y-hero {
-  /* The focus ring must contrast with the band it sits on, so re-point it at the band's own tokens. */
+/* ---------- Ink surfaces ---------- */
+
+/* Ink (near-black) surfaces: side navigation, footer, closing statement. Text on them uses only inverse-*
+   tokens, which are contrast-gated. Flat colour, no effects. */
+.a11y-ink {
+  /* The focus ring must contrast with the surface it sits on, so re-point it at the ink tokens. */
   --a11y-focus: var(--a11y-inverse-accent);
   --a11y-focus-halo: var(--a11y-inverse-bg);
   background-color: var(--a11y-inverse-bg);
-  background-image:
-    radial-gradient(60rem 30rem at 85% -10%, color-mix(in srgb, var(--a11y-inverse-accent) 22%, transparent), transparent 60%),
-    radial-gradient(40rem 24rem at -5% 110%, color-mix(in srgb, var(--a11y-inverse-accent) 14%, transparent), transparent 60%);
+  color: var(--a11y-inverse-fg);
 }
 @media (forced-colors: active) {
-  .a11y-hero { background-image: none; border: 2px solid CanvasText; }
+  .a11y-ink { border: 2px solid CanvasText; }
+  /* The ink surface relies on authored light-on-dark colours, which the OS palette replaces. Hand every
+     colour on it to the system palette so text can never end up light on light. */
+  .a11y-ink, .a11y-ink * { color: CanvasText !important; background-color: Canvas !important; }
+  .a11y-ink a { color: LinkText !important; }
+}
+@media (forced-colors: active) {
+  /* Filled and tinted surfaces use the system button and canvas colours, never authored light-on-dark pairs. */
+  .bg-accent, .bg-danger, .bg-inverse-fg { color: ButtonText !important; background-color: ButtonFace !important; }
+  .a11y-kicker, .a11y-note, .a11y-note * { color: CanvasText !important; }
 }
 
-/* Page sections become cards. Unlayered on purpose: it must win over a section's own max-w / padding
-   utilities, so every card lines up. Colours are tokens already gated for contrast. */
-.a11y-page-body > section {
+/* ---------- Signature details ---------- */
+
+/* The focus ring is this product's mark: a word or a block can be drawn "in focus". Decorative. */
+.a11y-infocus {
+  outline: 3px solid var(--a11y-accent);
+  outline-offset: 5px;
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.a11y-ink .a11y-infocus { outline-color: var(--a11y-inverse-accent); }
+@media (forced-colors: active) { .a11y-infocus { outline-color: Highlight; } }
+
+/* Mono label in the style of a spec section number: "§ 1.1.1". */
+.a11y-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--a11y-fg-muted);
+}
+.a11y-ink .a11y-kicker { color: var(--a11y-inverse-muted); }
+
+/* Marginal note: guidance that sits beside the work, like an annotation on a printed report. */
+.a11y-note {
+  border-left: 4px solid var(--a11y-accent);
+  background: var(--a11y-accent-subtle);
+  padding: 0.75rem 1rem;
+  font-size: 0.975rem;
+}
+@media (forced-colors: active) { .a11y-note { border-left-color: Highlight; border: 1px solid CanvasText; border-left-width: 4px; } }
+
+/* Ruled panel: a thick ink rule on top and open space below, the way a report sets off a section. */
+.a11y-panel {
+  border-top: 3px solid var(--a11y-fg);
+  padding-top: 1.1rem;
+}
+.a11y-boxed {
+  border: 1.5px solid var(--a11y-fg);
+  background: var(--a11y-bg);
+}
+
+/* Page sections become ruled panels. Unlayered on purpose: it must win over a section's own max-w / padding
+   utilities, so every panel lines up. */
+.a11y-page-body > section:not(.a11y-ink),
+.a11y-stack > section:not(.a11y-ink) {
   max-width: none;
-  padding: 1.25rem;
-  border: 2px solid var(--a11y-border-subtle);
-  border-radius: 1rem;
-  background: var(--a11y-bg-subtle);
+  border-top: 3px solid var(--a11y-fg);
+  padding-top: 1.1rem;
 }
-@media (min-width: 40rem) {
-  .a11y-page-body > section { padding: 1.5rem; }
+.a11y-page-body > section > h2,
+.a11y-stack > section > h2 { font-size: 1.65rem; }
+/* Keep running text at a readable line length. */
+.a11y-page-body > section > p,
+.a11y-stack > section > p { max-width: 68ch; }
+/* A form's submit button is as wide as its label, not the whole panel. */
+.a11y-page-body form > button, .a11y-stack form > button { align-self: flex-start; }
+
+/* Calm entrance: a short fade. Off entirely under prefers-reduced-motion (rule above). */
+@keyframes a11y-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
-/* Keep running text at a readable line length inside wide cards. */
-.a11y-page-body > section > p { max-width: 72ch; }
-/* A form's submit button is as wide as its label, not the whole card. */
-.a11y-page-body form > button { align-self: flex-start; }
+.a11y-rise { animation: a11y-fade 0.5s ease-out both; }
+.a11y-rise-2 { animation-delay: 0.08s; }
+.a11y-rise-3 { animation-delay: 0.16s; }
 
 .a11y-sr-only {
   position: absolute;

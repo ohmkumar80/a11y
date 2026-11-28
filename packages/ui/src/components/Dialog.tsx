@@ -26,7 +26,7 @@ export interface DialogProps {
 export function Dialog({ title, children, ...props }: DialogProps) {
   return (
     <ModalOverlay {...props} isDismissable className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-      <Modal className="max-h-full w-full max-w-lg overflow-auto rounded-2xl border-2 border-border-subtle bg-bg p-6 shadow-2xl">
+      <Modal className="max-h-full w-full max-w-lg overflow-auto rounded-lg border-2 border-fg bg-bg p-7 shadow-lift">
         <AriaDialog className="flex flex-col gap-4 outline-none">
           {({ close }) => (
             <>

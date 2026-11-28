@@ -11,7 +11,7 @@ async function open(page: import("@playwright/test").Page) {
   reviewAdmin.calls.length = 0;
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Reviews" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Reviews", exact: true }).click();
 }
 
 for (const scheme of ["light", "dark"] as const) {

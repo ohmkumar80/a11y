@@ -11,12 +11,12 @@ export interface CardProps {
 }
 
 const tones = {
-  default: "border-border-subtle bg-bg",
+  default: "border-fg bg-bg",
   subtle: "border-border-subtle bg-bg-subtle",
   accent: "border-accent bg-accent-subtle",
 } as const;
 
 /** Presentational surface only: no role, no tabindex. Put headings and landmarks inside it. */
 export function Card({ as: Tag = "div", tone = "default", className, children }: CardProps) {
-  return <Tag className={cn("rounded-2xl border-2 p-5 shadow-sm", tones[tone], className)}>{children}</Tag>;
+  return <Tag className={cn("rounded-lg border-[1.5px] p-5", tones[tone], className)}>{children}</Tag>;
 }

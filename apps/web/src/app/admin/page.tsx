@@ -1,7 +1,10 @@
 "use client";
 
-import { Tabs, StatusMessage } from "@a11y/ui";
-import { useCallback, useEffect, useState } from "react";
+import { StatusMessage } from "@a11y/ui";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ADMIN_TABS } from "@/lib/adminTabs";
+import { OverviewTab } from "@/components/admin/OverviewTab";
 import { get } from "@/lib/api";
 import { SecurityTab } from "@/components/admin/SecurityTab";
 import { AiTab } from "@/components/admin/AiTab";
@@ -28,29 +31,49 @@ function MfaOffBanner({ refresh }: { refresh: number }) {
   );
 }
 
-export default function AdminPage() {
+function Panels() {
   const [refresh, setRefresh] = useState(0);
   const bump = useCallback(() => setRefresh((n) => n + 1), []);
+  const requested = useSearchParams().get("tab");
+  const tab = ADMIN_TABS.find((t) => t.id === requested) ?? ADMIN_TABS[0];
+  const panel = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  // Choosing another area in the side navigation moves focus to the new content, so keyboard and screen-reader users land on it.
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    panel.current?.focus();
+  }, [tab.id]);
+
+  const content: Record<string, ReactNode> = {
+    overview: <OverviewTab />,
+    tenants: <TenantsTab />,
+    plans: <PlansTab />,
+    coupons: <CouponsTab />,
+    ai: <AiTab />,
+    documents: <DocumentsTab />,
+    reviews: <ReviewsTab />,
+    emails: <EmailsTab />,
+    ops: <OpsTab />,
+    security: <SecurityTab onChanged={bump} />,
+    settings: <SettingsTab />,
+  };
+  return (
+    <>
+      <MfaOffBanner refresh={refresh} />
+      <div ref={panel} tabIndex={-1} role="group" aria-label={`${tab.label} area`} className="flex flex-col gap-6 outline-none">
+        <p className="a11y-kicker">Admin · {tab.label}</p>
+        {content[tab.id]}
+      </div>
+    </>
+  );
+}
+
+export default function AdminPage() {
   return (
     <RequireAuth requiredRole="SUPER_ADMIN">
       {() => (
         <Page title="Admin" intro="Manage organisations, plans, coupons and platform settings. Every change is audit-logged.">
-          <MfaOffBanner refresh={refresh} />
-          <Tabs
-            label="Admin sections"
-            items={[
-              { id: "tenants", label: "Organisations", content: <TenantsTab /> },
-              { id: "plans", label: "Plans", content: <PlansTab /> },
-              { id: "coupons", label: "Coupons", content: <CouponsTab /> },
-              { id: "ai", label: "AI", content: <AiTab /> },
-              { id: "documents", label: "Documents", content: <DocumentsTab /> },
-              { id: "reviews", label: "Reviews", content: <ReviewsTab /> },
-              { id: "emails", label: "Emails", content: <EmailsTab /> },
-              { id: "ops", label: "Operations", content: <OpsTab /> },
-              { id: "security", label: "Security", content: <SecurityTab onChanged={bump} /> },
-              { id: "settings", label: "Settings", content: <SettingsTab /> },
-            ]}
-          />
+          <Suspense><Panels /></Suspense>
         </Page>
       )}
     </RequireAuth>

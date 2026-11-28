@@ -68,7 +68,7 @@ export function ReviewsTab() {
         {d.in_progress.length === 0 ? <p>No file is being worked on.</p> : (
           <ul className="flex max-w-3xl flex-col gap-3">
             {d.in_progress.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border-subtle p-3">
+              <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 border border-border p-3">
                 <span>{i.reviewer} has had it since {formatDateTime(i.claimed_at)} (due {formatDateTime(i.due_at)})</span>
                 <Button variant="secondary" onPress={() => void takeBack(i.id)}>Take back<span className="a11y-sr-only"> the file held by {i.reviewer}</span></Button>
               </li>
@@ -83,7 +83,7 @@ export function ReviewsTab() {
         {d.reviewers.length === 0 ? <p>There are no reviewers yet. Create one below.</p> : (
           <ul className="flex max-w-3xl flex-col gap-3">
             {d.reviewers.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border-subtle p-3">
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 border border-border p-3">
                 <span>
                   <strong>{p.email}</strong>: {p.active ? "Active" : "Switched off"}
                   <span className="block text-sm text-fg-muted">{p.open} in progress, {p.done_30d} finished in 30 days, two-step verification {p.mfa ? "on" : "not set up yet"}</span>

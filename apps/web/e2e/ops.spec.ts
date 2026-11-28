@@ -14,7 +14,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await mockApi(page, "SUPER_ADMIN");
     await page.goto("/admin");
-    await page.getByRole("tab", { name: "Operations" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Operations", exact: true }).click();
     await expect(page.getByRole("heading", { level: 2, name: /There are problems that need attention/ })).toBeVisible();
     const inc = page.getByRole("grid", { name: "Incidents" });
     await expect(inc.getByRole("row", { name: /Scans are stuck/ })).toContainText("Critical"); // severity is a word, not a colour
@@ -42,7 +42,7 @@ test("a healthy platform says so plainly", async ({ page }) => {
   opsState.healthy = true;
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Operations" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Operations", exact: true }).click();
   await expect(page.getByRole("heading", { level: 2, name: /All systems are working/ })).toBeVisible();
   await expect(page.getByText(/No incidents/)).toBeVisible();
   opsState.healthy = false;
@@ -52,7 +52,7 @@ test("refreshing reloads the numbers", async ({ page }) => {
   opsState.healthy = false;
   await mockApi(page, "SUPER_ADMIN");
   await page.goto("/admin");
-  await page.getByRole("tab", { name: "Operations" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Operations", exact: true }).click();
   await expect(page.getByRole("heading", { level: 2, name: /problems that need attention/ })).toBeVisible();
   opsState.healthy = true;
   await page.getByRole("button", { name: "Refresh" }).click();

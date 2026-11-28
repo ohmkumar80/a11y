@@ -58,7 +58,7 @@ function Queue() {
         {mine.length === 0 ? <p>You have no files. Take one from the list below.</p> : (
           <ul className="flex max-w-3xl flex-col gap-3">
             {mine.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border-subtle p-3">
+              <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 border border-border p-3">
                 <span>Due by <Due i={i} />, {i.pages} page{i.pages === 1 ? "" : "s"}<span className="block text-sm text-fg-muted">{know(i)}</span></span>
                 <NextLink href={`/review/item?id=${i.id}`} className="inline-flex min-h-11 items-center rounded-lg border-2 border-border px-4 font-semibold underline">
                   Open<span className="a11y-sr-only"> the file due {formatDateTime(i.due_at)}</span>
@@ -75,10 +75,10 @@ function Queue() {
         {waiting.length === 0 ? <p>Nothing is waiting.</p> : (
           // A native table, so the buttons in it can be reached with the Tab key.
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be focusable so keyboard users can scroll it (axe: scrollable-region-focusable)
-          <div role="region" aria-label="Waiting for a reviewer (scrollable)" tabIndex={0} className="relative max-w-full overflow-x-auto rounded-xl border-2 border-border-subtle bg-bg">
+          <div role="region" aria-label="Waiting for a reviewer (scrollable)" tabIndex={0} className="relative max-w-full overflow-x-auto border border-border bg-bg">
             <table className="w-full border-collapse text-left" aria-labelledby="waiting">
               <thead>
-                <tr>{["Due by", "Pages", "What we know", "Action"].map((h) => <th key={h} scope="col" className="border-b-2 border-border-subtle bg-bg-subtle px-4 py-3 text-sm font-semibold">{h}</th>)}</tr>
+                <tr>{["Due by", "Pages", "What we know", "Action"].map((h) => <th key={h} scope="col" className="border-b-2 border-fg bg-bg-subtle px-4 py-3 text-sm font-semibold">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {waiting.map((i) => (

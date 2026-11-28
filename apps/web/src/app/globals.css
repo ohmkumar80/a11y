@@ -1,2 +1,5 @@
+@import "@fontsource-variable/atkinson-hyperlegible-next";
+@import "@fontsource-variable/atkinson-hyperlegible-mono";
+@import "@fontsource-variable/fraunces/opsz.css";
 @import "@a11y/ui/styles.css";
 @source "../../../../packages/ui/src";

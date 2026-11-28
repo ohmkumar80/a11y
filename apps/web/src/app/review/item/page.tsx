@@ -52,7 +52,7 @@ function Work({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="file" className="flex max-w-3xl flex-col gap-2 rounded-xl border-2 border-border-subtle p-4">
+      <section aria-labelledby="file" className="flex max-w-3xl flex-col gap-2 border border-border p-4">
         <h2 id="file" className="text-xl font-bold">The file</h2>
         <p className="[overflow-wrap:anywhere]"><span className="font-semibold">Name:</span> {doc.filename} · {doc.page_count ?? "?"} page{doc.page_count === 1 ? "" : "s"}</p>
         <p><span className="font-semibold">Due by:</span> {formatDateTime(review.due_at)} · you took it {formatDateTime(review.claimed_at)}</p>
@@ -85,7 +85,7 @@ function Work({ id }: { id: string }) {
         />
       </section>
 
-      <section aria-labelledby="finish" className="flex max-w-3xl flex-col gap-4 rounded-xl border-2 border-border-subtle p-4">
+      <section aria-labelledby="finish" className="flex max-w-3xl flex-col gap-4 border border-border p-4">
         <h2 id="finish" className="text-xl font-bold">Finish the review</h2>
         <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
           <fieldset className="flex flex-col gap-2">
