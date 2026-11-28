@@ -19,6 +19,8 @@ SCOPES: dict[str, str] = {
     "scans:write": "Start scans (uses scan credits)",
     "reports:read": "List and download reports",
     "reports:write": "Create reports",
+    "documents:read": "List documents and read their accessibility check results",
+    "documents:write": "Upload and delete documents, and start accessibility checks (uses document pages)",
     "audit:read": "Read your organisation's audit log",
 }
 ENTITLEMENT = "api_access"

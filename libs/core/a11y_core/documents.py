@@ -213,6 +213,8 @@ async def erase(db: AsyncSession, doc: Document, reason: str) -> None:
     """Delete the bytes, then blank the row to a tombstone. Idempotent. `reason`: retention | customer | rejected."""
     if doc.storage_key:
         await get_store().delete(doc.storage_key)
+    # What was found in the file is derived from it, so it goes with it (findings are deleted by cascade).
+    await db.execute(text("DELETE FROM document_audits WHERE document_id = :d"), {"d": doc.id})
     doc.storage_key = None
     doc.wrapped_key = None
     doc.filename = "deleted"

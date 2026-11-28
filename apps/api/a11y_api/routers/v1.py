@@ -28,6 +28,7 @@ from sqlalchemy import select, text
 
 from ..api_auth import ApiCaller, any_valid_key, require_scope
 from ..security import Principal
+from . import documents as documents_router
 from . import reports as reports_router
 from . import scans as scans_router
 
@@ -198,6 +199,65 @@ class AuditList(BaseModel):
     next_before: datetime | None = Field(
         description="Pass as `before` to get the next page; null at the end"
     )
+
+
+class AuditOut(BaseModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    standard: str = Field(description="`PDF_UA_1`")
+    status: str = Field(description="`QUEUED`, `RUNNING`, `SUCCEEDED` or `FAILED`")
+    pages: int = Field(
+        description="Document pages this check uses from the plan's monthly allowance"
+    )
+    summary: dict[str, Any] = Field(
+        description="Counts by severity, whether anything was found, facts about the file and a `caveat`; empty until the check has finished"
+    )
+    error_code: str | None = None
+    error_detail: str | None = Field(
+        None, description="Why a failed check failed, in words you can show to a person"
+    )
+    created_at: datetime
+    finished_at: datetime | None = None
+
+
+class DocumentOut(BaseModel):
+    id: uuid.UUID
+    filename: str
+    kind: str = Field(description="`pdf`, `docx`, `pptx` or `epub`")
+    size_bytes: int
+    status: str = Field(
+        description="`UPLOADED` and `SCANNING` (being virus-scanned and inspected), `CLEAN` (ready), `REJECTED` (the file failed a check, see `reject_detail`) or `FAILED` (a problem on our side)"
+    )
+    reject_code: str | None = None
+    reject_detail: str | None = None
+    page_count: int | None = None
+    created_at: datetime
+    scanned_at: datetime | None = None
+    expires_at: datetime = Field(description="When the file will be deleted (retention)")
+    ready: bool = Field(description="True once the file has passed every safety check")
+    latest_audit: AuditOut | None = None
+
+
+class DocFindingOut(BaseModel):
+    id: uuid.UUID
+    rule_id: str
+    source: str = Field(description="`verapdf` (the PDF/UA-1 checker) or `direct` (our own check)")
+    severity: str = Field(description="`critical`, `serious`, `moderate` or `minor`")
+    title: str
+    explanation: str
+    how_to_fix: str
+    wcag: list[str] = Field(description="WCAG success criteria this relates to")
+    needs_human: bool = Field(description="True when a person has to judge or write the fix")
+    count: int = Field(description="How many places in the file")
+    pages: list[int] = Field(description="The first pages affected, when the checker knows them")
+    pages_total: int
+    examples: list[dict[str, Any]]
+    explained: bool = Field(description="False for a check we do not yet explain in plain language")
+
+
+class DocumentAuditDetail(AuditOut):
+    document: dict[str, Any]
+    findings: list[DocFindingOut]
 
 
 def op(scope: str | None, summary: str, description: str = "") -> dict[str, Any]:
@@ -527,6 +587,187 @@ async def download_report(
     report_id: uuid.UUID, p: Principal = Depends(require_scope("reports:read"))
 ):
     return await reports_router.download(report_id, p)
+
+
+# -- documents -------------------------------------------------------------------------------------
+@router.post(
+    "/documents",
+    status_code=202,
+    response_model=DocumentOut,
+    tags=["Documents"],
+    responses=ERRORS
+    | {
+        413: {"model": Problem, "description": "The file is larger than your limit (`too_large`)."},
+        415: {
+            "model": Problem,
+            "description": "A file type that is not accepted (`unsupported_type`).",
+        },
+        422: {
+            "model": Problem,
+            "description": "The file was refused: not what its name says, empty, or unsafe (`type_mismatch`, `empty`, `zip_bomb`...).",
+        },
+    },
+    summary="Upload a document",
+    description="Send the file itself as the request body (`Content-Type: application/octet-stream`) and its name in `filename`. "
+    "The file is encrypted at rest and held until it has been virus-scanned and inspected: poll `GET /v1/documents/{id}` until `status` is `CLEAN` "
+    "(or `REJECTED`, with the reason in `reject_detail`). Nothing can read it before then.\n\n**Required scope:** `documents:write`.",
+    openapi_extra={
+        "x-required-scope": "documents:write",
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+            },
+        },
+    },
+)
+async def upload_document(
+    request: Request,
+    response: Response,
+    filename: str = Query(
+        ..., min_length=1, max_length=255, description="The file's name, with its extension"
+    ),
+    p: Principal = Depends(require_scope("documents:write")),
+    idempotency_key: str | None = IDEM_HEADER,
+):
+    idem = Idem(p.org_id, "documents:upload", idem_key(idempotency_key))
+    await idem.start()
+    if idem.replay is not None:
+        response.headers["Idempotent-Replay"] = "true"
+        return idem.replay
+    try:
+        out = await documents_router.upload(request, filename, p)
+    except BaseException:
+        await idem.finish(None, ok=False)
+        raise
+    await idem.finish(out, ok=True)
+    return out
+
+
+@router.get(
+    "/documents",
+    response_model=list[DocumentOut],
+    tags=["Documents"],
+    **op("documents:read", "List documents", "Newest first, without erased files."),
+)
+async def list_documents(
+    limit: int = Query(50, ge=1, le=200), p: Principal = Depends(require_scope("documents:read"))
+):
+    return await documents_router.list_documents(limit, p)
+
+
+@router.get(
+    "/documents/{document_id}",
+    response_model=DocumentOut,
+    tags=["Documents"],
+    **op(
+        "documents:read",
+        "Get a document",
+        "Includes the latest accessibility check, if there is one.",
+    ),
+)
+async def get_document(
+    document_id: uuid.UUID, p: Principal = Depends(require_scope("documents:read"))
+):
+    return await documents_router.get_one(document_id, p)
+
+
+@router.get(
+    "/documents/{document_id}/download",
+    tags=["Documents"],
+    response_class=Response,
+    responses={
+        200: {"description": "The original file", "content": {"application/octet-stream": {}}},
+        **ERRORS,
+    },
+    summary="Download the original file",
+    description="Only a document that has passed its safety checks (`status` `CLEAN`) can be downloaded.\n\n**Required scope:** `documents:read`.",
+    openapi_extra={"x-required-scope": "documents:read"},
+)
+async def download_document(
+    document_id: uuid.UUID, p: Principal = Depends(require_scope("documents:read"))
+):
+    return await documents_router.download(document_id, p)
+
+
+@router.delete(
+    "/documents/{document_id}",
+    status_code=204,
+    tags=["Documents"],
+    response_class=Response,
+    **op(
+        "documents:write",
+        "Delete a document",
+        "Erases the file and its encryption key at once, together with the results of its checks. This cannot be undone.",
+    ),
+)
+async def delete_document(
+    document_id: uuid.UUID, p: Principal = Depends(require_scope("documents:write"))
+):
+    return await documents_router.delete(document_id, p)
+
+
+@router.post(
+    "/documents/{document_id}/audits",
+    status_code=202,
+    response_model=AuditOut,
+    tags=["Documents"],
+    **op(
+        "documents:write",
+        "Check a PDF for accessibility",
+        "Checks a `CLEAN` PDF against PDF/UA-1. The document's pages are reserved from the plan's monthly allowance when you ask (a plan limit is reported as `quota_exceeded`), "
+        "and given back if the check fails because of a problem on our side. Poll the audit until `SUCCEEDED`, then read its findings. "
+        "A clean result means the automated checks found nothing; it is never a statement of conformance.",
+    ),
+)
+async def start_document_audit(
+    document_id: uuid.UUID,
+    response: Response,
+    p: Principal = Depends(require_scope("documents:write")),
+    idempotency_key: str | None = IDEM_HEADER,
+):
+    idem = Idem(p.org_id, f"documents:audit:{document_id}", idem_key(idempotency_key))
+    await idem.start()
+    if idem.replay is not None:
+        response.headers["Idempotent-Replay"] = "true"
+        return idem.replay
+    try:
+        out = await documents_router.start_audit(document_id, p)
+    except BaseException:
+        await idem.finish(None, ok=False)
+        raise
+    await idem.finish(out, ok=True)
+    return out
+
+
+@router.get(
+    "/documents/{document_id}/audits",
+    response_model=list[AuditOut],
+    tags=["Documents"],
+    **op("documents:read", "List a document's accessibility checks", "Newest first."),
+)
+async def list_document_audits(
+    document_id: uuid.UUID, p: Principal = Depends(require_scope("documents:read"))
+):
+    return await documents_router.list_audits(document_id, p)
+
+
+@router.get(
+    "/documents/{document_id}/audits/{audit_id}",
+    response_model=DocumentAuditDetail,
+    tags=["Documents"],
+    **op(
+        "documents:read",
+        "Get an accessibility check with its findings",
+        "Findings are worst first, each with a plain-language explanation and how to fix it. `summary.caveat` says what automated checks cannot judge.",
+    ),
+)
+async def get_document_audit(
+    document_id: uuid.UUID,
+    audit_id: uuid.UUID,
+    p: Principal = Depends(require_scope("documents:read")),
+):
+    return await documents_router.get_audit(document_id, audit_id, p)
 
 
 @router.get(

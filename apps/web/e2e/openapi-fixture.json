@@ -1053,6 +1053,719 @@
     ]
    }
   },
+  "/v1/documents": {
+   "post": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Upload a document",
+    "description": "Send the file itself as the request body (`Content-Type: application/octet-stream`) and its name in `filename`. The file is encrypted at rest and held until it has been virus-scanned and inspected: poll `GET /v1/documents/{id}` until `status` is `CLEAN` (or `REJECTED`, with the reason in `reject_detail`). Nothing can read it before then.\n\n**Required scope:** `documents:write`.",
+    "operationId": "upload_document_v1_documents_post",
+    "parameters": [
+     {
+      "name": "filename",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 255,
+       "description": "The file's name, with its extension",
+       "title": "Filename"
+      },
+      "description": "The file's name, with its extension"
+     },
+     {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry.",
+       "title": "Idempotency-Key"
+      },
+      "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry."
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DocumentOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "The file is larger than your limit (`too_large`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "415": {
+      "description": "A file type that is not accepted (`unsupported_type`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "The file was refused: not what its name says, empty, or unsafe (`type_mismatch`, `empty`, `zip_bomb`...).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:write",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/octet-stream": {
+       "schema": {
+        "type": "string",
+        "format": "binary"
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   },
+   "get": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "List documents",
+    "description": "Newest first, without erased files.\n\n**Required scope:** `documents:read`.",
+    "operationId": "list_documents_v1_documents_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DocumentOut"
+         },
+         "title": "Response List Documents V1 Documents Get"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/documents/{document_id}": {
+   "get": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Get a document",
+    "description": "Includes the latest accessibility check, if there is one.\n\n**Required scope:** `documents:read`.",
+    "operationId": "get_document_v1_documents__document_id__get",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DocumentOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   },
+   "delete": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Delete a document",
+    "description": "Erases the file and its encryption key at once, together with the results of its checks. This cannot be undone.\n\n**Required scope:** `documents:write`.",
+    "operationId": "delete_document_v1_documents__document_id__delete",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:write",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/documents/{document_id}/download": {
+   "get": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Download the original file",
+    "description": "Only a document that has passed its safety checks (`status` `CLEAN`) can be downloaded.\n\n**Required scope:** `documents:read`.",
+    "operationId": "download_document_v1_documents__document_id__download_get",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The original file",
+      "content": {
+       "application/octet-stream": {}
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/documents/{document_id}/audits": {
+   "post": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Check a PDF for accessibility",
+    "description": "Checks a `CLEAN` PDF against PDF/UA-1. The document's pages are reserved from the plan's monthly allowance when you ask (a plan limit is reported as `quota_exceeded`), and given back if the check fails because of a problem on our side. Poll the audit until `SUCCEEDED`, then read its findings. A clean result means the automated checks found nothing; it is never a statement of conformance.\n\n**Required scope:** `documents:write`.",
+    "operationId": "start_document_audit_v1_documents__document_id__audits_post",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     },
+     {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry.",
+       "title": "Idempotency-Key"
+      },
+      "description": "Any unique string (for example a UUID), up to 80 characters. Repeat it when you retry."
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AuditOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:write",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   },
+   "get": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "List a document's accessibility checks",
+    "description": "Newest first.\n\n**Required scope:** `documents:read`.",
+    "operationId": "list_document_audits_v1_documents__document_id__audits_get",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AuditOut"
+         },
+         "title": "Response List Document Audits V1 Documents  Document Id  Audits Get"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
+  "/v1/documents/{document_id}/audits/{audit_id}": {
+   "get": {
+    "tags": [
+     "Documents"
+    ],
+    "summary": "Get an accessibility check with its findings",
+    "description": "Findings are worst first, each with a plain-language explanation and how to fix it. `summary.caveat` says what automated checks cannot judge.\n\n**Required scope:** `documents:read`.",
+    "operationId": "get_document_audit_v1_documents__document_id__audits__audit_id__get",
+    "parameters": [
+     {
+      "name": "document_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Document Id"
+      }
+     },
+     {
+      "name": "audit_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Audit Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DocumentAuditDetail"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "The API key is missing, wrong, revoked or expired (`invalid_api_key`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The key lacks the required scope (`scope_missing`), or the plan has no API access (`api_not_in_plan`).",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many requests (`rate_limited`). Wait for `Retry-After` seconds.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "x-required-scope": "documents:read",
+    "security": [
+     {
+      "apiKey": []
+     }
+    ]
+   }
+  },
   "/v1/audit-log": {
    "get": {
     "tags": [
@@ -1249,6 +1962,398 @@
      "next_before"
     ],
     "title": "AuditList"
+   },
+   "AuditOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "document_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Document Id"
+     },
+     "standard": {
+      "type": "string",
+      "title": "Standard",
+      "description": "`PDF_UA_1`"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`QUEUED`, `RUNNING`, `SUCCEEDED` or `FAILED`"
+     },
+     "pages": {
+      "type": "integer",
+      "title": "Pages",
+      "description": "Document pages this check uses from the plan's monthly allowance"
+     },
+     "summary": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Summary",
+      "description": "Counts by severity, whether anything was found, facts about the file and a `caveat`; empty until the check has finished"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Detail",
+      "description": "Why a failed check failed, in words you can show to a person"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "document_id",
+     "standard",
+     "status",
+     "pages",
+     "summary",
+     "created_at"
+    ],
+    "title": "AuditOut"
+   },
+   "DocFindingOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "rule_id": {
+      "type": "string",
+      "title": "Rule Id"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "description": "`verapdf` (the PDF/UA-1 checker) or `direct` (our own check)"
+     },
+     "severity": {
+      "type": "string",
+      "title": "Severity",
+      "description": "`critical`, `serious`, `moderate` or `minor`"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "explanation": {
+      "type": "string",
+      "title": "Explanation"
+     },
+     "how_to_fix": {
+      "type": "string",
+      "title": "How To Fix"
+     },
+     "wcag": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Wcag",
+      "description": "WCAG success criteria this relates to"
+     },
+     "needs_human": {
+      "type": "boolean",
+      "title": "Needs Human",
+      "description": "True when a person has to judge or write the fix"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count",
+      "description": "How many places in the file"
+     },
+     "pages": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Pages",
+      "description": "The first pages affected, when the checker knows them"
+     },
+     "pages_total": {
+      "type": "integer",
+      "title": "Pages Total"
+     },
+     "examples": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Examples"
+     },
+     "explained": {
+      "type": "boolean",
+      "title": "Explained",
+      "description": "False for a check we do not yet explain in plain language"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "rule_id",
+     "source",
+     "severity",
+     "title",
+     "explanation",
+     "how_to_fix",
+     "wcag",
+     "needs_human",
+     "count",
+     "pages",
+     "pages_total",
+     "examples",
+     "explained"
+    ],
+    "title": "DocFindingOut"
+   },
+   "DocumentAuditDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "document_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Document Id"
+     },
+     "standard": {
+      "type": "string",
+      "title": "Standard",
+      "description": "`PDF_UA_1`"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`QUEUED`, `RUNNING`, `SUCCEEDED` or `FAILED`"
+     },
+     "pages": {
+      "type": "integer",
+      "title": "Pages",
+      "description": "Document pages this check uses from the plan's monthly allowance"
+     },
+     "summary": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Summary",
+      "description": "Counts by severity, whether anything was found, facts about the file and a `caveat`; empty until the check has finished"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Detail",
+      "description": "Why a failed check failed, in words you can show to a person"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "document": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Document"
+     },
+     "findings": {
+      "items": {
+       "$ref": "#/components/schemas/DocFindingOut"
+      },
+      "type": "array",
+      "title": "Findings"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "document_id",
+     "standard",
+     "status",
+     "pages",
+     "summary",
+     "created_at",
+     "document",
+     "findings"
+    ],
+    "title": "DocumentAuditDetail"
+   },
+   "DocumentOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "description": "`pdf`, `docx`, `pptx` or `epub`"
+     },
+     "size_bytes": {
+      "type": "integer",
+      "title": "Size Bytes"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "`UPLOADED` and `SCANNING` (being virus-scanned and inspected), `CLEAN` (ready), `REJECTED` (the file failed a check, see `reject_detail`) or `FAILED` (a problem on our side)"
+     },
+     "reject_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reject Code"
+     },
+     "reject_detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reject Detail"
+     },
+     "page_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page Count"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "scanned_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scanned At"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At",
+      "description": "When the file will be deleted (retention)"
+     },
+     "ready": {
+      "type": "boolean",
+      "title": "Ready",
+      "description": "True once the file has passed every safety check"
+     },
+     "latest_audit": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AuditOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "filename",
+     "kind",
+     "size_bytes",
+     "status",
+     "created_at",
+     "expires_at",
+     "ready"
+    ],
+    "title": "DocumentOut"
    },
    "Finding": {
     "properties": {

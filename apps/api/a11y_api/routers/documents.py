@@ -7,9 +7,9 @@ downloaded or used for anything."""
 
 import uuid
 
-from a11y_core import documents
+from a11y_core import document_audits, documents
 from a11y_core.db import tenant_session
-from a11y_core.models import AuditLog, Document, DocumentStatus
+from a11y_core.models import AuditLog, Document, DocumentAudit, DocumentFinding, DocumentStatus
 from a11y_core.storage import StorageError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -31,8 +31,59 @@ def _problem(http_status: int, detail: str, field: str | None = None, **extra) -
     return HTTPException(http_status, detail={"detail": detail, "field": field, **extra})
 
 
-def _json(d: Document) -> dict:
+def _audit_json(a: DocumentAudit) -> dict:
     return {
+        "id": str(a.id),
+        "document_id": str(a.document_id),
+        "standard": a.standard,
+        "status": a.status,
+        "pages": a.pages,
+        "summary": a.summary,
+        "error_code": a.error_code,
+        "error_detail": a.error_detail,
+        "created_at": a.created_at,
+        "finished_at": a.finished_at,
+    }
+
+
+def _finding_json(f: DocumentFinding) -> dict:
+    return {
+        "id": str(f.id),
+        "rule_id": f.rule_id,
+        "source": f.source,
+        "severity": f.severity,
+        "title": f.title,
+        "explanation": f.explanation,
+        "how_to_fix": f.how_to_fix,
+        "wcag": f.wcag,
+        "needs_human": f.needs_human,
+        "count": f.count,
+        "pages": f.pages,
+        "pages_total": f.pages_total,
+        "examples": f.examples,
+        "explained": f.explained,
+    }
+
+
+async def _latest_audits(db, doc_ids: list[uuid.UUID]) -> dict[uuid.UUID, DocumentAudit]:
+    if not doc_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(DocumentAudit)
+            .where(DocumentAudit.document_id.in_(doc_ids))
+            .order_by(DocumentAudit.created_at.desc())
+        )
+    ).scalars()
+    latest: dict[uuid.UUID, DocumentAudit] = {}
+    for a in rows:  # newest first: the first one seen for a document is its latest
+        latest.setdefault(a.document_id, a)
+    return latest
+
+
+def _json(d: Document, audit: DocumentAudit | None = None) -> dict:
+    return {
+        "latest_audit": _audit_json(audit) if audit else None,
         "id": str(d.id),
         "filename": d.filename,
         "kind": d.kind,
@@ -108,7 +159,9 @@ async def list_documents(limit: int = 50, p: Principal = Depends(current_princip
                 .limit(max(1, min(limit, 200)))
             )
         ).scalars()
-        return [_json(d) for d in rows]
+        docs = list(rows)
+        latest = await _latest_audits(db, [d.id for d in docs])
+        return [_json(d, latest.get(d.id)) for d in docs]
 
 
 async def _get(db, doc_id: uuid.UUID) -> Document:
@@ -122,7 +175,8 @@ async def _get(db, doc_id: uuid.UUID) -> Document:
 async def get_one(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
     await ensure_flag("documents", p)
     async with tenant_session(p.org_id) as db:
-        return _json(await _get(db, doc_id))
+        d = await _get(db, doc_id)
+        return _json(d, (await _latest_audits(db, [d.id])).get(d.id))
 
 
 @router.get("/{doc_id}/download")
@@ -176,3 +230,69 @@ async def delete(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
             )
         )
     return Response(status_code=204)
+
+
+# --- accessibility audits ----------------------------------------------------------------------------
+
+
+@router.post("/{doc_id}/audits", status_code=status.HTTP_202_ACCEPTED)
+async def start_audit(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
+    """Check a PDF against PDF/UA. Reserves the document's pages from the plan quota (a quota or locked-plan problem
+    is reported with an upgrade link); the pages are given back if the failure was ours."""
+    await ensure_flag("documents", p)
+    try:
+        a = await document_audits.start_audit(p.org_id, p.user_id, doc_id)
+    except document_audits.AuditRefused as r:
+        raise HTTPException(r.http_status, detail={"detail": r.message, "code": r.code}) from None
+    return _audit_json(a)
+
+
+@router.get("/{doc_id}/audits")
+async def list_audits(doc_id: uuid.UUID, p: Principal = Depends(current_principal)):
+    await ensure_flag("documents", p)
+    async with tenant_session(p.org_id) as db:
+        await _get(db, doc_id)
+        rows = (
+            await db.execute(
+                select(DocumentAudit)
+                .where(DocumentAudit.document_id == doc_id)
+                .order_by(DocumentAudit.created_at.desc())
+                .limit(50)
+            )
+        ).scalars()
+        return [_audit_json(a) for a in rows]
+
+
+@router.get("/{doc_id}/audits/{audit_id}")
+async def get_audit(
+    doc_id: uuid.UUID, audit_id: uuid.UUID, p: Principal = Depends(current_principal)
+):
+    await ensure_flag("documents", p)
+    async with tenant_session(p.org_id) as db:
+        d = await _get(db, doc_id)
+        a = (
+            await db.execute(
+                select(DocumentAudit).where(
+                    DocumentAudit.id == audit_id, DocumentAudit.document_id == doc_id
+                )
+            )
+        ).scalar_one_or_none()
+        if a is None:
+            raise _problem(404, "We could not find that check.")
+        findings = (
+            await db.execute(
+                select(DocumentFinding)
+                .where(DocumentFinding.audit_id == audit_id)
+                .order_by(DocumentFinding.ordinal)
+            )
+        ).scalars()
+        return {
+            **_audit_json(a),
+            "document": {
+                "id": str(d.id),
+                "filename": d.filename,
+                "kind": d.kind,
+                "page_count": d.page_count,
+            },
+            "findings": [_finding_json(f) for f in findings],
+        }

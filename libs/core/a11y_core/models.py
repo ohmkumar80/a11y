@@ -874,3 +874,63 @@ class Document(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_reason: Mapped[str | None] = mapped_column(String(20))
+
+
+class DocumentAudit(Base):
+    """One run of the PDF accessibility checks on a document (ADR 0021). Charged in document pages."""
+
+    __tablename__ = "document_audits"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED')", name="ck_document_audit_status"
+        ),
+        Index("ix_document_audits_doc", "document_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    standard: Mapped[str] = mapped_column(String(20), server_default="PDF_UA_1")
+    status: Mapped[str] = mapped_column(String(10), server_default="QUEUED")
+    pages: Mapped[int] = mapped_column(Integer)
+    summary: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    tool_version: Mapped[str | None] = mapped_column(String(40))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentFinding(Base):
+    __tablename__ = "document_findings"
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('critical', 'serious', 'moderate', 'minor')",
+            name="ck_document_finding_severity",
+        ),
+        Index("ix_document_findings_audit", "audit_id", "ordinal"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    audit_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_audits.id", ondelete="CASCADE"))
+    ordinal: Mapped[int] = mapped_column(Integer)
+    rule_id: Mapped[str] = mapped_column(String(60))
+    source: Mapped[str] = mapped_column(String(10))
+    severity: Mapped[str] = mapped_column(String(10))
+    title: Mapped[str] = mapped_column(Text)
+    explanation: Mapped[str] = mapped_column(Text)
+    how_to_fix: Mapped[str] = mapped_column(Text)
+    wcag: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    needs_human: Mapped[bool] = mapped_column(server_default=text("false"))
+    count: Mapped[int] = mapped_column(Integer, server_default="1")
+    pages: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    pages_total: Mapped[int] = mapped_column(Integer, server_default="0")
+    examples: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    explained: Mapped[bool] = mapped_column(server_default=text("true"))

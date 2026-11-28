@@ -1018,7 +1018,7 @@ Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harde
 - Upload safety tests pass: a malicious PDF, a zip bomb and an oversized file are all refused, and no customer file leaves the allowed region or is kept past its retention limit.
 - Human review cost per document is measured, and the plan quotas cover it.
 
-**Status (2026-11-28, in progress on branch `phase-3`).** Slice 1 of the build order, upload safety (including the customer upload screen), is built; the PDF audit (slice 2) is next. Everything an administrator might want to tune is a setting (`documents.uploads`, `documents.safety`, `documents.retention`, the `documents` feature flag), editable in `/admin` at global, plan or organisation scope, plus a read-and-act Documents tab.
+**Status (2026-11-28, in progress on branch `phase-3`).** Slice 1 of the build order, upload safety (including the customer upload screen), is built; the PDF audit (slice 2) is built apart from page previews and an audit report file. Everything an administrator might want to tune is a setting (`documents.uploads`, `documents.safety`, `documents.retention`, the `documents` feature flag), editable in `/admin` at global, plan or organisation scope, plus a read-and-act Documents tab.
 
 | Story | Slice | Status |
 |---|---|---|
@@ -1027,7 +1027,7 @@ Sell "audit plus guided fix" first. Automatic remediation of a PDF is much harde
 | Retention, deletion on request, tombstones, hourly sweep, stuck-upload re-queue | 1 | Built |
 | Admin Documents module: scanner and store health, pipeline counts, refusal reasons, retry files that failed on our side, run the sweep | 1 | Built (API + `/admin` tab, axe in both colour schemes) |
 | Customer upload screen and document list (`/workspace/documents`): limits and retention explained up front, plain-word statuses, download, delete with confirmation, refreshes while a file is checked | 1 | Built (axe in both colour schemes; Tab and Enter path tested) |
-| PDF audit: veraPDF check, findings, document workbench, page quota (`document_pages`), `/v1/documents` | 2 | Not started |
+| PDF audit: veraPDF PDF/UA-1 check with plain-language findings, three direct checks (scanned pages, bookmarks, facts), `document_pages_monthly` page quota with reserve and settle, results page, `/v1/documents` ([ADR 0021](adr/0021-pdf-audit.md)) | 2 | Built and tested against real veraPDF. Not yet: page previews with marked problem areas, an audit report file, a webhook event, AI layout analysis |
 | Per-organisation data policy (regions, zero-retention AI use), granular reviewer role, human-review unit cost | 2 to 3 | Not started |
 | PDF remediation with human review, DOCX and PPTX, EPUB3 | 3 to 5 | Not started |
 
