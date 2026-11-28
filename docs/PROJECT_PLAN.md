@@ -1,6 +1,6 @@
 # Project Plan: Omni-Channel AI Accessibility Platform
 
-**Status:** Draft v3 · 2026-11-27. v2 added model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent and Razorpay billing (3.13 to 3.16). v3 adds the Phase 1 staging (1a and 1b) around work already built, the public API and enterprise integrations (3.17), and positioning, unit economics and trust (3.18).
+**Status:** Draft v4 · 2026-11-27. v2 added model tiering and validation, templates-first reporting and notifications, the self-healing Ops Agent and Razorpay billing (3.13 to 3.16). v3 added the Phase 1 staging (1a and 1b) around work already built, the public API and enterprise integrations (3.17), and positioning, unit economics and trust (3.18). v4 adds subscription, discount and coupon management (3.19), the accessibility knowledge base with AI-assisted article authoring (3.20), and refunds and support tickets in the admin area (3.21). All v4 additions are additive and do not change Phase 1 work in progress.
 **Inputs:** [MASTER_BUILD_PROMPT.md](MASTER_BUILD_PROMPT.md) (product spec) · [ARCHITECTURE.md](ARCHITECTURE.md) (blueprint)
 
 This plan sets out the build order and the changes recommended to the spec. It also commits us to making our own product accessible: an accessibility vendor whose app fails WCAG will not win enterprise or government deals.
@@ -25,6 +25,9 @@ This plan sets out the build order and the changes recommended to the spec. It a
 14. **Stage Phase 1 instead of rebuilding it.** What is already built stays as it is. The remaining Phase 1 work is split into 1a (sellable to design partners) and 1b (breadth and hardening), with an item-by-item status table. Admin MFA moves into 1a, because the admin panel already controls keys, prices and billing. See [Phase 1](#phase-1-mvp-sellable-web-accessibility-audits).
 15. **Make the product integrable with a versioned public API and Swagger/OpenAPI docs.** A `/v1` API with API keys, scopes, webhooks, rate limits, generated SDKs and a CLI, added next to the existing internal routes, which are not renamed. See [section 3.17](#317-public-api-and-enterprise-integrations).
 16. **Settle the market wedge and the unit economics before scaling the build.** Web scanning is a commodity. The plan needs a defined wedge, a cost-per-unit model that sets plan quotas, and the legal, security and ownership items that enterprise buyers ask for. See [section 3.18](#318-positioning-unit-economics-and-trust).
+17. **Manage plans, discounts and coupons as versioned data, with one pricing function.** Plan versions with grandfathering, per-customer overrides, add-ons, automatic promotions and coupon campaigns, all feeding a single `price_quote` function that checkout, Payment Links, invoices and the pricing page share. See [section 3.19](#319-subscription-pricing-and-promotions-management).
+18. **Publish accessibility articles, drafted by AI and published by people.** A knowledge base at `/learn`, with a Content Agent that plans, drafts, validates (our own scanner checks every code sample) and refreshes articles, and never publishes without a named human reviewer. See [section 3.20](#320-accessibility-knowledge-base-article-management-and-ai-authoring).
+19. **Keep refunds and support in the admin area, small and auditable.** A policy-driven refund workflow with approvals and credit notes, and a lightweight built-in ticket system with SLA timers, both on the existing template, notification and audit systems. See [section 3.21](#321-refunds-and-support-tickets-admin-area).
 
 ---
 
@@ -227,6 +230,7 @@ Different workers need very different runtimes, so build **separate images and C
 | `billing` | Lightweight Python | Razorpay webhooks, reconciliation, invoice generation (3.16) |
 | `ops` | Lightweight Python | Ops Agent and runbook executor, with its own least-privilege credentials (3.15) |
 | `integrations` | Lightweight Python | Outbound webhooks and Jira, GitHub and Slack sync, aware of each provider's rate limits (3.17) |
+| `content` | Lightweight Python | Content Agent: article planning, drafting, validation, refresh and link checks. Its code-sample check calls the scanner through the `web` queue (3.20) |
 
 Celery on Redis: use `acks_late`, idempotent task IDs, and set `visibility_timeout` above the longest job (video), or move long media jobs to RabbitMQ.
 
@@ -316,6 +320,9 @@ AIUsage         org_id, job_id, task_key, model_id, tokens_in/out, cost, latency
 | **AI tiers and validation** | Tier per model, tier ladder per task, validation mode and sample rate, escalation limits (3.13) | 1 |
 | **Ops Agent** | Autonomy level per action, runbooks, canaries, escalation contacts, token budgets (3.15) | 2 |
 | **Public API and integrations** | API access and rate limits per plan, key lifetime, webhook limits, docs visibility, enabled integrations and their OAuth app credentials (3.17) | 1 |
+| **Plan versions, promotions and coupon rules** | Plan versions and grandfathering, entitlement overrides, add-ons and top-ups, automatic promotions, coupon eligibility, stacking and caps, campaigns, pricing-page content (3.19) | 1a (quote), 1b, 2 |
+| **Knowledge base and Content Agent** | Content types and templates, source pack, style guide and banned phrases, task routes, review periods, weekly cap, autonomy per type (3.20) | 2 |
+| **Refunds and support** | Refund policy and thresholds, ticket categories, priorities, SLA targets, canned replies, retention, AI help on or off (3.21) | 5 (basic refund in 2) |
 
 ### 3.12 Proposed repository layout
 
@@ -783,6 +790,57 @@ Autonomy levels, set per action and per environment: **Observe → Suggest → A
 
 **Stage.** Phase 2. The CMS, public `/learn` and the first articles come before the agent: the agent needs 20 or so human-written, reviewed articles as style examples and as the golden set for evaluation. Two tasks can start earlier, without disturbing Phase 1: the owner writes a handful of launch articles in a Markdown repository folder, and the 1b rule content library already carries the explanation and fix text that the agent will reuse.
 
+### 3.21 Refunds and support tickets (admin area)
+
+Two admin-area functions that every paid product needs. Both are deliberately small. They sit in the existing admin and organisation areas, use the template, notification and audit systems already planned, and do not add a separate helpdesk product.
+
+**Where they sit in the plan.** The basic admin-initiated refund with a credit note stays in Phase 2 with self-serve billing (3.16), because the first live payments need it. The policy-driven refund workflow, customer refund requests, dispute handling and the support ticket system described here are added to **Phase 5, the last phase**, as requested. If design partners need tickets earlier, the section can move up without changes, because it depends only on pieces built in Phases 1 and 2.
+
+**Refund mechanism** (extends the Razorpay design in 3.16)
+
+| Step | Design |
+|---|---|
+| **Policy (settings)** | Refund window in days, eligible reasons, full or partial, pro-rata for the unused part of an annual plan, non-refundable items (consumed AI or human-review credits), trial rules, and approval thresholds. Terms of service carry the matching wording (3.18). |
+| **Request** | From `/org/billing` ("Request a refund" with a reason), from a support ticket, or started by an admin. |
+| **Eligibility** | A pure function, like `price_quote` (3.19): refundable amount = amount paid minus the value of what was used, capped at the captured amount, summing all earlier refunds. It shows its working to the admin. |
+| **Approval** | Two-person approval above the configured amount (3.16). Reason is mandatory on approve and reject. |
+| **Execution** | Razorpay Refund API, idempotent (our refund id is the key). The status changes only on the `refund.processed` or `refund.failed` webhook, never on the API response alone. Refund speed and timing depend on Razorpay and the customer's bank, and we state that to the customer. |
+| **Paper trail** | A GST credit note (accessible PDF/UA) is issued from the template system. Entitlements change according to policy: cancel at period end, or immediately. The coupon redemption is handled per policy. Templates send the notices. Everything is audited. |
+| **Failure path** | A failed refund opens an admin task and an incident. The fallback is a bank transfer recorded with its reference. |
+
+States: `Requested → Under review → Approved | Rejected → Processing → Refunded | Failed`.
+
+Other cases covered: payments made through Payment Links or bank transfer (the transfer is refunded by a manual transfer with TDS considered), partial refunds, a refund larger than what was captured (blocked), and **disputes and chargebacks** (the Razorpay dispute events open a ticket and an incident, evidence can be attached, and the deadline is tracked). The nightly reconciliation (3.16) includes refunds, credit notes and disputes. A report shows refunds by reason and by plan, and a repeated refund-then-new-trial pattern is flagged.
+
+**Admin screens:** `/admin/billing/refunds` (queue, detail with payment, usage and policy calculation, approve or reject, status, export) and the customer's request form and history in `/org/billing`. Needs a Billing admin role (granular roles, 1b).
+
+**Support tickets (small, built in)**
+
+*Customer side* (`/org/support`, with a consistent "Help" link on every screen, SC 3.2.6):
+- Create a ticket with a category (billing and refunds, scan problem, report or file problem, account and access, **accessibility barrier in our product**, other), subject and description. Context is attached only with the customer's consent: organisation, plan, and the chosen scan or report.
+- Attachments with type and size limits, and malware scanning (3.6).
+- A ticket list, a conversation thread, reply, close and reopen, and a one-click satisfaction rating after resolution.
+- The "accessibility barrier" category is a feedback channel that honours the commitment in section 2.8: higher default priority and a published response target.
+
+*Admin side* (`/admin/support`):
+- A queue with filters (status, priority, category, assignee, organisation), assignment, tags, search, merge for duplicates, CSV export.
+- Statuses `New, Open, Waiting on customer, Waiting on us, Resolved, Closed`. Private internal notes that are never visible to the customer.
+- Canned replies, which are templates (3.14), editable in admin and versioned.
+- **SLA timers per plan** (first response and resolution targets are settings), warnings before a breach and an alert on breach through the `notify` queue.
+- Links from a ticket to the organisation, scan, report, payment and refund, so an admin sees context without asking the customer. No "log in as the customer" feature, and no passwords ever.
+
+*Optional AI help* (admin toggle, off by default, tiered under 3.13): a light model suggests category, priority, language and duplicates; a draft reply built from the rule library and the knowledge base (3.20) for the agent to edit. It is **never sent automatically**, and V1 checks block secrets and personal data in drafts.
+
+*Not in scope:* live chat, phone, social channels and inbound email parsing in version 1. If volume grows, tickets sync to an external helpdesk through the integrations in 3.17.
+
+**Data model.** `RefundRequest` (linked to the existing `Refund` and `CreditNote`), `RefundPolicy` (settings), `SupportTicket`, `SupportMessage` (with a `visibility` of public or internal), `SupportAttachment`, `TicketEvent`, `SupportSlaPolicy`. All are tenant-scoped under RLS, so customers see only their own organisation's tickets. The isolation suite covers them, with a test that internal notes never leave the admin API. Retention is a setting.
+
+**Notification events (3.14):** to customers: refund requested, approved, rejected, processed, failed; ticket received, replied, resolved. To admins: new ticket, SLA warning and breach, refund awaiting approval, dispute opened.
+
+**Accessibility.** Both areas meet section 2: the thread is a structured list with headings, a new reply is announced without moving focus, the page does not refresh itself under the user, attachments work by keyboard, and every status is conveyed by text as well as colour.
+
+**Settings (3.11.3):** refund policy and thresholds, ticket categories, priorities and SLA targets, canned replies, satisfaction survey on or off, retention, AI help on or off.
+
 ---
 
 ## 4. Phased build plan
@@ -813,7 +871,7 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 
 ### Phase 1: MVP, sellable web accessibility audits
 
-**Staging (added 2026-11-27).** Phase 1 is already in development, so this staging does not change anything that is built. It only assigns the remaining work to two stages, so design partners can start sooner. The scope and exit criteria below remain the full list; this table says in which stage each item lands. Status comes from the repository on 2026-11-27 and should be updated as work lands.
+**Staging (added 2026-11-27).** Phase 1 is already in development, so this staging does not change anything that is built. It only assigns the remaining work to two stages, so design partners can start sooner. The scope and exit criteria below remain the full list; this table says in which stage each item lands. Status comes from the repository and was last updated on 2026-11-28; the summary under the table says where Phase 1 stands.
 
 - **1a, sellable to design partners:** scan a site, understand the findings, export a report, be billed.
 - **1b, breadth and hardening:** what makes it cheaper to run and easier to operate, but is not needed on day one.
@@ -822,27 +880,44 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 |---|---|---|
 | Settings framework, `/admin/settings`, schema-generated admin forms (3.11.1) | 1a | Built |
 | SaaS core: plans and entitlements, trial, seat guard, quota reservations, coupons; admin screens for organisations, plans and coupons | 1a | Built |
-| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built. Adapters: DeepSeek, Azure OpenAI, OpenAI, OpenAI-compatible (and fake); enterprise own-key (BYOK) built. Anthropic and Bedrock not started |
+| `LLMGateway`: routing, fallback, budgets, metering | 1a | Built. Adapters: DeepSeek, Azure OpenAI, OpenAI, OpenAI-compatible, Anthropic (Claude, Messages API) and fake; enterprise own-key (BYOK) built. Five real providers, so fallback works across vendors. Bedrock not started (needs AWS request signing and an account to test against) |
 | Rule registry and switching standards | 1a | Built (87 criteria, 12 standards, 42 canonical rules; mappings still `draft` until SME review) |
-| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built except screenshots. Benchmark baseline recorded and gated in CI: [docs/benchmark.md](benchmark.md) (own fixtures 60 of 60 planted defects, 0 false failures; independent GOV.UK suite 54 of the 92 failures that at least one of 13 other tools reported, 59%) |
+| Web scanner: Playwright, three engines, normalisation, screenshots | 1a | Built, including page screenshots ([ADR 0012](adr/0012-screenshots-and-fix-workbench.md)). Benchmark baseline recorded and gated in CI: [docs/benchmark.md](benchmark.md) (own fixtures 60 of 60 planted defects, 0 false failures; independent GOV.UK suite 54 of the 92 failures that at least one of 13 other tools reported, 59%) |
 | SSRF protection, domain verification, rate limits | 1a | Built (egress proxy, domain verification, per-org rate and concurrency limits) |
-| Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Not started |
+| Code-fix copilot: library text, recipes, V1 re-scan check (3.13) | 1a | Built ([ADR 0011](adr/0011-code-fix-copilot.md)): cache, 6 deterministic recipes, the light model with one repair, a stronger model tried once (`code_fix_escalate`), and an independent reviewer (`code_fix_validate`, policy off/sample/always, fails closed when required); every fix must pass static checks and the re-scan oracle or it is never shown; admin setting `ai.code_fix`; "Suggest a fix" in the finding dialog and the Workbench. Not yet: human review queue, shadow-mode promotion, content-level fixes (the scanner stores only the element's tag) |
 | Reports: in-app, CSV, accessible PDF, DOCX, VPAT draft with sign-off | 1a | Built: audit PDF (veraPDF-gated), DOCX (structure-checked), CSV, and the VPAT (WCAG tables) with draft defaults, editing, sign-off and export ([ADR 0008](adr/0008-pdf-ua-generation.md), [ADR 0009](adr/0009-reports-and-vpat.md)). Not yet: the 508/EU/INT chapters, per-element screenshots |
-| Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Report templates built (sandboxed, versioned, accessibility-checked, golden-tested); admin template editor and the email events not started |
-| Content library for the 50 or so most common rules; engine help text for the rest | 1a | Not started |
+| Template engine, report layouts and about 10 essential email events (verify, invite, reset, trial ending and expired, scan complete and failed, quota full, payment) | 1a | Built ([ADR 0013](adr/0013-notifications-and-reservation-sweeper.md)): report templates, plus 9 email events (4 account, trial ending and ended, scan finished and failed, scan limit reached) with fixed accessible layout, admin-editable wording (versioned, guarded), logged idempotent delivery with retries, and the `/admin` Emails editor with preview and test send. Payment emails come with Razorpay. Not yet: per-user opt-out, email provider setting, bounce handling |
+| Content library for the 50 or so most common rules; engine help text for the rest | 1a | Built: a guide for every one of the 43 canonical rules in `rules/content/*.yaml`, each example run through the real engines (9 rules no engine can judge by default are marked for human checking); served at `/rules/{id}/guidance` and shown in the finding dialog and the Fix Workbench. Draft until an accessibility SME reviews it. Not yet: code examples beyond HTML and React |
 | Admin MFA for every admin role, and session refresh | 1a | Built: MFA admin-configurable (dev default off, refused in production) and rotating Super Admin sessions ([ADR 0010](adr/0010-admin-two-step-verification.md)) |
-| Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Not started |
-| Workspace screens: new scan, findings list, Fix Workbench | 1a | New scan, scans list, results and findings built; Fix Workbench and screenshots not started |
+| Public API: `/v1` skeleton, API keys and scopes, OpenAPI published (3.17) | 1a | Built ([ADR 0014](adr/0014-public-api.md)): 10 endpoints (scans, findings, summary, reports, audit log), hashed scoped keys with a key-management page at `/org/api`, per-key rate limits, idempotency keys, plan entitlement `api_access`, published OpenAPI at `/v1/openapi.json`. Outbound webhooks arrived with 1b (below). Not yet: SDK |
+| Workspace screens: new scan, findings list, Fix Workbench | 1a | Built: new scan, scans list, results and findings, and the Fix Workbench (problem list, screenshot with the element outlined, guidance, checked code fix; [ADR 0012](adr/0012-screenshots-and-fix-workbench.md)). Not yet: mark as fixed or ignore, single-page re-scan |
 | Razorpay: webhook receiver, Payment Links, GST invoice engine, essential `/admin/billing` | 1a | Not started |
-| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Built for scans (state machine, heartbeat, idempotent redelivery, stuck-scan sweeper, credit rules); orphaned-reservation sweeper not started |
-| Remaining notification events, in-app notification centre | 1b | Not started |
-| Content library for all rules | 1b | Not started |
-| Outbound webhooks and the audit-log endpoint (3.17) | 1b | Not started |
-| Accessible API reference page and the full API quality gates (3.17) | 1b | Not started |
-| Canaries, first runbooks, read-only `/admin/ops` | 1b | Not started |
-| Sampled premium validation (V2) and shadow-mode promotion (3.13) | 1b | Not started |
-| Remaining admin settings (email provider, legal pages, scan engines, feature flags), granular admin roles, two-person approval | 1b | Not started |
+| Reliability layer 0 for the scan pipeline; stuck-job and reservation sweepers (3.15) | 1a | Built: state machine, heartbeat, idempotent redelivery, stuck-scan sweeper, credit rules, and the orphaned-reservation sweeper ([ADR 0013](adr/0013-notifications-and-reservation-sweeper.md)) |
+| Remaining notification events, in-app notification centre | 1b | Built ([ADR 0017](adr/0017-notification-centre.md)): in-app items for every email event (same editable wording), unread count in the header, list with mark read, per-person opt-out of scan emails, feature flag. Not yet: digests, per-event preferences, push |
+| Content library for all rules | 1b | Built (covered by the row above: every canonical rule has a guide and a test enforces it) |
+| Outbound webhooks and the audit-log endpoint (3.17) | 1b | Built ([ADR 0015](adr/0015-outbound-webhooks.md)): signed, retried, SSRF-checked webhooks for scan and report events with `/org/webhooks` and a section in the API reference; audit log readable at `GET /v1/audit-log` |
+| Accessible API reference page and the full API quality gates (3.17) | 1b | Built: `/developers` renders the published OpenAPI with our own accessible components (axe in both themes, keyboard, 320px); contract tests cover every operation (summary, scope, documented errors, unique ids) and fail if the saved copy drifts from the real description. Not yet: runnable examples, changelog |
+| Canaries, first runbooks, read-only `/admin/ops` | 1b | Built ([ADR 0018](adr/0018-operations-canaries-and-runbooks.md)): three scheduled canaries (browser and engines, PDF/UA, mail server), a read-only Operations tab with health, queues and computed incidents, and 12 runbooks. Not yet: paging, status page |
+| Sampled premium validation (V2) and shadow-mode promotion (3.13) | 1b | V2 built (sampled or always, see the code-fix row). Shadow-mode promotion and the cost-versus-quality dashboard not started |
+| Remaining admin settings (email provider, legal pages, scan engines, feature flags), granular admin roles, two-person approval | 1b | Email provider, legal pages (mechanism only: no legal text is shipped) and feature flags built ([ADR 0016](adr/0016-admin-settings-email-provider-and-flags.md)); scan engines built earlier. Not yet: granular admin roles, two-person approval |
+| `price_quote`: one pure pricing function (plan, cycle, coupon, tax) shared by checkout, Payment Links, invoices and previews (3.19) | 1a | Not started. Plans, prices and coupons exist, but there is no single quote function yet. Built together with the Razorpay Payment Link flow |
+| Plan versions with grandfathering, per-organisation entitlement overrides, coupon campaigns (bulk codes) and stacking rules (3.19) | 1b | Overrides and campaigns built ([ADR 0019](adr/0019-entitlement-overrides-campaigns-and-fix-credits.md)): per-organisation exceptions with a reason and end date (honoured by quotas, seats, API and own-AI), batches of unique codes with campaign reporting and a kill switch. Not yet: plan versions with grandfathering and stacking rules (they come with the price-quote work for Razorpay) |
 | Our own ACR from a human audit, Accessibility Statement, manual NVDA and VoiceOver pass | 1b | Not started |
+
+**Completion status (2026-11-28).** Nothing is pushed: all of it sits on the local branch `phase-1`, and CI has never run on GitHub. Verified on a clean scratch database: 674 API tests (1 skipped), 208 browser tests including the axe checks in light and dark, and clean lint and type checks. A live run on the Docker stack covered a real API key, a real scan, a PDF/UA report, the scan email, an in-app notification, and the Fix Workbench.
+
+| Stage | Rows | Built | Partly built | Not started |
+|---|---|---|---|---|
+| 1a | 16 | 14 | 0 | 2: Razorpay, and `price_quote` |
+| 1b | 9 | 5 | 3 | 1: our own ACR, Accessibility Statement and manual screen reader pass |
+
+- **Open in 1a:** Razorpay (webhook receiver, Payment Links, GST invoices, essential `/admin/billing`, read-only `/org/billing`) and `price_quote`. This is the only blocker for onboarding design partners. It is deferred to the end and will be built and tested together with the owner, starting with test mode.
+- **Partly built in 1b:** shadow-mode promotion (the second-model review is done); granular admin roles and two-person approval (which role may do what is an owner decision); plan versions with grandfathering and coupon stacking rules (they come with `price_quote`). Entitlement overrides and bulk coupon campaigns are done.
+- **Built but still draft, waiting for an accessibility specialist:** the standards mappings, all 43 rule guides, and the review of the GOV.UK benchmark, which was AI-assisted.
+- **Deferred to the final phase by the owner (2026-11-28):** Razorpay; granular admin roles and two-person approval; Bedrock; plan versions and stacking rules; the 508, EU and international VPAT chapters; our own ACR, Accessibility Statement and manual NVDA and VoiceOver pass; the specialist sign-off; the legal page text.
+- **Small gaps, no decision needed:** digests and per-event email preferences, paging and a status page, shadow-mode promotion and the cost-versus-quality dashboard, mark-as-fixed and single-page re-scan in the Workbench, runnable API examples and a changelog, a screenshot retention setting, bounce handling.
+- **Before production:** real `A11Y_MASTER_KEYS` and `JWT_SECRET`; run the web worker on a network with no route to internal services; never set `SCAN_DEV_ALLOW_HOSTS`, and never leave MFA on its dev default of off.
+- **Exit criteria still unmet:** our own ACR with zero open Critical or Serious issues on our screens, the Razorpay webhook tests, and 3 to 5 design partners actively scanning. The measured share of fixes made without a model call and the cost per accepted fix are not yet reported.
 
 **Stage gates.** Design partners onboard when **1a** exits: the scanner benchmark is recorded; the quota and coupon concurrency tests pass; exported PDFs pass veraPDF; switching the code-fix provider needs no redeploy and falls back automatically (two real adapters); a worker killed mid-scan resumes or fails with a reason and leaves no credits reserved; a Razorpay Payment Link activates a plan through the webhook, including the duplicate, out-of-order and forged-signature tests; admin MFA is enforced for every admin role; the `/v1` exit criteria in 3.17 pass; and no Critical or Serious accessibility issue is open on any screen shipped so far. **1b** closes when the remaining exit criteria below pass, 3 to 5 design partners are actively scanning, and our own ACR is done before the first paid customer.
 
@@ -887,6 +962,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - **Ops Agent (3.15):** start it once real production incidents exist, because runbooks are written from real failures (layers 0 to 2 ship earlier, in Phase 1). Suggest and Approve-to-run modes, action catalogue with policy engine, approvals in `/admin/ops`, billing-reconciliation incidents, public status page; proven runbooks promoted to Auto.
 - **AI tiering, round 2 (3.13):** sampled premium validation, shadow-mode promotion of cheaper models, cost-versus-quality dashboard.
 - **Notifications, round 2 (3.14):** Slack or Teams alerts, per-user preferences and digests, Indian-language template variants (for example Tamil and Hindi). Outbound webhooks arrive earlier, in 1b (3.17).
+- **Subscription and promotions, round 2 (3.19):** automatic promotions, add-ons and top-ups, eligibility discounts (non-profit, education, government), partner and referral attribution, coupon analytics, and the pricing page generated from published plan versions.
+- **Accessibility knowledge base (3.20):** article data model and workflow, `/admin/content` editor and review queue, public `/learn` with search, RSS and sitemap, "Learn more" links from rule pages, and the accessibility publishing gate. About 20 human-written, reviewed articles first. Then the Content Agent in **draft-only** mode: plan, ground, draft, validate (V1 code-sample check with our scanner, V2 fact check), refresh when a standard or rule changes, and reviewed translations.
 - Super Admin: MRR/ARR, trial conversion, AI FinOps (token cost per tenant), budget caps.
 - Configuration, round 2: payment gateway registry, tax settings, bring-your-own AI key for Enterprise, per-org data policy (regions, zero retention), prompt versioning with evaluation-gated activation, staged rollouts, two-person approval for high-risk changes.
 - White-label: contrast-validated brand colours, custom report branding.
@@ -899,6 +976,8 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - A self-serve payment through Razorpay works end to end in live mode, and the nightly reconciliation shows no unexplained differences over a full billing cycle.
 - In Suggest mode the Ops Agent makes correct proposals for injected faults (provider outage, stuck queue, orphaned reservations), and every action and proposal is in the audit log.
 - A sample customer pipeline fails a build on a new violation through the CLI or GitHub Action, and a finding can be sent to Jira from the UI and through the API.
+- Plan versioning: a price change on a published plan leaves existing subscribers on their version until moved, and `price_quote` property tests pass (never negative, never above list, stacking cap respected).
+- At least 20 reviewed articles are live and every one passes our own scanner at publish. The Content Agent's V1 checks catch planted defects in test drafts (a wrong criterion number, a code sample that does not trigger its rule, an overclaiming phrase, a copied passage). The accepted-draft rate, edit effort and cost per published article are reported. No article is published without a named reviewer.
 
 ### Phase 3: Documents and eBooks
 
@@ -939,9 +1018,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 - iOS (XCUITest + VoiceOver on on-demand macOS hosts) and real NVDA/VoiceOver capture for web: backlog, prioritised by customer demand.
 - Mobile runbooks (emulator recycle, host failover) and the mobile report template (3.15, 3.14).
 - Public API: the `/v1/mobile` endpoints (3.17).
+- **Refunds in the admin area (3.21):** refund policy settings, customer refund requests from `/org/billing`, the eligibility calculation, approval with two-person approval above a threshold, execution through Razorpay confirmed by webhook, GST credit notes, failure path, dispute and chargeback handling, and `/admin/billing/refunds`. (The basic admin-initiated refund from Phase 2 stays and is folded into this workflow.)
+- **Support tickets in the admin area (3.21):** `/org/support` and `/admin/support` with categories, assignment, internal notes, canned replies from templates, SLA timers per plan, notifications, satisfaction rating, and an "accessibility barrier" channel. Optional AI triage and draft replies, off by default and never auto-sent.
 
 **Exit criteria**
 - Benchmark against a known-bad sample APK set; sandbox escape and network-isolation tests pass.
+- A refund goes from request through approval to a confirmed Razorpay refund and a credit note, including the failure, partial, over-refund and dispute cases. Reconciliation includes refunds, and every step is in the audit log.
+- Tickets can be created, answered and resolved end to end by keyboard and screen reader. Tenant-isolation tests prove that customers see only their own tickets and never see internal notes. SLA warnings and breaches notify the assigned admin.
 
 ---
 
@@ -966,7 +1049,13 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | 15 | Public API contract | `/v1` as a sub-application next to the internal routes; API keys first, OAuth client credentials in Phase 2; additive-only changes within a version; 12-month deprecation window (3.17) |
 | 16 | Hosting region and security assurance | India region at launch; penetration test before the first paying customer; SOC 2 or ISO 27001 when the pipeline requires it (3.18) |
 | 17 | Product brand | A distinctive name and domain with a trademark check before public launch; keep `a11y` as the code and repository name |
-| 18 | Named owners | Accessibility lead, rule-mapping SME, security owner, chartered accountant, privacy contact, ops owner (3.18) |
+| 18 | Named owners | Accessibility lead, rule-mapping SME, security owner, chartered accountant, privacy contact, ops owner (3.18), content owner and pricing owner (3.19, 3.20) |
+| 19 | Plan change policy | Published plan versions are immutable; existing subscribers are grandfathered and moved only at renewal with notice (3.19). Confirm with the pricing owner |
+| 20 | Discount stacking | One coupon plus automatic promotions under a total discount cap, `best_of` by default (3.19) |
+| 21 | AI-authored articles | Draft-only at launch; a named human reviewer publishes every article; no auto-publish for law, compliance, pricing or product claims; AI assistance disclosed on the page (3.20) |
+| 22 | Source licences for the article source pack | Confirm the licence terms of each source (W3C documents, legal texts) in an ADR before building the pack; paraphrase and cite (3.20) |
+| 23 | Refund policy | Window, pro-rata rules, non-refundable items and approval thresholds are set by the business and reviewed by the chartered accountant and legal advisor, then stored as settings (3.21) |
+| 24 | Support scope and timing | A small built-in ticket system in Phase 5 as requested; move earlier if design partners need it; sync to an external helpdesk if volume grows (3.21) |
 
 ## 6. Top risks
 
@@ -991,3 +1080,10 @@ Each phase ends with exit criteria, not dates, because timelines depend on team 
 | API key leaks | Hashed storage, recognisable key format for secret scanners, scopes, IP allow-lists, rotation, anomaly alerts |
 | Liability from customers relying on our reports | Terms with liability limits, "not a guarantee" wording, human-signed VPATs, insurance review |
 | Engine and rule drift over time | Pinned engine versions per scan, versioned rule registry, benchmark suite in CI |
+| A price or plan edit changes existing subscribers' bills | Immutable plan versions, grandfathering, impact preview, two-person approval, notice before any move (3.19) |
+| Discounts stack into near-free plans, or codes are guessed | Total discount cap, stacking policy, attempt rate limits with uniform errors, per-coupon kill switch, coupon analytics (3.19) |
+| AI-written articles contain wrong accessibility or legal statements | Source-grounded drafting, V1 checks (our scanner runs every code sample), V2 claim check, mandatory named human reviewer, SME for law, overclaim lint, review dates (3.20) |
+| Search penalties or lost trust from mass-produced AI content | Draft-only, weekly cap, original verified examples, `noindex` until reviewed, AI disclosure (3.20) |
+| Our own articles are inaccessible | The publish gate runs our scanner on the rendered page and blocks on failure (3.20) |
+| Refund errors or fraud (over-refund, refund-then-retrial) | One eligibility function, capped at captured amount, two-person approval, webhook-confirmed status, credit notes, reconciliation, abuse flags (3.21) |
+| Support data leaks between tenants, or internal notes reach customers | RLS on all ticket tables, `visibility` column with tests, isolation suite coverage, attachment scanning, retention limit (3.21) |
