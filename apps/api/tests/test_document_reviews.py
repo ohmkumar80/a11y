@@ -21,6 +21,8 @@ from .test_document_fixes import audited  # noqa: F401
 from .test_documents import _clean_settings, pdf_bytes, put_setting, scan, store, uploaded  # noqa: F401
 
 PW = "a-long-passphrase-123"
+NEW_PW = "a-brand-new-passphrase-9"
+WRONG_PW = "wrong-password-123"
 FEATURE = "document_reviews_monthly"
 PAGES = "document_pages_monthly"
 
@@ -68,7 +70,7 @@ async def ask(client, org, user, did, note="Please check the charts", consent=Tr
 
 async def test_a_reviewer_signs_in_with_no_organisation_and_gets_a_platform_session(client):
     uid, _, email = await make_reviewer()
-    r = await client.post("/auth/login", json={"email": email, "password": "a-long-passphrase-123"})
+    r = await client.post("/auth/login", json={"email": email, "password": PW})
     assert r.status_code == 200, r.text
     u = r.json()["user"]
     assert u["role"] == "REVIEWER" and u["organization_id"] == ""
@@ -78,7 +80,7 @@ async def test_a_reviewer_signs_in_with_no_organisation_and_gets_a_platform_sess
         "/auth/refresh", headers=cookie
     )  # the rotating platform cookie works for reviewers too
     assert refreshed.status_code == 200 and refreshed.json()["user"]["role"] == "REVIEWER"
-    bad = await client.post("/auth/login", json={"email": email, "password": "wrong-password-123"})
+    bad = await client.post("/auth/login", json={"email": email, "password": WRONG_PW})
     assert bad.status_code == 401
 
 
@@ -109,14 +111,14 @@ async def test_switching_a_reviewer_off_takes_effect_immediately_not_at_token_ex
     await sql("UPDATE users SET is_active = false WHERE id = $1", uid)
     assert (await client.get("/review/queue", headers=h)).status_code == 403
     assert (
-        await client.post("/auth/login", json={"email": email, "password": "a-long-passphrase-123"})
+        await client.post("/auth/login", json={"email": email, "password": PW})
     ).status_code == 401
 
 
 async def test_the_platform_two_step_policy_applies_to_reviewers_too(client):
     _, _, email = await make_reviewer()
     await put_setting("auth.mfa", Scope.GLOBAL, "", super_admin="required", org_admin="optional")
-    r = await client.post("/auth/login", json={"email": email, "password": "a-long-passphrase-123"})
+    r = await client.post("/auth/login", json={"email": email, "password": PW})
     assert r.status_code == 200 and r.json().get("mfa") in ("enroll", "verify"), r.text
     assert "access_token" not in r.json()
 
@@ -570,43 +572,37 @@ async def test_the_owner_creates_switches_off_and_resets_reviewers(client):
         "/admin/reviewers", headers=sa, json={"email": email, "password": "short"}
     )
     assert r.status_code == 422 and r.json()["field"] == "password"
-    r = await client.post(
-        "/admin/reviewers", headers=sa, json={"email": email, "password": "a-long-passphrase-123"}
-    )
+    r = await client.post("/admin/reviewers", headers=sa, json={"email": email, "password": PW})
     assert r.status_code == 201, r.text
     rid = r.json()["id"]
     assert (
         await client.post(
             "/admin/reviewers",
             headers=sa,
-            json={"email": email, "password": "a-long-passphrase-123"},
+            json={"email": email, "password": PW},
         )
     ).status_code == 409
     assert (
-        await client.post("/auth/login", json={"email": email, "password": "a-long-passphrase-123"})
+        await client.post("/auth/login", json={"email": email, "password": PW})
     ).status_code == 200
     assert (
         await client.post(
             f"/admin/reviewers/{rid}/password",
             headers=sa,
-            json={"password": "a-brand-new-passphrase-9"},
+            json={"password": NEW_PW},
         )
     ).status_code == 204
     assert (
-        await client.post("/auth/login", json={"email": email, "password": "a-long-passphrase-123"})
+        await client.post("/auth/login", json={"email": email, "password": PW})
     ).status_code == 401
     assert (
-        await client.post(
-            "/auth/login", json={"email": email, "password": "a-brand-new-passphrase-9"}
-        )
+        await client.post("/auth/login", json={"email": email, "password": NEW_PW})
     ).status_code == 200
     assert (
         await client.post(f"/admin/reviewers/{rid}/active", headers=sa, json={"active": False})
     ).status_code == 204
     assert (
-        await client.post(
-            "/auth/login", json={"email": email, "password": "a-brand-new-passphrase-9"}
-        )
+        await client.post("/auth/login", json={"email": email, "password": NEW_PW})
     ).status_code == 401
     ov = (await client.get("/admin/reviews/overview", headers=sa)).json()
     assert any(p["email"] == email and p["active"] is False for p in ov["reviewers"])
