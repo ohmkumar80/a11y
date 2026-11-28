@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
-from functools import lru_cache
 from typing import Protocol
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -129,29 +128,75 @@ class S3Store:
             raise StorageError(f"could not check object: {type(e).__name__}") from e
 
 
-_override: ObjectStore | None = None
+_overrides: dict[str | None, ObjectStore] = {}
+_s3_cache: dict[tuple, S3Store] = {}
 
 
-def set_store(store: ObjectStore | None) -> None:
-    """Tests install a fake here."""
-    global _override
-    _override = store
+def set_store(store: ObjectStore | None, region: str | None = None) -> None:
+    """Tests install a fake here. With no region it serves every region; with one it serves only that region.
+    `set_store(None)` removes every fake."""
+    if store is None:
+        _overrides.clear()
+    else:
+        _overrides[region] = store
 
 
-@lru_cache
-def _s3() -> S3Store:
+async def regions() -> tuple[dict, str]:
+    """(every storage region by id, the default region's id). The region 'default' always exists and uses the platform's
+    own storage settings unless an administrator redefines it."""
+    from .config import get_config  # noqa: PLC0415
+    from .config.definitions import StorageRegion  # noqa: PLC0415
+
+    cfg = (await get_config().effective("data.regions")).value
+    out = {r.id: r for r in cfg.items}
+    out.setdefault("default", StorageRegion(id="default", label="Default region"))
+    return out, cfg.default_id
+
+
+async def store_for(region_id: str) -> ObjectStore:
+    """The store for one region. A file is only ever read from, written to or deleted in ITS region: an unknown region is an
+    error, never a silent fall back to another place."""
+    if region_id in _overrides:
+        return _overrides[region_id]
+    if None in _overrides:
+        return _overrides[None]
+    regs, _ = await regions()
+    r = regs.get(region_id)
+    if r is None:
+        raise StorageError(f"storage region {region_id!r} is not configured")
     s = get_settings()
-    return S3Store(
-        endpoint_url=s.s3_endpoint_url,
-        access_key=s.s3_access_key,
-        secret_key=s.s3_secret_key,
-        bucket=s.s3_bucket,
-        region=s.s3_region,
+    endpoint, bucket, aws = (
+        r.endpoint_url or s.s3_endpoint_url,
+        r.bucket or s.s3_bucket,
+        r.aws_region or s.s3_region,
     )
+    key = (endpoint, bucket, aws)
+    if key not in _s3_cache:
+        _s3_cache[key] = S3Store(
+            endpoint_url=endpoint,
+            access_key=s.s3_access_key,
+            secret_key=s.s3_secret_key,
+            bucket=bucket,
+            region=aws,
+        )
+    return _s3_cache[key]
 
 
 def get_store() -> ObjectStore:
-    return _override if _override is not None else _s3()
+    """The default region's store, for health checks and code that is not about one customer's file."""
+    if None in _overrides:
+        return _overrides[None]
+    s = get_settings()
+    key = (s.s3_endpoint_url, s.s3_bucket, s.s3_region)
+    if key not in _s3_cache:
+        _s3_cache[key] = S3Store(
+            endpoint_url=s.s3_endpoint_url,
+            access_key=s.s3_access_key,
+            secret_key=s.s3_secret_key,
+            bucket=s.s3_bucket,
+            region=s.s3_region,
+        )
+    return _s3_cache[key]
 
 
 # --- envelope encryption ------------------------------------------------------------------------------

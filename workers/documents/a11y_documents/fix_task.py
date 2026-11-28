@@ -20,7 +20,7 @@ from a11y_core.celery_app import celery_app
 from a11y_core.db import dispose_engines, tenant_session
 from a11y_core.doc_fix import FixPlan
 from a11y_core.models import Document, DocumentAudit, DocumentFinding, DocumentFix, DocumentStatus
-from a11y_core.storage import StorageError, get_store, object_key, seal_bytes
+from a11y_core.storage import StorageError, object_key, seal_bytes, store_for
 from a11y_core.upload_checks import sanitize_filename
 from sqlalchemy import select
 
@@ -74,9 +74,9 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
                     )
                 ).scalars()
             ]
-        data, source_name, source_id = None, "", None
+        data, source_name, source_id, source_region = None, "", None, "default"
         if doc is not None and doc.status == DocumentStatus.CLEAN:
-            source_name, source_id = doc.filename, doc.id
+            source_name, source_id, source_region = doc.filename, doc.id, doc.region
             try:
                 data = await documents.load_clean(db, doc)
             except (documents.NotReadable, StorageError, ValueError) as e:
@@ -132,7 +132,7 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
     key = object_key(org_id, new_id)
     blob, wrapped = seal_bytes(out, key)
     retention = await documents.retention_days(org_id)
-    store = get_store()
+    store = await store_for(source_region)  # the copy stays in the region of the file it was made from
     try:
         await store.put(key, blob)
     except StorageError:
@@ -164,6 +164,7 @@ async def run_fix(org_id: uuid.UUID, fix_id: uuid.UUID) -> str:
                     scanned_at=now,
                     expires_at=now + timedelta(days=retention),
                     derived_from=source_id,
+                    region=source_region,
                 )
             )
             await db.flush()

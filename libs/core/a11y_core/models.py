@@ -880,6 +880,7 @@ class Document(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_reason: Mapped[str | None] = mapped_column(String(20))
     derived_from: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    region: Mapped[str] = mapped_column(String(30), server_default="default")
 
 
 class DocumentAudit(Base):

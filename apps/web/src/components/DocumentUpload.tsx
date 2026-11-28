@@ -30,7 +30,8 @@ export function DocumentUpload({ onUploaded }: { onUploaded: () => void }) {
       <ul className="list-disc pl-6 text-fg-muted">
         {p.kinds.map((k) => <li key={k.kind}>{KIND_LABEL[k.kind] ?? k.kind}: up to {k.max_mb} MB</li>)}
         <li>Up to {p.max_pages} pages or slides per file.</li>
-        <li>Files are deleted after {p.retention_days} days. You can delete one sooner at any time.</li>
+        <li>Files are stored in {p.region?.label ?? "our default region"} and deleted after {p.retention_days} days. You can delete one sooner at any time.</li>
+        <li><NextLink href="/org/data-policy" className="underline">Your data policy</NextLink> sets how long files are kept, where, and who may open them.</li>
       </ul>
       <ErrorSummary errors={form.errors} />
       {structured && (structured.code === "quota_exceeded" || structured.code === "subscription_locked") && (

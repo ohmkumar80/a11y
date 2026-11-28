@@ -13,7 +13,7 @@ from a11y_core import clamav, documents
 from a11y_core.db import admin_session, tenant_session
 from a11y_core.models import DocumentStatus
 from a11y_core.settings import get_settings
-from a11y_core.storage import StorageError, get_store
+from a11y_core.storage import StorageError, regions, store_for
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
@@ -29,17 +29,24 @@ async def _health() -> dict[str, str]:
     out["scanner"] = (
         "ok" if await clamav.ping(host=s.clamd_host, port=s.clamd_port, timeout=3) else "down"
     )
-    try:
-        await asyncio.wait_for(get_store().exists("healthcheck/none"), 5)
-        out["storage"] = "ok"
-    except (StorageError, TimeoutError):
-        out["storage"] = "down"
+    regs, _ = await regions()
+    out["regions"] = {}
+    for r in regs.values():
+        if not r.is_active:
+            continue
+        try:
+            await asyncio.wait_for((await store_for(r.id)).exists("healthcheck/none"), 5)
+            out["regions"][r.id] = "ok"
+        except (StorageError, TimeoutError):
+            out["regions"][r.id] = "down"
+    out["storage"] = "ok" if all(v == "ok" for v in out["regions"].values()) else "down"
     return out
 
 
 @router.get("/overview")
 async def overview(p: Principal = Depends(require_super_admin)):
     health = await _health()
+    known = set((await regions())[0])
     async with admin_session(
         actor_user_id=p.user_id, reason="documents overview", action="admin.read"
     ) as db:
@@ -62,6 +69,13 @@ async def overview(p: Principal = Depends(require_super_admin)):
                 )
             ).all()
         ]
+        region_rows = (
+            await db.execute(
+                text(
+                    "SELECT region, count(*) AS n FROM documents WHERE storage_key IS NOT NULL GROUP BY region ORDER BY region"
+                )
+            )
+        ).all()
         stored = (
             await db.execute(
                 text(
@@ -104,7 +118,11 @@ async def overview(p: Principal = Depends(require_super_admin)):
                 )
             ).all()
         ]
+    by_region = [
+        {"region": r.region, "files": r.n, "configured": r.region in known} for r in region_rows
+    ]
     return {
+        "by_region": by_region,
         "health": health,
         "by_status": {s.value: by_status.get(s.value, 0) for s in DocumentStatus},
         "rejections_30d": rejections,

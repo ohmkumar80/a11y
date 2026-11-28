@@ -4,6 +4,7 @@ import openapi from "./openapi-fixture.json" with { type: "json" };
 import { mockApiKeys } from "./apikey-mocks";
 import { mockWebhooks } from "./webhook-mocks";
 import { mockNotifications } from "./notification-mocks";
+import { mockDataPolicy } from "./data-policy-mocks";
 import { mockDocumentApi } from "./document-mocks";
 import { mockReportApi } from "./report-mocks";
 import { mockReviewApi } from "./review-mocks";
@@ -57,6 +58,7 @@ export async function mockApi(page: Page, role: Role) {
   await mockReportApi(page);
   await mockDocumentApi(page);
   await mockReviewApi(page);
+  await mockDataPolicy(page);
   await mockApiKeys(page);
   await mockWebhooks(page);
   await mockNotifications(page);

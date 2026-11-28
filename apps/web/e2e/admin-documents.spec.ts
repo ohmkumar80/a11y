@@ -25,6 +25,10 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(why.getByRole("row", { name: /Virus found/ })).toContainText("1");
     await expect(page.getByRole("list", { name: "Files we could not check" }).getByRole("listitem")).toContainText("virus scanner unavailable");
     await expect(page.getByText(/documents.uploads, documents.safety and documents.retention/)).toBeVisible();
+    const regions = page.getByRole("region", { name: "Where files are stored" });
+    await expect(regions).toContainText("default: 10 files, storage working");
+    await expect(regions).toContainText("eu: 3 files, storage not reachable"); // said in words
+    await expect(regions).toContainText("This region is no longer configured"); // never hidden
     await audit(page, "admin documents");
   });
 }

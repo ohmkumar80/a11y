@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text
 
-from . import billing, document_fixes, documents
+from . import billing, data_policy, document_fixes, documents
 from .celery_app import celery_app
 from .config import get_config
 from .db import admin_session, dispose_engines, reviewer_session, tenant_session
@@ -80,6 +80,12 @@ async def request_review(
     async with tenant_session(org_id) as db:
         plan_id = (await billing.load_subscription(db)).plan_id
     pol = await _policy(org_id, plan_id)
+    if not (await data_policy.effective(org_id, plan_id)).allow_human_review:
+        raise ReviewRefused(
+            403,
+            "review_blocked_by_policy",
+            "Your organisation's data policy does not let people on our team open its files. An administrator can change this on the data policy page.",
+        )
     if not pol.enabled:
         raise ReviewRefused(
             403,

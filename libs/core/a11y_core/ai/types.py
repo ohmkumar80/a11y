@@ -20,6 +20,9 @@ class LLMRequest:
     job_id: str | None = None
     plan_id: str | None = None  # lets plan-scoped routing overrides apply
     json_mode: bool = False
+    # "customer_document" means the request carries the contents of a customer's file. The organisation's data policy then
+    # decides which providers may receive it (ADR 0024). Anything else leaves the policy out of it.
+    data_class: str = "none"
 
 
 @dataclass(frozen=True)

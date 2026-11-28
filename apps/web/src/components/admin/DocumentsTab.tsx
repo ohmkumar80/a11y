@@ -8,7 +8,8 @@ import { useApi } from "@/lib/useApi";
 
 interface Failed { id: string; organization: string; kind: string; size_bytes: number; created_at: string; attempts: number; why: string | null }
 interface Overview {
-  health: { scanner: "ok" | "down"; storage: "ok" | "down" };
+  health: { scanner: "ok" | "down"; storage: "ok" | "down"; regions?: Record<string, "ok" | "down"> };
+  by_region?: { region: string; files: number; configured: boolean }[];
   by_status: Record<string, number>;
   rejections_30d: { code: string; count: number }[];
   stored_bytes: number;
@@ -63,6 +64,22 @@ export function DocumentsTab() {
         </p>
         <p className="max-w-prose text-fg-muted">To change file types, size and page limits, retention or the safety policy, use the Settings tab: documents.uploads, documents.safety and documents.retention. Each can be set for everyone, one plan or one organisation, is versioned and can be rolled back. The feature itself can be switched off with the “documents” flag.</p>
       </section>
+
+      {d.by_region && d.by_region.length > 0 && (
+        <section aria-labelledby="docs-regions" className="flex flex-col gap-3">
+          <h2 id="docs-regions" className="text-xl font-bold">Where files are stored</h2>
+          <ul className="flex max-w-xl flex-col gap-1">
+            {d.by_region.map((r) => (
+              <li key={r.region}>
+                <strong>{r.region}</strong>: {r.files} file{r.files === 1 ? "" : "s"}
+                {d.health.regions?.[r.region] ? `, storage ${d.health.regions[r.region] === "ok" ? "working" : "not reachable"}` : ""}
+                {!r.configured && <strong> · This region is no longer configured. Its files cannot be read until it is added back in Settings, data.regions.</strong>}
+              </li>
+            ))}
+          </ul>
+          <p className="max-w-prose text-fg-muted">Regions are set in the Settings tab under data.regions, and what each plan or organisation may choose under data.controls. A file stays in the region it was written to.</p>
+        </section>
+      )}
 
       <section aria-labelledby="docs-status" className="flex flex-col gap-3">
         <h2 id="docs-status" className="text-xl font-bold">Where files are</h2>

@@ -69,6 +69,8 @@ export interface UploadPolicy {
   kinds: { kind: string; max_mb: number }[];
   max_pages: number;
   retention_days: number;
+  region?: { id: string; label: string };
+  human_review_allowed?: boolean;
 }
 
 /** Plain words, never colour alone (SC 1.4.1). */
@@ -175,4 +177,13 @@ export interface ReviewDetail {
   findings: DocFinding[];
   structure: FixState["structure"];
   fix: FixRow | null;
+}
+
+export interface DataPolicyState {
+  controls: { can_choose_region: boolean; can_enable_ai: boolean; can_set_retention: boolean; can_block_human_review: boolean; min_retention_days: number };
+  chosen: { retention_days: number | null; storage_region: string | null; allow_human_review: boolean; ai_on_documents: boolean; ai_require_zero_retention: boolean; ai_regions: string[] };
+  effective: { retention_days: number; retention_ceiling: number; region: { id: string; label: string }; allow_human_review: boolean; ai_on_documents: boolean; ai_require_zero_retention: boolean; ai_regions: string[] };
+  regions: { id: string; label: string }[];
+  ai_region_options: string[];
+  documents: { stored: number; by_region: Record<string, number> };
 }

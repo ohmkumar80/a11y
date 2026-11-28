@@ -73,7 +73,7 @@ export function ReviewPanel({ docId }: { docId: string }) {
                 <Checkbox label="I agree to a person opening this file" isSelected={consent} onChange={setConsent} />
                 {problem && (
                   <p role="alert" className="font-semibold text-danger">
-                    {problem.detail} {(problem.code === "quota_exceeded" || problem.code === "subscription_locked") && <NextLink href="/org" className="underline">See your plan</NextLink>}
+                    {problem.detail} {(problem.code === "quota_exceeded" || problem.code === "subscription_locked") && <NextLink href="/org" className="underline">See your plan</NextLink>}{problem.code === "review_blocked_by_policy" && <NextLink href="/org/data-policy" className="underline">Open the data policy</NextLink>}
                   </p>
                 )}
                 <div className="flex gap-3"><Button type="submit" isPending={busy} pendingLabel="Sending" isDisabled={!consent}>Send to a reviewer</Button></div>

@@ -31,6 +31,7 @@ from .routers import (
     org,
     org_ai,
     org_api_keys,
+    org_data_policy,
     org_webhooks,
     reports,
     review,
@@ -113,6 +114,7 @@ app.include_router(legal.router)
 app.include_router(fixes.router)
 app.include_router(me_notifications.router)
 app.include_router(org_api_keys.router)
+app.include_router(org_data_policy.router)
 app.include_router(org_webhooks.router)
 app.include_router(v1.router)
 app.include_router(scans.router)

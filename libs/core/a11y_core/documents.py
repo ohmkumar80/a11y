@@ -16,13 +16,13 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import billing
+from . import billing, data_policy
 from .celery_app import celery_app
 from .config import get_config
 from .config.definitions import DocumentUploads
 from .db import admin_session, dispose_engines, tenant_session
 from .models import Document, DocumentStatus
-from .storage import StorageError, get_store, object_key, open_bytes, seal_bytes
+from .storage import StorageError, object_key, open_bytes, seal_bytes, store_for
 from .upload_checks import (
     Refusal,
     ZipLimits,
@@ -68,11 +68,8 @@ async def upload_policy(org_id: uuid.UUID) -> DocumentUploads:
 
 
 async def retention_days(org_id: uuid.UUID) -> int:
-    """How long this organisation's new files are kept, for telling people up front."""
-    async with tenant_session(org_id) as db:
-        plan_id = (await billing.load_subscription(db)).plan_id
-    ret = (await get_config().effective("documents.retention", org_id=org_id, plan_id=plan_id)).value
-    return ret.retention_days
+    """How long this organisation's new files are kept (plan default, or its own shorter choice), for telling people up front."""
+    return (await data_policy.effective(org_id)).retention_days
 
 
 async def accept_upload(
@@ -83,7 +80,8 @@ async def accept_upload(
         sub = await billing.load_subscription(db)
         await billing.require_writable(db)
         plan_id = sub.plan_id
-    up, zl, ret = await _limits(org_id, plan_id)
+    up, zl, _ret = await _limits(org_id, plan_id)
+    eff = await data_policy.effective(org_id, plan_id)
     if not up.enabled:
         raise UploadRefused(
             403, "uploads_disabled", "Document uploads are switched off at the moment."
@@ -108,7 +106,7 @@ async def accept_upload(
     doc_id = uuid.uuid4()
     key = object_key(org_id, doc_id)
     blob, wrapped = seal_bytes(data, key)
-    store = get_store()
+    store = await store_for(eff.region.id)  # the organisation's region: a file never leaves the one it was written to
     stored = False
     try:
         async with tenant_session(org_id) as db:
@@ -148,7 +146,8 @@ async def accept_upload(
                 wrapped_key=wrapped,
                 status=DocumentStatus.UPLOADED,
                 created_by=user_id,
-                expires_at=datetime.now(UTC) + timedelta(days=ret.retention_days),
+                expires_at=datetime.now(UTC) + timedelta(days=eff.retention_days),
+                region=eff.region.id,
             )
             db.add(doc)
             await db.flush()
@@ -180,7 +179,7 @@ def enqueue_scan(org_id: uuid.UUID, doc_id: uuid.UUID) -> bool:
 async def _read(db: AsyncSession, doc: Document) -> bytes:
     if not doc.storage_key or not doc.wrapped_key:
         raise NotReadable("the file's bytes are gone")
-    blob = await get_store().get(doc.storage_key)
+    blob = await (await store_for(doc.region)).get(doc.storage_key)
     data = open_bytes(blob, doc.wrapped_key, doc.storage_key)
     if hashlib.sha256(data).hexdigest() != doc.sha256:
         raise NotReadable("the stored file does not match its checksum")
@@ -204,7 +203,7 @@ async def load_for_scan(db: AsyncSession, doc: Document) -> bytes:
 async def scrub_bytes(doc: Document) -> None:
     """Delete the stored bytes but keep the row's status, so a customer can still see WHY a file was refused."""
     if doc.storage_key:
-        await get_store().delete(doc.storage_key)
+        await (await store_for(doc.region)).delete(doc.storage_key)
     doc.storage_key = None
     doc.wrapped_key = None
 
@@ -212,7 +211,7 @@ async def scrub_bytes(doc: Document) -> None:
 async def erase(db: AsyncSession, doc: Document, reason: str) -> None:
     """Delete the bytes, then blank the row to a tombstone. Idempotent. `reason`: retention | customer | rejected."""
     if doc.storage_key:
-        await get_store().delete(doc.storage_key)
+        await (await store_for(doc.region)).delete(doc.storage_key)
     # What was found in the file is derived from it, so it goes with it (findings are deleted by cascade).
     await db.execute(text("DELETE FROM document_fixes WHERE document_id = :d"), {"d": doc.id})
     await db.execute(text("DELETE FROM document_audits WHERE document_id = :d"), {"d": doc.id})

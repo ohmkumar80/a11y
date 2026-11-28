@@ -7,7 +7,7 @@ downloaded or used for anything."""
 
 import uuid
 
-from a11y_core import document_audits, document_fixes, document_reviews, documents
+from a11y_core import data_policy, document_audits, document_fixes, document_reviews, documents
 from a11y_core.db import tenant_session
 from a11y_core.doc_fix import FixPlan
 from a11y_core.models import (
@@ -134,11 +134,14 @@ async def policy(p: Principal = Depends(current_principal)):
     """What this organisation may upload: used by the upload form to explain the limits before anything is sent."""
     await ensure_flag("documents", p)
     up = await documents.upload_policy(p.org_id)
+    eff = await data_policy.effective(p.org_id)
     return {
         "enabled": up.enabled,
         "kinds": [{"kind": k, "max_mb": getattr(up, f"max_mb_{k}")} for k in up.kinds()],
         "max_pages": up.max_pages,
-        "retention_days": await documents.retention_days(p.org_id),
+        "retention_days": eff.retention_days,
+        "region": {"id": eff.region.id, "label": eff.region.label},
+        "human_review_allowed": eff.allow_human_review,
     }
 
 

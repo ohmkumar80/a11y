@@ -29,7 +29,8 @@ const REVIEW_OVERVIEW = {
 };
 export const docsState = { healthy: true, rescans: [] as string[], purges: 0 };
 const DOCS_OVERVIEW = {
-  health: { scanner: "ok", storage: "ok" },
+  health: { scanner: "ok", storage: "ok", regions: { default: "ok", eu: "down" } },
+  by_region: [{ region: "default", files: 10, configured: true }, { region: "eu", files: 3, configured: true }, { region: "old-in", files: 1, configured: false }],
   by_status: { UPLOADED: 1, SCANNING: 0, CLEAN: 12, REJECTED: 3, FAILED: 1, DELETED: 20 },
   rejections_30d: [{ code: "encrypted", count: 2 }, { code: "malware", count: 1 }],
   stored_bytes: 73400320, expired_waiting: 4, stuck: 0,

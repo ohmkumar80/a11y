@@ -70,6 +70,11 @@ AI_TASKS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Tasks whose input IS a customer's document. The gateway applies the organisation's data policy to these whatever the
+# caller says, so a future feature cannot forget to ask (ADR 0024). Other tasks opt in with `data_class="customer_document"`.
+DOCUMENT_TASKS = frozenset({"doc_layout"})
+
+
 class DataPolicy(BaseModel):
     zero_retention: bool = False
     processing_regions: list[str] = Field(default_factory=list, description="e.g. ['us','eu','in']")
@@ -604,5 +609,101 @@ register(
         description="Human review of documents: on or off, turnaround target, queue limits and the cost of reviewer time. Override per plan or organisation.",
         scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
         tags=("documents",),
+    )
+)
+
+
+# --- Data policy (PROJECT_PLAN Phase 3; ADR 0024) ---------------------------------------------------------------------
+# Three layers. The platform decides which REGIONS exist (data.regions). The platform decides, per plan or organisation,
+# which CONTROLS an organisation may use (data.controls). The organisation then sets its own POLICY inside those limits
+# (data.policy, edited by its administrator on /org/data-policy). The strictest answer always wins.
+
+
+class StorageRegion(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,29}$", description="Short name, for example eu or in")
+    label: str = Field(max_length=80, description="What customers see, for example 'European Union (Frankfurt)'")
+    bucket: str | None = Field(None, max_length=100, description="Storage bucket; empty = the platform's default bucket")
+    aws_region: str | None = Field(None, max_length=40, description="The storage provider's own region name")
+    endpoint_url: str | None = Field(None, max_length=300, description="Only for S3-compatible stores that are not AWS")
+    is_active: bool = Field(True, description="Offered for new files. Switch off instead of deleting a region that holds files")
+
+
+class StorageRegions(BaseModel):
+    items: list[StorageRegion] = Field(default_factory=list)
+    default_id: str = Field("default", max_length=30, description="Where files go unless the organisation chooses otherwise")
+
+    @model_validator(mode="after")
+    def _check(self):
+        ids = [r.id for r in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Region ids must be unique.")
+        if self.default_id != "default" and self.default_id not in ids:
+            raise ValueError("The default region must be one of the regions listed.")
+        for r in self.items:
+            if r.id == self.default_id and not r.is_active:
+                raise ValueError("The default region cannot be switched off.")
+        return self
+
+
+register(
+    SettingDef(
+        key="data.regions",
+        model=StorageRegions,
+        default=StorageRegions(),
+        description="Where customer files can be stored. The built-in region 'default' always exists and uses the platform's storage settings. "
+        "Files stay in the region they were uploaded to: never remove a region that holds files, switch it off instead.",
+        scopes=frozenset({Scope.GLOBAL}),
+        high_risk=True,
+        tags=("documents", "privacy"),
+    )
+)
+
+
+class DataControls(BaseModel):
+    """What an organisation's administrator is allowed to decide for themselves. Set it for everyone, one plan or one organisation."""
+
+    can_choose_region: bool = Field(False, description="May choose where new files are stored (from the active regions)")
+    can_enable_ai: bool = Field(False, description="May allow AI models to process their documents (off by default)")
+    can_set_retention: bool = Field(True, description="May keep files for a shorter time than the plan's default")
+    can_block_human_review: bool = Field(True, description="May forbid people on our team from opening their files")
+    min_retention_days: int = Field(1, ge=1, le=3650, description="The shortest time an organisation may choose to keep files")
+
+
+register(
+    SettingDef(
+        key="data.controls",
+        model=DataControls,
+        default=DataControls(),
+        description="Which privacy controls an organisation may use: region, AI on documents, shorter retention, blocking human review.",
+        scopes=frozenset({Scope.GLOBAL, Scope.PLAN, Scope.ORG}),
+        tags=("documents", "privacy"),
+    )
+)
+
+
+class OrgDataPolicy(BaseModel):
+    """An organisation's own choices. Anything the platform has not allowed it to change is ignored, and the page says so."""
+
+    retention_days: int | None = Field(None, ge=1, le=3650, description="Keep files this many days (never longer than the plan allows)")
+    storage_region: str | None = Field(None, max_length=30, description="Where new files are stored")
+    allow_human_review: bool = Field(True, description="People on our team may open files you ask them to check")
+    ai_on_documents: bool = Field(False, description="AI models may process your documents")
+    ai_require_zero_retention: bool = Field(True, description="Only use AI providers that do not keep or train on what they receive")
+    ai_regions: list[str] = Field(default_factory=list, max_length=10, description="Only use AI providers that process in these regions; empty = any")
+
+    @model_validator(mode="after")
+    def _clean(self):
+        self.ai_regions = sorted({r.strip().lower() for r in self.ai_regions if r.strip()})
+        return self
+
+
+register(
+    SettingDef(
+        key="data.policy",
+        model=OrgDataPolicy,
+        default=OrgDataPolicy(),
+        description="An organisation's own data choices (retention, region, human review, AI on documents). Normally edited by the organisation's administrator on /org/data-policy.",
+        scopes=frozenset({Scope.ORG}),
+        tags=("documents", "privacy"),
     )
 )

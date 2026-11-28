@@ -31,7 +31,8 @@ for (const scheme of ["light", "dark"] as const) {
     expect(bodies[0]).toEqual({ name: "CI server", scopes: ["scans:read", "scans:write"], expires_in_days: 90 });
     await audit(page, "api keys: one-time key");
     await page.getByRole("button", { name: "Copy key" }).click();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^a11y_2222/);
+    // Copying is asynchronous: wait for it to land instead of reading the clipboard the instant after the click.
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/^a11y_2222/);
     await page.getByRole("button", { name: "I have stored it safely" }).click();
     await expect(h).toHaveCount(0); // the secret is gone from the page
     await expect(page.getByRole("row", { name: /CI server/ })).toBeVisible();

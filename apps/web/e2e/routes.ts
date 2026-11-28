@@ -28,6 +28,7 @@ export const ROUTES: Array<{ path: string; roles: Role[] }> = [
   { path: "/org", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/ai", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/api", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
+  { path: "/org/data-policy", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/org/webhooks", roles: ["COMPANY_ADMIN", "STANDARD_USER"] }, // standard user sees the no-access page
   { path: "/admin", roles: ["SUPER_ADMIN", "COMPANY_ADMIN"] }, // company admin sees the no-access page
   { path: "/does-not-exist", roles: ["ANON"] },
